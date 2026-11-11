@@ -1,0 +1,26 @@
+# Papers the evaluation questions are drawn from.
+# One arXiv identifier per line, with the version pinned.
+# First line: the author's own paper. The rest: references read in depth.
+2610.26648v1
+0803.2932v2
+0910.2998v2
+1003.0904v2
+1005.5480v3
+1202.3665v4
+1202.4039v2
+1303.3514v1
+1402.6703v2
+1407.7905v1
+1409.0042v1
+1410.3696v1
+1411.4647v2
+1503.01773v2
+1511.08787v2
+1601.05089v3
+1704.03910v2
+1710.05137v1
+2101.04694v2
+2101.11027v1
+2112.09706v2
+2209.00006v2
+2602.22148v2

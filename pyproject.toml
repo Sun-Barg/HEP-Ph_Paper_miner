@@ -1,0 +1,25 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hepph-paper-miner"
+version = "0.0.1"
+description = "An MCP server for searching arXiv and reading papers section by section, with a minimal tool-calling loop and a small evaluation set (work in progress)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+    # Lower bound: the version this was written and tested against.
+    # Upper bound: the SDK makes breaking changes only in a new major.
+    "mcp>=2.3,<3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

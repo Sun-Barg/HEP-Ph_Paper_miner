@@ -1,0 +1,21 @@
+# Secrets
+.env
+
+# Never commit: downloaded paper text, HTTP cache, run records that contain paper text
+cache/
+runs_private/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
