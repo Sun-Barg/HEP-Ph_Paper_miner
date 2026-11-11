@@ -32,9 +32,15 @@ class SourceError(Exception):
     """An expected failure. `kind` says which one; `detail` carries the offending value."""
 
     def __init__(self, kind: ErrorKind, detail: str = "") -> None:
-        super().__init__(f"{kind.value}: {detail}")
+        # Hand both arguments to Exception. pickle and copy rebuild an exception by
+        # calling its class with `args`, so `args` has to match this signature;
+        # a process pool sends a worker's exception to the parent that way.
+        super().__init__(kind, detail)
         self.kind = kind
         self.detail = detail
+
+    def __str__(self) -> str:
+        return f"{self.kind.value}: {self.detail}"
 
 
 @dataclass(frozen=True)
@@ -48,10 +54,33 @@ class ArxivId:
         return self.base if self.version is None else f"{self.base}v{self.version}"
 
 
+# The rules below follow arXiv's description of its identifiers
+# (https://info.arxiv.org/help/arxiv_identifier.html) and its own parser
+# (github.com/arXiv/arxiv-base, arxiv/identifier). A rule belongs here only if it can
+# never turn away a real paper: a wrongly accepted identifier costs one request that
+# ends in NOT_FOUND, a wrongly rejected one makes a real paper unreachable.
+
+# Digits are spelled [0-9]: in a str pattern `\d` also matches digits of other scripts.
+# Versions start at v1 and arXiv names no maximum. Three digits is this project's own
+# limit, the one rule here that is not arXiv's; it keeps an endless run of digits
+# away from int().
+_VERSION = r"(?:v([1-9][0-9]{0,2}))?"
 # Since 2007-04: YYMM.NNNN through 1412, YYMM.NNNNN from 1501.
-_NEW_STYLE = re.compile(r"(\d{2})(\d{2})\.(\d{4,5})(?:v([1-9]\d*))?")
+_NEW_STYLE = re.compile(r"([0-9]{2})([0-9]{2})\.([0-9]{4,5})" + _VERSION)
 # Until 2007-03: archive/YYMMNNN, for example hep-ph/0404175.
-_OLD_STYLE = re.compile(r"([a-z]+(?:-[a-z]+)?)/(\d{2})(\d{2})(\d{3})(?:v([1-9]\d*))?")
+_OLD_STYLE = re.compile(r"([a-z]+(?:-[a-z]+)?)/([0-9]{2})([0-9]{2})([0-9]{3})" + _VERSION)
+
+# Archive names that old identifiers can carry: every archive in arXiv's taxonomy
+# (arxiv-base, arxiv/taxonomy/definitions.py) that started before 2007-04, without
+# arXiv's internal "test" archive.
+OLD_SCHEME_ARCHIVES = frozenset(
+    """
+    acc-phys adap-org alg-geom ao-sci astro-ph atom-ph bayes-an chao-dyn chem-ph
+    cmp-lg comp-gas cond-mat cs dg-ga funct-an gr-qc hep-ex hep-lat hep-ph hep-th
+    math math-ph mtrl-th nlin nucl-ex nucl-th patt-sol physics plasm-ph q-alg q-bio
+    quant-ph solv-int supr-con
+    """.split()
+)
 
 _PREFIX = "arxiv:"
 
@@ -62,6 +91,11 @@ def parse_arxiv_id(text: str) -> ArxivId:
     Surrounding whitespace and a leading "arXiv:" are accepted. URLs and
     everything else are rejected: a tool should be called with an identifier
     exactly as another tool returned it.
+
+    Only the form and the limits that never move are checked: months, the first
+    and last month of each scheme, sequence numbers from 1, known archive names.
+    A month that has not come yet passes, as it does in arXiv's own examples
+    (9912.12345v2). Whether a paper exists is for the network to answer.
     """
     candidate = text.strip()
     if candidate[: len(_PREFIX)].lower() == _PREFIX:
@@ -72,7 +106,12 @@ def parse_arxiv_id(text: str) -> ArxivId:
         yy, mm, number, version = match.groups()
         year_month = (2000 + int(yy), int(mm))
         expected_digits = 4 if year_month <= (2014, 12) else 5
-        if 1 <= int(mm) <= 12 and year_month >= (2007, 4) and len(number) == expected_digits:
+        if (
+            1 <= int(mm) <= 12
+            and year_month >= (2007, 4)
+            and len(number) == expected_digits
+            and int(number) >= 1  # sequence numbers start at 0001 / 00001
+        ):
             return ArxivId(f"{yy}{mm}.{number}", _as_version(version))
         raise SourceError(ErrorKind.INVALID_ID, text)
 
@@ -81,7 +120,12 @@ def parse_arxiv_id(text: str) -> ArxivId:
         archive, yy, mm, number, version = match.groups()
         # Two-digit years: 91-99 are 1991-1999, 00-07 are 2000-2007.
         year_month = ((1900 if int(yy) >= 91 else 2000) + int(yy), int(mm))
-        if 1 <= int(mm) <= 12 and year_month <= (2007, 3):
+        if (
+            archive in OLD_SCHEME_ARCHIVES
+            and 1 <= int(mm) <= 12
+            and (1991, 7) <= year_month <= (2007, 3)  # arXiv gives the range as 9107-0703
+            and int(number) >= 1
+        ):
             return ArxivId(f"{archive}/{yy}{mm}{number}", _as_version(version))
 
     raise SourceError(ErrorKind.INVALID_ID, text)
