@@ -30,9 +30,13 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Tests marked "network" send real requests to arXiv. Run them on purpose: uv run pytest -m network
-addopts = "-m 'not network'"
-markers = ["network: sends real requests to arXiv (not run by default)"]
+# Tests marked "network" send real requests to arXiv, tests marked "tex" run pdflatex.
+# Run them on purpose: uv run pytest -m network, uv run pytest -m tex
+addopts = "-m 'not network and not tex'"
+markers = [
+    "network: sends real requests to arXiv (not run by default)",
+    "tex: runs pdflatex, which has to be installed (not run by default)",
+]
 
 [tool.ruff]
 # The code is formatted with "ruff format". ruff is not a dependency: run it with uvx.

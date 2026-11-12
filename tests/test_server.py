@@ -157,7 +157,7 @@ async def test_outline_shows_abstract_and_every_section_with_its_size(client, so
     lines = text.splitlines()
     paper = source.paper_by_id("2501.00001v2")
 
-    assert lines[0] == f"outline | 2501.00001v2 | {paper.chars} chars | 8 sections | parser 2"
+    assert lines[0] == f"outline | 2501.00001v2 | {paper.chars} chars | 8 sections | parser 3"
     assert lines[1:5] == [
         "Title: A Sample Paper",
         "Authors: Ada Alpha, Ben Beta",
@@ -205,6 +205,24 @@ async def test_outline_of_a_paper_without_readable_text_still_shows_the_abstract
 async def test_outline_fails_when_arxiv_itself_does_not_answer(client, arxiv_id, kind):
     text = await failure(client, "get_outline", arxiv_id=arxiv_id)
     assert text.startswith(f"[{kind}] {arxiv_id!r}: ")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("kind", [ErrorKind.UPSTREAM_BUSY, ErrorKind.TIMEOUT])
+async def test_outline_is_an_error_when_the_paper_is_listed_but_its_text_does_not_arrive(kind):
+    # The listing answers, the download does not. The abstract must not be passed off
+    # as all there is to read: the text may well be there on the next try.
+    class DownloadFails(FixtureSource):
+        def paper(self, arxiv_id):
+            raise SourceError(kind, str(arxiv_id))
+
+    source = DownloadFails([paper_from_latex(SAMPLE_META, SAMPLE_LATEX)])
+    async with Client(build_server(source), raise_exceptions=True) as connected:
+        text = await failure(connected, "get_outline", arxiv_id="2501.00001v2")
+
+    assert text.startswith(f"[{kind.value}] '2501.00001v2': ")
+    assert "Abstract" not in text and SAMPLE_META.abstract not in text
+    assert source.calls == [("listing", "2501.00001v2")]  # the listing was asked, and it answered
 
 
 # --- read_section ------------------------------------------------------------------------

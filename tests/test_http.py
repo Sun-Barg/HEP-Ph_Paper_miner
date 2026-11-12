@@ -142,6 +142,51 @@ def test_a_broken_connection_counts_as_busy(tmp_path):
     assert caught.value.reason == "busy"
 
 
+def undecodable() -> httpx2.Response:
+    """Status 200 and a body that is not what its header says."""
+    return httpx2.Response(200, headers={"Content-Encoding": "gzip"}, content=b"this is not gzip")
+
+
+def test_a_body_that_cannot_be_decoded_is_tried_again_like_a_broken_connection(tmp_path):
+    asked = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        asked.append(request)
+        return undecodable() if len(asked) == 1 else httpx2.Response(200, content=b"good")
+
+    fetcher = Fetcher(tmp_path, transport=httpx2.MockTransport(handler), sleep=lambda seconds: None)
+    assert fetcher.get(URL).body == b"good"
+    assert len(asked) == 2
+
+
+def test_a_body_that_can_never_be_decoded_is_reported_as_busy(tmp_path):
+    waits = []
+    fetcher = Fetcher(
+        tmp_path, transport=httpx2.MockTransport(lambda request: undecodable()), sleep=waits.append
+    )
+    with pytest.raises(FetchError) as caught:
+        fetcher.get(URL)
+    assert caught.value.reason == "busy"
+    assert len(waits) == 3  # the three retries, each after a longer wait
+    assert list(tmp_path.glob("*/*")) == []  # and nothing was kept
+
+
+def test_a_redirect_that_never_ends_is_busy_and_is_not_tried_again(tmp_path):
+    asked, waits = [], []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        asked.append(request)
+        return httpx2.Response(302, headers={"Location": URL})
+
+    fetcher = Fetcher(tmp_path, transport=httpx2.MockTransport(handler), sleep=waits.append)
+    with pytest.raises(FetchError) as caught:
+        fetcher.get(URL)
+
+    assert caught.value.reason == "busy"
+    assert len(asked) > 1  # the circle was walked ...
+    assert waits == []  # ... once: a retry always waits first, and nothing waited
+
+
 def test_a_damaged_cache_entry_is_fetched_again(tmp_path):
     script = Script((200, b"good"), (200, b"good"))
     fetcher = script.fetcher(tmp_path)

@@ -10,7 +10,22 @@ runs TeX, so it follows \\input but not macros that authors define for themselve
 
 A split that lost text is worse than no split: the reader would take a part of the
 paper for the whole. So where the parser can see that text is missing (a file named
-by \\input that it could not find), it reports PARSE_ERROR instead of a result.
+by \\input that it could not find, a command that reads files in a way it does not
+follow), it reports PARSE_ERROR instead of a result.
+
+Known limits. tests/test_against_tex.py shows each of them by running TeX itself.
+
+    Turned away with PARSE_ERROR although TeX reads them:
+      - a paper that, inside its body, reads a file of the TeX installation by a
+        bare name (\\input epsf). In the preamble this does no harm.
+      - a paper that reads files with \\import, \\subimport or their relatives, or
+        with \\InputIfFileExists.
+    Read wrongly, and nothing shows it:
+      - text in files that are read through a macro of the author's own is left out.
+      - a download that holds several documents and comes without arXiv's list of
+        its files: the longest file is taken for the paper.
+      - \\includeonly, \\endinput and \\if... are not obeyed, so text that TeX
+        skips can end up in a section.
 """
 
 from __future__ import annotations
@@ -20,11 +35,12 @@ import io
 import json
 import re
 import tarfile
+import zlib
 
 from hepph_paper_miner.sources.base import ErrorKind, Section, SourceError
 
 # Part of every run record. Change it whenever the same source would split differently.
-PARSER_VERSION = "2"
+PARSER_VERSION = "3"
 
 _MAX_UNPACKED_BYTES = 200_000_000
 _MAX_MEMBER_BYTES = 5_000_000
@@ -36,12 +52,14 @@ _MAX_INPUT_DEPTH = 10
 
 
 class NotASource(SourceError):
-    """PARSE_ERROR for a download that holds no LaTeX document at all.
+    """PARSE_ERROR for a download that is not a paper's files: asking again may bring others.
 
-    Broken gzip, or no file with \\begin{document}: a page sent in place of the
-    paper looks like this, and so do a withdrawn paper and a paper in plain TeX.
-    The caller can tell it from a real source that only failed to split, and must
-    not keep it. Takes the arguments of SourceError, so that it survives pickle.
+    Broken gzip, an archive that ends early, an empty answer, a web page sent in
+    place of the paper. The caller can tell these from a real source that only
+    failed to split, and must not keep them. A real source without
+    \\begin{document} (plain TeX, the notice left by a withdrawn paper) is not one
+    of them: asking again would bring the same bytes.
+    Takes the arguments of SourceError, so that it survives pickle.
     """
 
 
@@ -68,12 +86,15 @@ def unpack(data: bytes) -> dict[str, str]:
     arXiv sends a gzipped tar when a paper has several files, and otherwise a single
     gzipped TeX file or a PDF. The HTTP client may already have removed the gzip
     layer, so every layer is recognised by its first bytes, not by a header.
+
+    Raises NotASource for bytes that are damaged or plainly not a paper's files.
     """
     if data[:2] == b"\x1f\x8b":
         try:
             with gzip.GzipFile(fileobj=io.BytesIO(data)) as packed:
                 data = packed.read(_MAX_UNPACKED_BYTES + 1)
-        except (OSError, EOFError) as error:
+        except (OSError, EOFError, zlib.error) as error:
+            # zlib.error is not an OSError: a damaged byte inside the stream raises it.
             raise NotASource(
                 ErrorKind.PARSE_ERROR, f"the download is not valid gzip ({error})"
             ) from error
@@ -86,21 +107,41 @@ def unpack(data: bytes) -> dict[str, str]:
     try:
         bundle = tarfile.open(fileobj=io.BytesIO(data), mode="r:")
     except tarfile.TarError:
-        return {"main.tex": _decode(data)}  # a single TeX file
+        return {"main.tex": _single_file(data)}  # not an archive: a single TeX file
 
     files: dict[str, str] = {}
-    with bundle:
-        for member in bundle:
-            name = member.name.removeprefix("./")
-            wanted = name == _MANIFEST or name.lower().endswith(_TEXT_SUFFIXES)
-            if not (member.isfile() and wanted and member.size <= _MAX_MEMBER_BYTES):
-                continue
-            # Members are read into memory and never written to disk, so a member
-            # name cannot place a file anywhere.
-            extracted = bundle.extractfile(member)
-            if extracted is not None:
-                files[name] = _decode(extracted.read())
+    try:
+        with bundle:
+            for member in bundle:
+                name = member.name.removeprefix("./")
+                wanted = name == _MANIFEST or name.lower().endswith(_TEXT_SUFFIXES)
+                if not (member.isfile() and wanted and member.size <= _MAX_MEMBER_BYTES):
+                    continue
+                # Members are read into memory and never written to disk, so a member
+                # name cannot place a file anywhere.
+                extracted = bundle.extractfile(member)
+                if extracted is not None:
+                    files[name] = _decode(extracted.read())
+    except tarfile.TarError as error:
+        # It began as an archive and then broke off. What was read so far is not the paper.
+        raise NotASource(
+            ErrorKind.PARSE_ERROR, f"the download is a damaged archive ({error})"
+        ) from error
     return files
+
+
+def _single_file(data: bytes) -> str:
+    """The text of a download that is one file, unless it plainly is not TeX.
+
+    Any other text is taken for the paper's source, also when it later turns out to
+    have no \\begin{document}.
+    """
+    start = data.lstrip(b"\xef\xbb\xbf \t\r\n")[:16].lower()
+    if not start:
+        raise NotASource(ErrorKind.PARSE_ERROR, "the download is empty")
+    if start.startswith((b"<!doctype", b"<html", b"<?xml")):
+        raise NotASource(ErrorKind.PARSE_ERROR, "the download is a web page, not the paper's files")
+    return _decode(data)
 
 
 def _decode(raw: bytes) -> str:
@@ -120,6 +161,8 @@ def find_main(files: dict[str, str]) -> str:
     1. The file that arXiv's own list (00README.json) marks as "toplevel".
     2. Otherwise a file that contains \\begin{document}: one that also has
        \\documentclass or \\documentstyle before one that has not, then the longest.
+       A part written for the subfiles package is left out: it has both, and it can
+       be longer than the main file, but it is never the paper.
     """
     manifest = files.get(_MANIFEST)
     if manifest is not None:
@@ -135,11 +178,12 @@ def find_main(files: dict[str, str]) -> str:
         if name == _MANIFEST:
             continue
         bare = strip_comments(text)
-        if "\\begin{document}" in bare:
+        if "\\begin{document}" in bare and not _SUBFILES_PART.search(bare):
             has_class = "\\documentclass" in bare or "\\documentstyle" in bare
             candidates.append((not has_class, -len(bare), name))
     if not candidates:
-        raise NotASource(ErrorKind.PARSE_ERROR, "no file contains \\begin{document}")
+        # A real source, only not LaTeX: plain TeX, or the notice of a withdrawn paper.
+        raise SourceError(ErrorKind.PARSE_ERROR, "no file contains \\begin{document}")
     return min(candidates)[2]
 
 
@@ -152,11 +196,22 @@ _BLOCK_COMMENT = re.compile(
 # In these arguments a percent sign is a character of the address, not a comment.
 _VERBATIM_ARGUMENT = re.compile(r"\\(?:url|href|nolinkurl|path)\s*\{[^{}\n]*\}")
 _KEPT_PERCENT = "\ue000"  # stands in for such a percent sign while comments are removed
-# \input{name}, \include{name}, \subfile{name}, and TeX's own form: \input name
+# Commands that read another file into the text and that expand_inputs follows:
+# \input{name}, \include{name}, \subfile{name}, \subfileinclude{name}, and TeX's own
+# form: \input name
 _INPUT = re.compile(
-    r"\\(input|include|subfile)(?![A-Za-z])\s*\{([^{}]+)\}"
+    r"\\(input|include|subfile|subfileinclude)(?![A-Za-z])\s*\{([^{}]+)\}"
     r"|\\(input)(?![A-Za-z])[ \t]+([^\s{}\\%]+)"
 )
+# Commands that read a file too, but in ways that are not followed here. The import
+# package: \import{folder/}{name}, \subimport, \inputfrom, \subinputfrom, \includefrom,
+# \subincludefrom, each also with a star. LaTeX itself: \InputIfFileExists{name}{..}{..}
+_NOT_FOLLOWED = re.compile(
+    r"\\((?:sub)?(?:import|inputfrom|includefrom))(?![A-Za-z])\s*\*?\s*\{([^{}]*)\}\s*\{([^{}]+)\}"
+    r"|\\(InputIfFileExists)(?![A-Za-z])\s*\{([^{}]+)\}"
+)
+# The first line of a part written for the subfiles package: \documentclass[main]{subfiles}
+_SUBFILES_PART = re.compile(r"\\documentclass\s*(?:\[[^\]]*\])?\s*\{subfiles\}")
 _BIBLIOGRAPHY = re.compile(
     r"\\begin\{thebibliography\}.*?\\end\{thebibliography\}"
     r"|\\bibliography(?:style)?\s*\{[^{}]*\}"
@@ -189,24 +244,44 @@ def strip_comments(text: str) -> str:
 
 
 def expand_inputs(text: str, files: dict[str, str], depth: int = 0, folder: str = "") -> str:
-    """Replace \\input{name} by the file it names, as long as that file came with the paper.
+    """Read the files that the text names into it, in the order in which TeX reads them.
 
     `folder` is where the main file lies ("" or "paper/"): TeX runs there, so names
     are also tried from there. A name that is not among the files stays as written:
     papers also \\input files of the TeX installation, which are not part of the
     download. split() decides afterwards whether what stayed means lost text.
-    """
 
-    def replace(match: re.Match[str]) -> str:
+    Before the document has begun, a file is read as it is: it may be the one that
+    holds \\begin{document}. Inside the document, a file that is a document of its
+    own (a part for the subfiles package) adds only what stands between its own
+    \\begin{document} and \\end{document}, as it does in TeX.
+    """
+    in_document = False
+
+    def read(text: str, depth: int) -> str:
+        nonlocal in_document
+        pieces: list[str] = []
+        position = 0
+        for match in _INPUT.finditer(text):
+            before = text[position : match.start()]
+            in_document = in_document or "\\begin{document}" in before
+            pieces += [before, read_file(match, depth)]
+            position = match.end()
+        rest = text[position:]
+        in_document = in_document or "\\begin{document}" in rest
+        pieces.append(rest)
+        return "".join(pieces)
+
+    def read_file(match: re.Match[str], depth: int) -> str:
         name = _input_name(match)[1]
         if depth < _MAX_INPUT_DEPTH:
             for candidate in (name, name + ".tex", folder + name, folder + name + ".tex"):
                 if candidate in files:
-                    inner = _document_body(strip_comments(files[candidate]))
-                    return expand_inputs(inner, files, depth + 1, folder)
+                    inner = strip_comments(files[candidate])
+                    return read(_document_body(inner) if in_document else inner, depth + 1)
         return match.group(0)
 
-    return _INPUT.sub(replace, text)
+    return read(text, depth)
 
 
 def _input_name(match: re.Match[str]) -> tuple[str, str]:
@@ -216,11 +291,10 @@ def _input_name(match: re.Match[str]) -> tuple[str, str]:
 
 
 def _document_body(text: str) -> str:
-    """What a file adds when it is read into another one.
+    """What stands between the first \\begin{document} and the first \\end{document} after it.
 
-    A file that can also be compiled alone (the subfiles package) has a preamble and
-    its own \\begin{document} ... \\end{document}. Only what lies between them
-    counts; pasted whole, its \\end{document} would end the paper early.
+    All of the text when there is no \\begin{document}; up to the end of the text
+    when no \\end{document} follows.
     """
     start = text.find("\\begin{document}")
     if start < 0:
@@ -229,22 +303,44 @@ def _document_body(text: str) -> str:
     return text[start + len("\\begin{document}") : end if end >= 0 else len(text)]
 
 
-def _missing_inputs(body: str) -> list[str]:
-    """Files the body still asks for after expand_inputs, and whose text is therefore missing.
+def _holds_text(name: str) -> bool:
+    """Whether a file of this name can hold running text: no suffix, or a TeX suffix.
 
-    \\include and \\subfile always name a file of the paper. \\input counts when the
-    name has no suffix or a TeX suffix; "plot.pstex_t", "paper.bbl" or "epsf.sty" hold
-    no running text. This can also turn away a paper that, inside its body, reads a
-    file of the TeX installation by a bare name. That is the cheaper mistake.
+    "plot.pstex_t", "paper.bbl" and "epsf.sty" do not.
     """
-    missing = []
+    last = name.rsplit("/", 1)[-1]
+    return "." not in last or last.lower().endswith(_TEXT_SUFFIXES)
+
+
+def _unread_files(body: str) -> list[str]:
+    """Files that the body reads and whose text is not in it.
+
+    Either the body still names the file after expand_inputs, so it was not among
+    the TeX files of the download. Or the body reads it with a command that is not
+    followed; that command is then given in brackets after the name.
+
+    \\include, \\subfile and their relatives always name a file of the paper. For
+    \\input and the like, the name counts when it can hold text. This can also turn
+    away a paper that, inside its body, reads a file of the TeX installation by a
+    bare name. That is the cheaper mistake.
+    """
+    unread: list[str] = []
     for match in _INPUT.finditer(body):
         command, name = _input_name(match)
-        last = name.rsplit("/", 1)[-1]
-        holds_text = "." not in last or last.lower().endswith(_TEXT_SUFFIXES)
-        if (command != "input" or holds_text) and name not in missing:
-            missing.append(name)
-    return missing
+        if (command != "input" or _holds_text(name)) and name not in unread:
+            unread.append(name)
+    for match in _NOT_FOLLOWED.finditer(body):
+        if match.group(1):  # \import{folder/}{name} and its relatives
+            folder = match.group(2).strip()
+            if folder and not folder.endswith("/"):
+                folder += "/"  # the package adds the missing slash as well
+            command, name = match.group(1), folder + match.group(3).strip()
+        else:  # \InputIfFileExists{name}{..}{..}
+            command, name = match.group(4), match.group(5).strip()
+        entry = f"{name} (\\{command})"
+        if ("include" in command or _holds_text(name)) and entry not in unread:
+            unread.append(entry)
+    return unread
 
 
 def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
@@ -254,22 +350,26 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
     \\appendix "A", "B", "B.1". Starred headings have no number in LaTeX; they get
     "u1", "u2" in document order (or "2.u1" inside section 2).
     """
-    # The main file is cut to its body first and the other files are read into it
-    # afterwards. In the other order the first \\end{document} found could be one
-    # that an \\input file brought along.
-    text = strip_comments(files[main])
-    start = text.find("\\begin{document}")
-    if start < 0:
-        raise SourceError(ErrorKind.PARSE_ERROR, "no \\begin{document} in the main file")
+    # Read the other files in first, then cut. TeX begins the document at the first
+    # \begin{document} it meets and ends it at the first \end{document} after that,
+    # in whichever file they stand: an \input file may hold either of them, and what
+    # the main file says after an \end{document} that was read in is never typeset.
+    # (A part for the subfiles package has lost its own pair in expand_inputs.)
     folder = main.rpartition("/")[0]
-    body = expand_inputs(_document_body(text), files, folder=folder + "/" if folder else "")
-    missing = _missing_inputs(body)
-    if missing:
-        listed = ", ".join(missing[:5]) + (" ..." if len(missing) > 5 else "")
+    text = expand_inputs(strip_comments(files[main]), files, folder=folder + "/" if folder else "")
+    if "\\begin{document}" not in text:
+        raise SourceError(
+            ErrorKind.PARSE_ERROR,
+            "no \\begin{document} in the main file or in the files it reads",
+        )
+    body = _document_body(text)
+    unread = _unread_files(body)
+    if unread:
+        listed = ", ".join(unread[:5]) + (" ..." if len(unread) > 5 else "")
         # Short, and the names last: this is what a person reads to see what was lost.
         raise SourceError(
             ErrorKind.PARSE_ERROR,
-            f"text is missing, {len(missing)} \\input file(s) not in the download: {listed}",
+            f"text is missing, {len(unread)} file(s) could not be read: {listed}",
         )
     body = _BIBLIOGRAPHY.sub("", body)
 

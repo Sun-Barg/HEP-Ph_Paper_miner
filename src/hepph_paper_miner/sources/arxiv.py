@@ -67,12 +67,17 @@ class ArxivSource:
                 raise
             try:
                 sections = parse_source(data)
+            except NotASource as error:
+                # Damaged, or not the paper's files at all (a page sent in their place):
+                # arXiv has not answered properly, which says nothing about the paper.
+                # Not kept, so that the next call asks again.
+                self._fetcher.forget(url, {})
+                raise SourceError(
+                    ErrorKind.UPSTREAM_BUSY, f"{meta.arxiv_id}: {error.detail}"
+                ) from error
             except SourceError as error:
-                if isinstance(error, NotASource):
-                    # Not the paper's files at all: perhaps a page sent in their place.
-                    # Do not keep it. A source that is real but cannot be split stays
-                    # in the cache: asking again would bring the same bytes.
-                    self._fetcher.forget(url, {})
+                # A real source that cannot be read stays in the cache: asking again
+                # would bring the same bytes.
                 raise SourceError(error.kind, f"{meta.arxiv_id}: {error.detail}") from error
             self._papers[meta.arxiv_id] = Paper(meta, sections, PARSER_VERSION)
         return self._papers[meta.arxiv_id]

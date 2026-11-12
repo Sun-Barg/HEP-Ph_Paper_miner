@@ -33,6 +33,14 @@ uv run pytest -m network
 uv run python scripts/check_targets.py
 ```
 
+A further set of tests runs TeX itself on small invented papers and compares what TeX
+reads with what the section parser returns. It needs `pdflatex` on the PATH and is
+skipped without it:
+
+```
+uv run pytest -m tex
+```
+
 The server speaks MCP over stdio. Started by hand it prints nothing and waits for a
 client on stdin (stop it with Ctrl-C):
 

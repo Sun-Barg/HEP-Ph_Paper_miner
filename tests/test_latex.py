@@ -2,6 +2,7 @@
 
 import gzip
 import pickle
+import zlib
 
 import pytest
 from conftest import SAMPLE_LATEX, filler, plain_tar, tar_gz
@@ -184,14 +185,53 @@ def test_a_file_with_its_own_document_adds_only_what_is_inside_it():
     # The subfiles package: every part can be compiled alone, so every part ends the document.
     part = (
         "\\documentclass[main]{subfiles}\n\\begin{document}\n\\section{%s}\n%s\n\\end{document}\n"
+        "Kept below the end of the part. Never typeset.\n"
     )
-    main = document("\\subfile{one}\n\\subfile{two}\n\\section{Three}\nThird.")
+    main = document("\\subfile{one}\n\\subfileinclude{two}\n\\section{Three}\nThird.")
     extra = {"one.tex": part % ("One", "First."), "two.tex": part % ("Two", "Second.")}
     assert [(s.section_id, s.title, s.text) for s in sections_of(main, extra)] == [
         ("1", "One", "First."),
         ("2", "Two", "Second."),
         ("3", "Three", "Third."),
     ]
+
+
+# Where the document begins and ends. test_against_tex.py runs the same shapes through TeX.
+
+
+def test_a_file_that_is_read_in_can_end_the_document():
+    # TeX stops at the first \end{document} it meets. What the main file says after
+    # that point, and what the file itself says below it, is never typeset.
+    main = document(
+        "\\section{One}\nFirst.\n\\input{tail}\nNotes to self.\n\\section{Ghost}\nNever typeset."
+    )
+    extra = {"tail.tex": "\\section{Two}\nLast words.\n\\end{document}\nKept below the end.\n"}
+    assert [(s.section_id, s.title, s.text) for s in sections_of(main, extra)] == [
+        ("1", "One", "First."),
+        ("2", "Two", "Last words."),
+    ]
+
+
+def test_a_file_that_is_read_in_can_begin_the_document():
+    main = "\\input{header}\n\\section{One}\nFirst.\n\\section{Two}\nSecond.\n\\end{document}\n"
+    extra = {"header.tex": "\\documentclass{article}\n\\title{T}\n\\begin{document}\n\\maketitle\n"}
+    assert [(s.section_id, s.text) for s in sections_of(main, extra)] == [
+        ("1", "First."),
+        ("2", "Second."),
+    ]
+
+
+def test_a_main_file_can_read_the_whole_paper_from_another_file():
+    paper = document("\\section{One}\nFirst.\n\\section{Two}\nSecond.") + "Kept below the end.\n"
+    sections = sections_of("\\input{paper}\n", {"paper.tex": paper})
+    assert [(s.section_id, s.text) for s in sections] == [("1", "First."), ("2", "Second.")]
+
+
+def test_no_document_in_the_main_file_or_in_what_it_reads_is_a_parse_error():
+    with pytest.raises(SourceError) as caught:
+        sections_of("\\input{macros}\nNo document.", {"macros.tex": "\\newcommand{\\x}{y}"})
+    assert caught.value.kind is ErrorKind.PARSE_ERROR
+    assert "no \\begin{document}" in caught.value.detail
 
 
 @pytest.mark.parametrize(
@@ -212,6 +252,47 @@ def test_a_body_that_names_a_file_the_download_lacks_is_a_parse_error(line, name
     assert caught.value.kind is ErrorKind.PARSE_ERROR
     assert not isinstance(caught.value, NotASource)  # a real source: the download is kept
     assert caught.value.detail.endswith(": " + named)
+
+
+@pytest.mark.parametrize(
+    ("line", "named"),
+    [
+        ("\\import{parts/}{sec2}", "parts/sec2 (\\import)"),
+        ("\\subimport*{parts}{sec2.tex}", "parts/sec2.tex (\\subimport)"),
+        ("\\inputfrom{parts/}{sec2}", "parts/sec2 (\\inputfrom)"),
+        ("\\subinputfrom {}{sec2}", "sec2 (\\subinputfrom)"),
+        ("\\includefrom{parts/}{sec2}", "parts/sec2 (\\includefrom)"),
+        ("\\subincludefrom{parts/}{sec2}", "parts/sec2 (\\subincludefrom)"),
+        ("\\InputIfFileExists{sec2}{}{}", "sec2 (\\InputIfFileExists)"),
+    ],
+)
+def test_a_body_that_reads_a_file_in_a_way_that_is_not_followed_is_a_parse_error(line, named):
+    # The file is in the download, and still its section would be left out without a sign.
+    main = document("\\section{One}\nFirst.\n" + line + "\n\\section{Three}\nThird.")
+    extra = {"sec2.tex": "\\section{Two}\nSecond.", "parts/sec2.tex": "\\section{Two}\nSecond."}
+    with pytest.raises(SourceError) as caught:
+        sections_of(main, extra)
+    assert caught.value.kind is ErrorKind.PARSE_ERROR
+    assert not isinstance(caught.value, NotASource)  # a real source: the download is kept
+    assert caught.value.detail.endswith(": " + named)
+
+
+def test_commands_that_are_not_followed_do_no_harm_where_the_file_holds_no_text():
+    body = (
+        "\\section{One}\nFirst. \\import{figures/}{drawing.pdf_tex} \\subimport{figures/}{plot.pgf}\n"
+        "\\InputIfFileExists{paper.aux}{}{} \\important{a}{b} \\inputencoding{utf8}"
+    )
+    (section,) = sections_of(document(body))
+    assert section.text == body.removeprefix("\\section{One}\n")
+
+
+def test_every_file_that_could_not_be_read_is_named_once():
+    body = "\\input{a}\n\\import{p/}{b}\n\\input{a}\n\\include{c}\n\\import{p/}{b}"
+    with pytest.raises(SourceError) as caught:
+        sections_of(document(body))
+    assert caught.value.detail == (
+        "text is missing, 3 file(s) could not be read: a, c, p/b (\\import)"
+    )
 
 
 def test_missing_files_that_hold_no_running_text_do_not_stop_the_split():
@@ -268,6 +349,53 @@ def test_broken_gzip_is_a_parse_error():
     assert caught.value.kind is ErrorKind.PARSE_ERROR
 
 
+def test_gzip_with_a_damaged_byte_inside_is_not_a_source():
+    # A good header, then a block of a kind that does not exist. That raises
+    # zlib.error, which is neither an OSError nor an EOFError.
+    damaged = b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x03" + b"\x07" + bytes(20)
+    with pytest.raises(zlib.error):
+        gzip.decompress(damaged)
+    with pytest.raises(NotASource) as caught:
+        unpack(damaged)
+    assert "not valid gzip" in caught.value.detail
+
+
+def test_an_archive_that_breaks_off_is_not_a_source():
+    cut = plain_tar({"paper.tex": SAMPLE_LATEX.encode()})[:700]  # inside the text of its first file
+    for data in (cut, gzip.compress(cut)):
+        with pytest.raises(NotASource) as caught:
+            unpack(data)
+        assert caught.value.kind is ErrorKind.PARSE_ERROR
+        assert "damaged archive" in caught.value.detail
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        b"",
+        b" \r\n\t",
+        b"<!DOCTYPE html>\n<html><body>Rate exceeded.</body></html>",
+        b"\xef\xbb\xbf\n <HTML><head>",
+        b'<?xml version="1.0"?><error>no</error>',
+    ],
+)
+def test_an_empty_answer_and_a_web_page_are_not_a_source(data):
+    for packed in (data, gzip.compress(data)):
+        with pytest.raises(NotASource):
+            unpack(packed)
+
+
+def test_a_single_file_that_is_not_latex_is_still_taken_for_the_source():
+    # Plain TeX, or the notice a withdrawn paper leaves. That it has no \begin{document}
+    # is found later, and it is no reason to ask arXiv for the same bytes again.
+    plain = b"\\input harvmac\n\\Title{HUTP-91/A001}{A paper in plain TeX}\n<not a tag>\n\\bye\n"
+    assert unpack(plain) == {"main.tex": plain.decode()}
+    with pytest.raises(SourceError) as caught:
+        parse_source(gzip.compress(plain))
+    assert caught.value.kind is ErrorKind.PARSE_ERROR
+    assert not isinstance(caught.value, NotASource)
+
+
 def test_latin1_bytes_and_windows_line_ends_are_read():
     files = unpack("caf\xe9\r\nline two\r".encode("latin-1"))
     assert files == {"main.tex": "caf\xe9\nline two\n"}
@@ -296,9 +424,26 @@ def test_without_a_list_the_file_with_documentclass_wins_then_the_longest():
 
 
 def test_no_file_with_a_document_is_a_parse_error():
-    with pytest.raises(NotASource) as caught:
+    with pytest.raises(SourceError) as caught:
         find_main({"macros.tex": "\\newcommand{\\x}{y}"})
     assert caught.value.kind is ErrorKind.PARSE_ERROR
+    assert not isinstance(caught.value, NotASource)  # a real source: the download is kept
+
+
+def test_a_part_for_the_subfiles_package_is_never_the_main_file():
+    # Every part has \documentclass and \begin{document}, and a part can be far
+    # longer than the main file, which may hold little more than \subfile lines.
+    part = (
+        "\\documentclass[main]{subfiles}\n\\begin{document}\n"
+        + "A long part. " * 500
+        + "\n\\end{document}\n"
+    )
+    files = {
+        "one.tex": part,
+        "sec/two.tex": part.replace("[main]", " [../main] "),
+        "main.tex": document("\\subfile{one}\n\\subfile{sec/two}"),
+    }
+    assert find_main(files) == "main.tex"
 
 
 def test_not_a_source_survives_pickle():

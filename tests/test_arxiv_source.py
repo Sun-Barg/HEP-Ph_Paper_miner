@@ -2,7 +2,7 @@
 
 import httpx2
 import pytest
-from conftest import FIXTURES, SAMPLE_LATEX, tar_gz
+from conftest import FIXTURES, SAMPLE_LATEX, plain_tar, tar_gz
 
 from hepph_paper_miner.http import Fetcher
 from hepph_paper_miner.sources.arxiv import API_URL, SOURCE_URL, ArxivSource
@@ -57,7 +57,7 @@ def test_paper_is_looked_up_then_downloaded_then_split(tmp_path):
     assert paper.meta.arxiv_id == "2610.26648v1"
     assert paper.meta.authors[1] == "Hae Barg Kang"
     assert [section.section_id for section in paper.sections][:3] == ["1", "2", "2.1"]
-    assert paper.parser_version == "2"
+    assert paper.parser_version == "3"
     lookup, download = arxiv.requests
     assert lookup.params["id_list"] == "2610.26648v1"
     assert str(download) == SOURCE_URL.format(arxiv_id="2610.26648v1")
@@ -116,24 +116,31 @@ class Flaky(FakeArxiv):
 
 
 @pytest.mark.parametrize(
-    ("kind", "bad", "first_failure"),
+    ("kind", "bad", "reported_as"),
     [
-        ("api", EMPTY, SourceError),  # 200, but lists nothing
-        ("api", ERROR, SourceError),  # 200, but the API's error feed
-        ("api", b"<html><body>Rate exceeded.</body>", SourceError),  # 200, but not a feed
-        ("source", b"<html><body>Not the paper.</body></html>", SourceError),
-        ("source", b"\x1f\x8b broken gzip", SourceError),
+        ("api", EMPTY, ErrorKind.NOT_FOUND),  # 200, but lists nothing
+        ("api", ERROR, ErrorKind.NOT_FOUND),  # 200, but the API's error feed
+        ("api", b"<html><body>Rate exceeded.</body>", ErrorKind.UPSTREAM_BUSY),  # not a feed
+        # What follows came in place of the paper's files. That says nothing about the
+        # paper, so it is arXiv that has not answered: the model is told to try again.
+        ("source", b"<html><body>Not the paper.</body></html>", ErrorKind.UPSTREAM_BUSY),
+        ("source", b"", ErrorKind.UPSTREAM_BUSY),
+        ("source", b"\x1f\x8b broken gzip", ErrorKind.UPSTREAM_BUSY),
+        ("source", DOWNLOAD[:10] + b"\x07" + bytes(20), ErrorKind.UPSTREAM_BUSY),  # zlib.error
+        ("source", plain_tar({"paper.tex": SAMPLE_LATEX.encode()})[:700], ErrorKind.UPSTREAM_BUSY),
     ],
 )
 def test_one_unusable_answer_is_not_served_from_the_cache_afterwards(
-    tmp_path, kind, bad, first_failure
+    tmp_path, kind, bad, reported_as
 ):
     # The cache never expires. Kept, a single bad answer would hide the paper for good.
     arxiv = Flaky(kind, bad)
     source = arxiv.make(tmp_path)
 
-    with pytest.raises(first_failure):
+    with pytest.raises(SourceError) as caught:
         source.paper(parse_arxiv_id("2610.26648v1"))
+    assert caught.value.kind is reported_as
+    assert "2610.26648v1" in caught.value.detail
 
     assert source.paper(parse_arxiv_id("2610.26648v1")).meta.arxiv_id == "2610.26648v1"
 
@@ -149,19 +156,61 @@ def test_a_search_without_results_is_asked_again_the_next_time(tmp_path):
 
 
 @pytest.mark.parametrize(
-    "download",
+    ("download", "kind"),
     [
-        b"%PDF-1.7 ...",  # no TeX source: the same answer every time
-        tar_gz({"paper.tex": b"\\documentclass{article}\\begin{document}Short.\\end{document}"}),
+        (b"%PDF-1.7 ...", ErrorKind.NO_FULL_TEXT),  # no TeX source
+        (
+            tar_gz(
+                {"paper.tex": b"\\documentclass{article}\\begin{document}Short.\\end{document}"}
+            ),
+            ErrorKind.PARSE_ERROR,
+        ),
+        # A paper in plain TeX, as one file and as an archive: no \begin{document} anywhere.
+        (b"\\input harvmac\n\\Title{HUTP-91/A001}{Plain TeX}\n\\bye\n", ErrorKind.PARSE_ERROR),
+        (
+            tar_gz({"paper.tex": b"\\input harvmac\n\\bye\n", "fig.ps": b"%!PS"}),
+            ErrorKind.PARSE_ERROR,
+        ),
+        # A file of the paper is read in a way that is not followed.
+        (
+            tar_gz({"paper.tex": SAMPLE_LATEX.replace("Thanks.", "\\import{a/}{b}").encode()}),
+            ErrorKind.PARSE_ERROR,
+        ),
     ],
 )
-def test_a_real_download_that_cannot_be_read_stays_in_the_cache(tmp_path, download):
+def test_a_real_download_that_cannot_be_read_stays_in_the_cache(tmp_path, download, kind):
     # Asking again would bring the same bytes, so it is not asked again.
     arxiv = FakeArxiv(source=(200, download))
-    for _ in range(2):
-        with pytest.raises(SourceError):
+    for _ in range(3):
+        with pytest.raises(SourceError) as caught:
             arxiv.make(tmp_path).paper(parse_arxiv_id("2610.26648v1"))
+        assert caught.value.kind is kind
     assert [url.path for url in arxiv.requests] == ["/api/query", "/e-print/2610.26648v1"]
+
+
+@pytest.mark.parametrize("where", ["/api/query", "/e-print/2610.26648v1"])
+@pytest.mark.parametrize(
+    "answer",
+    [
+        lambda request: httpx2.Response(302, headers={"Location": str(request.url)}),
+        lambda request: httpx2.Response(
+            200, headers={"Content-Encoding": "gzip"}, content=b"this is not gzip"
+        ),
+    ],
+    ids=["a redirect that never ends", "a body that cannot be decoded"],
+)
+def test_an_answer_that_cannot_be_read_at_all_is_upstream_busy(tmp_path, where, answer):
+    arxiv = FakeArxiv()
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return answer(request) if request.url.path == where else arxiv.handler(request)
+
+    source = ArxivSource(
+        Fetcher(tmp_path, transport=httpx2.MockTransport(handler), sleep=lambda seconds: None)
+    )
+    with pytest.raises(SourceError) as caught:
+        source.paper(parse_arxiv_id("2610.26648v1"))
+    assert caught.value.kind is ErrorKind.UPSTREAM_BUSY
 
 
 @pytest.mark.parametrize(

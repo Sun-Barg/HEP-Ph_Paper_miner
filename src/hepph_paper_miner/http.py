@@ -40,8 +40,9 @@ def default_cache_dir() -> Path:
 class FetchError(Exception):
     """A request that did not produce an answer.
 
-    reason: "not_found" (404), "rejected" (another 4xx), "busy" (429, 5xx or a broken
-    connection, also after retries), "timeout".
+    reason: "not_found" (404), "rejected" (another 4xx), "timeout", and "busy": status
+    429 or 5xx, a broken connection or a body that cannot be decoded (each also after
+    retries), or a redirect that never ends.
     """
 
     def __init__(self, reason: str, url: str, status: int | None = None) -> None:
@@ -150,14 +151,21 @@ class Fetcher:
                 timeout_left -= 1
                 logger.warning("timeout, trying again: %s", url)
                 continue
-            except httpx2.TransportError as error:
+            except httpx2.TooManyRedirects as error:
+                # Not tried again: every try walks the same circle, some twenty requests
+                # one right after the other.
+                self._last_request_end = self._clock()
+                raise FetchError("busy", url) from error
+            except httpx2.RequestError as error:
+                # Everything else that can go wrong with one request: a broken connection
+                # (TransportError), a body that cannot be decoded (DecodingError).
                 self._last_request_end = self._clock()
                 if busy_left == 0:
                     raise FetchError("busy", url) from error
                 busy_left -= 1
                 wait *= 2
                 logger.warning(
-                    "connection failed (%s), waiting %.0f s: %s", type(error).__name__, wait, url
+                    "no usable answer (%s), waiting %.0f s: %s", type(error).__name__, wait, url
                 )
                 continue
             self._last_request_end = self._clock()
