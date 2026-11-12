@@ -20,6 +20,10 @@ Known limits. tests/test_against_tex.py shows each of them by running TeX itself
         bare name (\\input epsf). In the preamble this does no harm.
       - a paper that reads files with \\import, \\subimport or their relatives, or
         with \\InputIfFileExists.
+      - a part for the subfiles package that lies in a folder and reads a file
+        from beside itself: names are looked up beside the main file only.
+      - without arXiv's list of the files: a paper whose \\begin{document} stands
+        in an \\input file. That file is then taken for the main file.
     Read wrongly, and nothing shows it:
       - text in files that are read through a macro of the author's own is left out.
       - a download that holds several documents and comes without arXiv's list of
