@@ -103,7 +103,8 @@ class Fetcher:
         """Return the body for a 200 answer, from the cache when it is there.
 
         Only 200 answers are cached, and they never expire: pass refresh=True to
-        fetch again. Raises FetchError for everything else.
+        fetch again, or call forget() when an answer turns out to be unusable.
+        Raises FetchError for everything else.
         """
         params = dict(params or {})
         with self._lock:
@@ -115,6 +116,23 @@ class Fetcher:
             fetched_at = datetime.now(UTC).isoformat(timespec="seconds")
             self._write_cache(url, params, body, content_type, fetched_at)
             return Fetched(body, from_cache=False, fetched_at=fetched_at)
+
+    def forget(self, url: str, params: Mapping[str, str] | None = None) -> None:
+        """Remove the kept answer for a request, so that the next get() asks again.
+
+        A 200 answer is kept before anyone has read it. The caller that finds it
+        unusable (an empty listing, a page that is not the paper) calls this;
+        otherwise one bad answer would be served from the cache from then on.
+        """
+        paths = self._paths(url, dict(params or {}))
+        if paths is None:
+            return
+        with self._lock:
+            for path in paths:
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError as error:
+                    logger.warning("could not remove a cache entry (%s): %s", error, path)
 
     # --- network -----------------------------------------------------------------
 

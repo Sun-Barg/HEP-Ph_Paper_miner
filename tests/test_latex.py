@@ -1,11 +1,13 @@
 """Section splitting on invented LaTeX. No network."""
 
 import gzip
+import pickle
 
 import pytest
 from conftest import SAMPLE_LATEX, filler, plain_tar, tar_gz
 
 from hepph_paper_miner.sources.arxiv_latex import (
+    NotASource,
     check,
     expand_inputs,
     find_main,
@@ -32,6 +34,15 @@ def document(body: str) -> str:
 def test_comments_go_and_escaped_percent_signs_stay():
     text = "kept 100\\% here % gone\n% a whole line gone\nline break\\\\% gone too\nlast"
     assert strip_comments(text) == "kept 100\\% here \nline break\\\\\nlast"
+
+
+def test_a_percent_sign_inside_a_web_address_is_not_a_comment():
+    text = "See \\url{http://x.org/a%20b} and \\href{http://x.org/c%2Fd}{here}, then more. % gone"
+    assert strip_comments(text) == (
+        "See \\url{http://x.org/a%20b} and \\href{http://x.org/c%2Fd}{here}, then more. "
+    )
+    # After a comment has started, an address is part of the comment.
+    assert strip_comments("kept % \\url{http://x.org/a%20b} gone") == "kept "
 
 
 def test_comment_environment_and_iffalse_blocks_go():
@@ -114,6 +125,14 @@ def test_title_with_an_unclosed_brace_ends_at_the_line_end():
     assert titles == ["Broken title", "Fine"]
 
 
+def test_short_title_with_a_bracket_inside_braces_is_still_a_heading():
+    body = "\\section[Short {[x]} one]{Long $[a,b]$ title}\nFirst.\n\\section[Plain]{Second}\nMore."
+    assert [(s.section_id, s.title) for s in sections_of(document(body))] == [
+        ("1", "Long $[a,b]$ title"),
+        ("2", "Second"),
+    ]
+
+
 # --- \input ----------------------------------------------------------------------------
 
 
@@ -139,6 +158,70 @@ def test_sections_are_found_inside_input_files():
         ("1", "First."),
         ("2", "Second."),
     ]
+
+
+def test_input_without_braces_is_followed_too():
+    main = document("\\input sec1\n\\input sec2.tex\nAfter \\inputencoding{utf8}.")
+    extra = {"sec1.tex": "\\section{One}\nFirst.", "sec2.tex": "\\section{Two}\nSecond."}
+    assert [(s.section_id, s.text) for s in sections_of(main, extra)] == [
+        ("1", "First."),
+        ("2", "Second.\nAfter \\inputencoding{utf8}."),
+    ]
+
+
+def test_names_are_also_looked_up_beside_a_main_file_in_a_folder():
+    files = {
+        "paper/main.tex": document("\\input{sec/intro}\n\\section{Two}\nSecond."),
+        "paper/sec/intro.tex": "\\section{One}\nFirst.",
+    }
+    assert [(s.section_id, s.text) for s in split(files, "paper/main.tex")] == [
+        ("1", "First."),
+        ("2", "Second."),
+    ]
+
+
+def test_a_file_with_its_own_document_adds_only_what_is_inside_it():
+    # The subfiles package: every part can be compiled alone, so every part ends the document.
+    part = (
+        "\\documentclass[main]{subfiles}\n\\begin{document}\n\\section{%s}\n%s\n\\end{document}\n"
+    )
+    main = document("\\subfile{one}\n\\subfile{two}\n\\section{Three}\nThird.")
+    extra = {"one.tex": part % ("One", "First."), "two.tex": part % ("Two", "Second.")}
+    assert [(s.section_id, s.title, s.text) for s in sections_of(main, extra)] == [
+        ("1", "One", "First."),
+        ("2", "Two", "Second."),
+        ("3", "Three", "Third."),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("line", "named"),
+    [
+        ("\\input{sec2}", "sec2"),
+        ("\\input sec2", "sec2"),
+        ("\\input{parts/sec2.tex}", "parts/sec2.tex"),
+        ("\\include{sec2}", "sec2"),
+        ("\\subfile{sec2}", "sec2"),
+    ],
+)
+def test_a_body_that_names_a_file_the_download_lacks_is_a_parse_error(line, named):
+    # Without this the paper would come back with a section missing and nothing to show it.
+    main = document("\\section{One}\nFirst.\n" + line + "\n\\section{Three}\nThird.")
+    with pytest.raises(SourceError) as caught:
+        sections_of(main)
+    assert caught.value.kind is ErrorKind.PARSE_ERROR
+    assert not isinstance(caught.value, NotASource)  # a real source: the download is kept
+    assert caught.value.detail.endswith(": " + named)
+
+
+def test_missing_files_that_hold_no_running_text_do_not_stop_the_split():
+    body = (
+        "\\section{One}\nFirst. \\input{plot.pstex_t} \\input{fig.tikz} \\input epsf.sty\n"
+        "\\includegraphics{sec2} \\input{paper.bbl}"
+    )
+    preamble = "\\documentclass{article}\n\\input{mymacros}\n\\begin{document}\n"
+    (section,) = sections_of(preamble + body + "\n\\end{document}")
+    assert section.text == body.removeprefix("\\section{One}\n")
 
 
 # --- unpack ----------------------------------------------------------------------------
@@ -180,7 +263,7 @@ def test_a_download_without_tex_source_is_no_full_text(data):
 
 
 def test_broken_gzip_is_a_parse_error():
-    with pytest.raises(SourceError) as caught:
+    with pytest.raises(NotASource) as caught:
         unpack(gzip.compress(b"some text")[:-6])
     assert caught.value.kind is ErrorKind.PARSE_ERROR
 
@@ -211,9 +294,15 @@ def test_without_a_list_the_file_with_documentclass_wins_then_the_longest():
 
 
 def test_no_file_with_a_document_is_a_parse_error():
-    with pytest.raises(SourceError) as caught:
+    with pytest.raises(NotASource) as caught:
         find_main({"macros.tex": "\\newcommand{\\x}{y}"})
     assert caught.value.kind is ErrorKind.PARSE_ERROR
+
+
+def test_not_a_source_survives_pickle():
+    clone = pickle.loads(pickle.dumps(NotASource(ErrorKind.PARSE_ERROR, "no document")))
+    assert type(clone) is NotASource
+    assert (clone.kind, clone.detail) == (ErrorKind.PARSE_ERROR, "no document")
 
 
 # --- check and the whole path ------------------------------------------------------------

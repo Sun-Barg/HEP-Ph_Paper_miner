@@ -57,7 +57,7 @@ def test_paper_is_looked_up_then_downloaded_then_split(tmp_path):
     assert paper.meta.arxiv_id == "2610.26648v1"
     assert paper.meta.authors[1] == "Hae Barg Kang"
     assert [section.section_id for section in paper.sections][:3] == ["1", "2", "2.1"]
-    assert paper.parser_version == "1"
+    assert paper.parser_version == "2"
     lookup, download = arxiv.requests
     assert lookup.params["id_list"] == "2610.26648v1"
     assert str(download) == SOURCE_URL.format(arxiv_id="2610.26648v1")
@@ -97,6 +97,71 @@ def test_failures_are_reported_in_the_sources_terms(tmp_path, api, source, kind)
         FakeArxiv(api, source).make(tmp_path).paper(parse_arxiv_id("2610.26648v1"))
     assert caught.value.kind is kind
     assert "2610.26648v1" in caught.value.detail
+
+
+class Flaky(FakeArxiv):
+    """Answers the first request of one kind with `bad` (status 200), every later one correctly."""
+
+    def __init__(self, kind: str, bad: bytes):
+        super().__init__()
+        self.kind, self.bad, self.done = kind, bad, False
+
+    def handler(self, request: httpx2.Request) -> httpx2.Response:
+        response = super().handler(request)
+        kind = "api" if request.url.path == "/api/query" else "source"
+        if kind == self.kind and not self.done:
+            self.done = True
+            return httpx2.Response(200, content=self.bad)
+        return response
+
+
+@pytest.mark.parametrize(
+    ("kind", "bad", "first_failure"),
+    [
+        ("api", EMPTY, SourceError),  # 200, but lists nothing
+        ("api", ERROR, SourceError),  # 200, but the API's error feed
+        ("api", b"<html><body>Rate exceeded.</body>", Exception),  # 200, but not a feed
+        ("source", b"<html><body>Not the paper.</body></html>", SourceError),
+        ("source", b"\x1f\x8b broken gzip", SourceError),
+    ],
+)
+def test_one_unusable_answer_is_not_served_from_the_cache_afterwards(
+    tmp_path, kind, bad, first_failure
+):
+    # The cache never expires. Kept, a single bad answer would hide the paper for good.
+    arxiv = Flaky(kind, bad)
+    source = arxiv.make(tmp_path)
+
+    with pytest.raises(first_failure):
+        source.paper(parse_arxiv_id("2610.26648v1"))
+
+    assert source.paper(parse_arxiv_id("2610.26648v1")).meta.arxiv_id == "2610.26648v1"
+
+
+def test_a_search_without_results_is_asked_again_the_next_time(tmp_path):
+    arxiv = Flaky("api", EMPTY)
+    source = arxiv.make(tmp_path)
+
+    assert source.search(SearchQuery("excess")).total == 0
+    assert len(source.search(SearchQuery("excess")).papers) == 2
+    source.search(SearchQuery("excess"))  # a listing with papers is kept
+    assert len(arxiv.requests) == 2
+
+
+@pytest.mark.parametrize(
+    "download",
+    [
+        b"%PDF-1.7 ...",  # no TeX source: the same answer every time
+        tar_gz({"paper.tex": b"\\documentclass{article}\\begin{document}Short.\\end{document}"}),
+    ],
+)
+def test_a_real_download_that_cannot_be_read_stays_in_the_cache(tmp_path, download):
+    # Asking again would bring the same bytes, so it is not asked again.
+    arxiv = FakeArxiv(source=(200, download))
+    for _ in range(2):
+        with pytest.raises(SourceError):
+            arxiv.make(tmp_path).paper(parse_arxiv_id("2610.26648v1"))
+    assert [url.path for url in arxiv.requests] == ["/api/query", "/e-print/2610.26648v1"]
 
 
 def test_timeout_is_reported_as_timeout(tmp_path):

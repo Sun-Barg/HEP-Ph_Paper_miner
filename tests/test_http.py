@@ -165,6 +165,21 @@ def test_refresh_fetches_again_and_replaces_the_entry(tmp_path):
     assert len(script.requests) == 2
 
 
+def test_a_forgotten_answer_is_asked_for_again(tmp_path):
+    script = Script((200, b"bad"), (200, b"good"), (200, b"other"))
+    fetcher = script.fetcher(tmp_path)
+    fetcher.get(URL, {"a": "1"})
+    fetcher.get(URL, {"a": "2"})
+
+    fetcher.forget(URL, {"a": "1"})
+    fetcher.forget(URL, {"a": "1"})  # nothing left to remove: not an error
+
+    assert fetcher.get(URL, {"a": "2"}).from_cache is True  # other answers are untouched
+    again = fetcher.get(URL, {"a": "1"})
+    assert (again.body, again.from_cache) == (b"other", False)
+    script.fetcher(None).forget(URL)  # no cache folder: nothing to do
+
+
 def test_without_a_cache_folder_every_get_is_a_request():
     script = Script((200, b"1"), (200, b"1"))
     fetcher = script.fetcher(None)

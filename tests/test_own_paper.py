@@ -55,7 +55,7 @@ def test_main_file_comes_from_the_list_arxiv_ships():
 
 
 def test_outline_of_the_real_paper_is_what_the_paper_shows():
-    assert PARSER_VERSION == "1"
+    assert PARSER_VERSION == "2"
     sections = parse_source(download())
     assert [(section.section_id, section.chars, section.title) for section in sections] == EXPECTED
 
