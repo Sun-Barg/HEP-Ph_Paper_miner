@@ -11,7 +11,7 @@ sections.
 
 - [x] Project skeleton; tests run without network
 - [x] arXiv search, LaTeX section parsing, and the reading tools in two layouts
-- [ ] Tool-calling loop and run records
+- [x] Tool-calling loop and run records
 - [ ] Evaluation set, graders, results
 
 ## The two tool layouts
@@ -63,12 +63,37 @@ uv run hepph-paper-miner --toolset flat
 
 `uv run python -m hepph_paper_miner.server` does the same.
 
+## Asking one question
+
+The loop in `src/hepph_paper_miner/agent/` gives one question to a Claude model, runs
+the tools the model asks for, and stops with a named reason (`answered`, `turn_limit`,
+`tool_timeout`, ...). It needs an API key in the environment variable
+`ANTHROPIC_API_KEY`. Every run costs money and sends requests to arXiv.
+
+```
+uv run python -m hepph_paper_miner.agent --question-id dev-01
+uv run python -m hepph_paper_miner.agent --question-id dev-01 --toolset flat
+uv run python -m hepph_paper_miner.agent --question "Which paper ...?"
+```
+
+A run writes two files with the same name:
+
+- `results/runs/<run id>.jsonl`: what happened, turn by turn, without any text a tool
+  returned (sizes, hashes and the first line of each result stand in for it).
+- `~/hepph-paper-miner-runs/<run id>.jsonl` (set `HEPPH_PAPER_MINER_RUNS` to use
+  another folder): the same with the full conversation. It holds paper text and stays
+  outside this repository.
+
+The questions are in `eval_data/questions_dev.jsonl`. These five are for development:
+tool texts and the prompt may be tuned on them, so they are not part of the evaluation.
+
 ## Paper text and the cache
 
 Downloads from arXiv are kept in `~/.cache/hepph-paper-miner` (set
 `HEPPH_PAPER_MINER_CACHE` to use another folder), outside this repository. Paper text
-is never committed. The one exception is `tests/fixtures/arxiv-2610.26648v1/`: a paper
-under CC0 by the maintainer of this repository, used to test the section parser.
+is never committed, and neither is a run record that contains it. The one exception is
+`tests/fixtures/arxiv-2610.26648v1/`: a paper under CC0 by the maintainer of this
+repository, used to test the section parser.
 
 This project uses arXiv's API and source downloads. It is not affiliated with or
 endorsed by arXiv.

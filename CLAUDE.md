@@ -40,6 +40,10 @@ works here follows the rules below.
 - `TOOLSET_VERSION` in `src/hepph_paper_miner/server.py`: raise it whenever a tool
   description, an argument description or the form of a result changes. The model reads all
   three, so a change to any of them is a different experiment.
+- `PROMPT_VERSION` in `src/hepph_paper_miner/agent/prompt.py`: raise it whenever the system
+  prompt, the answer schema or a message the loop writes for the model changes.
+- `tests/test_toolset_pin.py` and `tests/test_prompt.py` fail when one of these texts changes
+  under an unchanged version. Raise the version first, then pin the digest the failure prints.
 
 ## Style
 

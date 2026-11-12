@@ -17,6 +17,8 @@ dependencies = [
     # Both come with mcp. They are named because this project imports them itself.
     "httpx2>=2.16,<3",
     "pydantic>=2,<3",
+    # The Claude API client, for the tool-calling loop only. The server does not import it.
+    "anthropic>=2.8,<3",
 ]
 
 [project.scripts]

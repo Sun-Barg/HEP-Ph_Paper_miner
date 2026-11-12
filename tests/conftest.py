@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from mcp.types import TextContent
 
+from hepph_paper_miner.agent.model import Reply, ToolCall
 from hepph_paper_miner.sources.base import ErrorKind, PaperMeta
 from hepph_paper_miner.sources.fixture import FixtureSource, paper_from_latex
 
@@ -147,3 +148,40 @@ def sample_source() -> FixtureSource:
     """The two invented papers and the four failing identifiers, behind one source."""
     papers = [paper_from_latex(SAMPLE_META, SAMPLE_LATEX), paper_from_latex(LONG_META, LONG_LATEX)]
     return FixtureSource(papers, FAILING, LISTED_ONLY)
+
+
+# --- a model that replies from a script, for the loop ------------------------------------
+
+
+def says(text: str, stop: str | None = "end_turn", **more) -> Reply:
+    """A response without tool calls."""
+    usage = {"input_tokens": 100, "output_tokens": 10}
+    return Reply(stop, text, (), ("text",) if text else (), usage, content=[text], **more)
+
+
+def asks(*calls: tuple[str, dict]) -> Reply:
+    """A response that asks for tools. Its content is an object the loop has no business opening."""
+    wanted = tuple(ToolCall(f"call-{name}-{n}", name, args) for n, (name, args) in enumerate(calls))
+    usage = {"input_tokens": 100, "output_tokens": 10}
+    return Reply("tool_use", "", wanted, ("thinking", *["tool_use"] * len(calls)), usage, object())
+
+
+class ScriptedModel:
+    """Replies with what it was given, in order, and keeps what it was asked."""
+
+    settings = {"model": "scripted"}
+
+    def __init__(self, *replies, on_reply=lambda: None) -> None:
+        self.replies = list(replies)
+        self.asked: list[dict] = []
+        self._on_reply = on_reply
+
+    async def reply(self, system, messages, tools, answer_schema) -> Reply:
+        self.asked.append(
+            {"system": system, "messages": list(messages), "tools": tools, "schema": answer_schema}
+        )
+        self._on_reply()
+        item = self.replies.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item

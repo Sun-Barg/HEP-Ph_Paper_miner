@@ -1,0 +1,282 @@
+"""The loop: ask the model, run the tools it asks for, hand back the results, until it answers.
+
+The Claude SDK has a tool runner that does this. This one is written by hand for
+three things the runner does not give:
+
+    why a run ended     Every run ends with one of the reasons below, and the caller
+                        gets it as a value. The runner stops without saying why, and
+                        a run cut off by its iteration limit looks like any other.
+    what counts as      Only a response that ends its turn with text of the expected
+    the answer          form is an answer. The runner returns the last message,
+                        whatever it is.
+    a record            Every turn is written down as it happens (trace.py).
+
+What it leaves to others: retries of API requests are the SDK's (model.py), and the
+tools retry their own requests to arXiv (http.py).
+"""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
+from enum import Enum
+from typing import Any
+
+from mcp import Client, MCPError
+from mcp.types import REQUEST_TIMEOUT
+
+from hepph_paper_miner.agent.model import Model, ModelError, Reply, ToolCall
+from hepph_paper_miner.agent.prompt import (
+    ANSWER_SCHEMA,
+    PROMPT_VERSION,
+    SYSTEM_PROMPT,
+    read_answer,
+    unknown_tool_text,
+)
+from hepph_paper_miner.agent.trace import ERROR, FAILED, NOT_RUN, NOT_SENT, OK, ToolRecord, Trace
+from hepph_paper_miner.result_text import error_kind
+
+
+class EndReason(str, Enum):
+    """Why a run ended. There is no run without one."""
+
+    ANSWERED = "answered"  # the model ended its turn with an answer of the expected form
+    NO_ANSWER = "no_answer"  # it ended its turn with no text, or with text that is not an answer
+    TURN_LIMIT = "turn_limit"  # the last allowed response still asked for tools
+    MAX_TOKENS = "max_tokens"  # a response was cut off at the output limit
+    REFUSAL = "refusal"  # the API declined to answer
+    CONTEXT_FULL = "context_full"  # the conversation outgrew the model's context window
+    UNEXPECTED_STOP = "unexpected_stop"  # a stop reason this loop should never see
+    API_ERROR = "api_error"  # the API gave no response, after the SDK's retries
+    TIME_LIMIT = "time_limit"  # the run took too long (checked between turns)
+    TOOL_TRANSPORT_ERROR = "tool_transport_error"  # a tool call broke at the protocol level
+    TOOL_TIMEOUT = "tool_timeout"  # a tool call did not return in time
+
+
+# stop_reason values of the API that end a run without an answer. "end_turn" and
+# "tool_use" are handled in the loop. Whatever is not listed is unexpected, and that
+# includes "pause_turn" (only server-side tools cause it, and there are none here)
+# and "stop_sequence" (none is sent).
+_STOPS = {
+    "max_tokens": EndReason.MAX_TOKENS,
+    "refusal": EndReason.REFUSAL,
+    "model_context_window_exceeded": EndReason.CONTEXT_FULL,
+}
+
+
+@dataclass(frozen=True)
+class Limits:
+    """How far a run may go. First values, to be set from what pilot runs show.
+
+    tool_seconds is a backstop, not a budget. The arXiv source gives up by itself
+    and says so ("[timeout]", "[upstream_busy]"); in the worst case, three requests
+    with five tries of 30 s each and 69 s of pauses, that takes about eleven
+    minutes. The limit here is longer, so that it only ends a call that would never
+    have come back.
+
+    run_seconds is looked at between turns only, so a run can exceed it by one
+    turn: one API request with its retries, and the tool calls that follow.
+    """
+
+    max_turns: int = 12
+    tool_seconds: float = 700.0
+    run_seconds: float = 900.0
+
+    def __post_init__(self) -> None:
+        if self.max_turns < 1:
+            raise ValueError("max_turns has to be at least 1")
+
+
+@dataclass(frozen=True)
+class Outcome:
+    """How a run ended."""
+
+    reason: EndReason
+    detail: str
+    answer: dict[str, Any] | None  # {"answer", "found", "evidence"} when reason is ANSWERED
+    turns: int
+
+
+class _ToolFailure(Exception):
+    """A tool call that produced no result. It ends the run."""
+
+    def __init__(self, reason: EndReason, detail: str) -> None:
+        super().__init__(reason, detail)
+        self.reason = reason
+        self.detail = detail
+
+
+async def run(
+    question: str,
+    *,
+    client: Client,
+    model: Model,
+    trace: Trace,
+    limits: Limits | None = None,
+    clock: Callable[[], float] = time.monotonic,
+) -> Outcome:
+    """Answer one question with the tools of the connected server.
+
+    A turn is one response of the model. With max_turns = N the model is asked at
+    most N times, and tools are run at most N - 1 times: if the Nth response still
+    asks for tools, they are not run, because nobody would read their results.
+    """
+    limits = limits or Limits()
+    listed = (await client.list_tools()).tools
+    # The server's own names, descriptions and schemas, passed on unchanged: the
+    # model is to see what any other MCP host would show it.
+    tools = [
+        {
+            "name": tool.name,
+            "description": tool.description or "",
+            "input_schema": tool.input_schema,
+        }
+        for tool in listed
+    ]
+    declared = [tool["name"] for tool in tools]
+    server = client.server_info
+    trace.start(
+        {
+            "question": question,
+            "server": server.name if server else None,
+            # What the server says its tool texts are called. Asked over MCP, not
+            # imported: the loop knows the server through the protocol only.
+            "toolset_version": server.version if server else None,
+            "tools": declared,
+            "prompt_version": PROMPT_VERSION,
+            "model": model.settings,
+            "limits": asdict(limits),
+        },
+        private={
+            "system": SYSTEM_PROMPT,
+            "tool_definitions": tools,
+            "answer_schema": ANSWER_SCHEMA,
+        },
+    )
+
+    messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
+    started = clock()
+    turn = 0
+
+    def end(reason: EndReason, detail: str = "", answer: dict[str, Any] | None = None) -> Outcome:
+        trace.end(reason.value, detail, answer, turns=turn, seconds=clock() - started)
+        return Outcome(reason, detail, answer, turn)
+
+    while True:
+        if clock() - started > limits.run_seconds:
+            return end(EndReason.TIME_LIMIT, f"over {limits.run_seconds:.0f} s after {turn} turns")
+        asked_at = clock()
+        try:
+            reply = await model.reply(SYSTEM_PROMPT, messages, tools, ANSWER_SCHEMA)
+        except ModelError as error:
+            return end(EndReason.API_ERROR, str(error))
+        turn += 1
+        seconds = clock() - asked_at
+
+        if reply.stop_reason != "tool_use":
+            trace.turn(turn, reply, seconds, [])
+            return end(*_final(reply))
+        if not reply.tool_calls:
+            trace.turn(turn, reply, seconds, [])
+            return end(EndReason.UNEXPECTED_STOP, "stop_reason 'tool_use' without a tool call")
+        if turn == limits.max_turns:
+            trace.turn(
+                turn, reply, seconds, [ToolRecord(call, NOT_RUN) for call in reply.tool_calls]
+            )
+            return end(EndReason.TURN_LIMIT, f"turn {turn} still asked for tools")
+
+        # One after the other, in the order asked: the tools share one paced
+        # connection to arXiv, and a record in a fixed order is easier to read.
+        records: list[ToolRecord] = []
+        for call in reply.tool_calls:
+            try:
+                records.append(await _call_tool(client, call, declared, limits.tool_seconds, clock))
+            except _ToolFailure as failure:
+                records.append(ToolRecord(call, FAILED))
+                trace.turn(turn, reply, seconds, records)
+                return end(failure.reason, failure.detail)
+        trace.turn(turn, reply, seconds, records)
+
+        # The assistant turn goes back exactly as it came (see Reply.content), and
+        # every tool call gets its result, all in one message and in the same order.
+        messages.append({"role": "assistant", "content": reply.content})
+        messages.append({"role": "user", "content": [_tool_result(record) for record in records]})
+
+
+def _final(reply: Reply) -> tuple[EndReason, str, dict[str, Any] | None]:
+    """Reason, detail and answer for a response that did not ask for tools."""
+    stop = reply.stop_reason
+    if stop == "end_turn":
+        answer = read_answer(reply.text)
+        if answer is not None:
+            return EndReason.ANSWERED, "", answer
+        if not reply.text.strip():
+            return EndReason.NO_ANSWER, "the response had no text", None
+        return EndReason.NO_ANSWER, "the text was not an answer of the expected form", None
+    if stop in _STOPS:
+        details = reply.stop_details or {}
+        told = " | ".join(
+            str(details[key]) for key in ("category", "explanation") if details.get(key)
+        )
+        return _STOPS[stop], told, None
+    return EndReason.UNEXPECTED_STOP, f"stop_reason {stop!r}", None
+
+
+async def _call_tool(
+    client: Client,
+    call: ToolCall,
+    declared: list[str],
+    seconds: float,
+    clock: Callable[[], float],
+) -> ToolRecord:
+    """Run one tool call and return what the model is to be given for it.
+
+    An error result is a result: the model reads the server's sentence, unchanged,
+    and chooses what to do next. Only a call that produces nothing at all, or
+    something other than one piece of text, raises _ToolFailure.
+    """
+    if call.name not in declared:
+        # Answered here. A name the server never offered is not passed on to it.
+        return ToolRecord(
+            call, NOT_SENT, unknown_tool_text(call.name, declared), 0.0, "unknown_tool"
+        )
+    began = clock()
+    try:
+        result = await client.call_tool(call.name, call.arguments, read_timeout_seconds=seconds)
+    except MCPError as error:
+        timed_out = error.code == REQUEST_TIMEOUT
+        reason = EndReason.TOOL_TIMEOUT if timed_out else EndReason.TOOL_TRANSPORT_ERROR
+        raise _ToolFailure(reason, f"{call.name}: {error}") from error
+    except Exception as error:
+        # Whatever else a broken connection raises. Nothing can be told to the model
+        # about a call whose answer never arrived, so the run ends.
+        detail = f"{call.name}: {type(error).__name__}: {error}"
+        raise _ToolFailure(EndReason.TOOL_TRANSPORT_ERROR, detail) from error
+    took = clock() - began
+
+    # The server returns one piece of text and nothing else. If something else
+    # arrives, the loop does not choose a part of it: what the model read would no
+    # longer be what the record says it read.
+    blocks = result.content
+    if len(blocks) != 1 or getattr(blocks[0], "type", None) != "text":
+        kinds = [getattr(block, "type", type(block).__name__) for block in blocks]
+        raise _ToolFailure(
+            EndReason.TOOL_TRANSPORT_ERROR,
+            f"{call.name}: the result was not one text block but {kinds}",
+        )
+    text = blocks[0].text
+    if result.is_error:
+        return ToolRecord(call, ERROR, text, took, error_kind(text))
+    return ToolRecord(call, OK, text, took)
+
+
+def _tool_result(record: ToolRecord) -> dict[str, Any]:
+    block: dict[str, Any] = {
+        "type": "tool_result",
+        "tool_use_id": record.call.id,
+        "content": record.text,
+    }
+    if record.is_error:
+        block["is_error"] = True
+    return block
