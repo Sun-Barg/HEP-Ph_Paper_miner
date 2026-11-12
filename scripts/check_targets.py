@@ -7,7 +7,8 @@ none once the answers are cached). Prints identifiers, counts and titles only: n
 paper text. The output can be pasted into an issue or a chat as it is.
 
 "largest" is the largest piece a reader has to take in one go: a subsection, or a
-section that has no subsections.
+section that has no subsections. The second line of the output names the parser
+version, so that an output kept for later shows which code produced it.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from pathlib import Path
 
 from hepph_paper_miner.http import Fetcher, default_cache_dir
 from hepph_paper_miner.sources.arxiv import ArxivSource
+from hepph_paper_miner.sources.arxiv_latex import PARSER_VERSION
 from hepph_paper_miner.sources.base import SourceError, parse_arxiv_id
 
 TARGETS = Path(__file__).parent.parent / "eval_data" / "target_papers.txt"
@@ -27,6 +29,7 @@ def main() -> int:
     targets = [line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")]
     source = ArxivSource(Fetcher(default_cache_dir(), user_agent="hepph-paper-miner/check-targets"))
     print(f"cache: {default_cache_dir()}")
+    print(f"parser: {PARSER_VERSION}")
     print(
         f"{'identifier':<14} {'result':<14} {'sections':>8} {'subs':>5} {'chars':>8} {'largest':>8}  title"
     )
