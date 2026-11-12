@@ -19,6 +19,10 @@ dependencies = [
     "pydantic>=2,<3",
 ]
 
+[project.scripts]
+# What a host is configured with to start the server: uv run hepph-paper-miner
+hepph-paper-miner = "hepph_paper_miner.server:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8",

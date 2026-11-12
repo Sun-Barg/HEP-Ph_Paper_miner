@@ -6,8 +6,8 @@ from mcp import Client
 from mcp.types import TextContent
 
 from hepph_paper_miner import __version__
-from hepph_paper_miner.server import SECTION_CHAR_LIMIT, SERVER_NAME, build_server
-from hepph_paper_miner.sources.base import ErrorKind, PaperMeta
+from hepph_paper_miner.server import SECTION_CHAR_LIMIT, SERVER_NAME, build_server, explain
+from hepph_paper_miner.sources.base import ErrorKind, PaperMeta, SourceError
 from hepph_paper_miner.sources.fixture import FixtureSource, paper_from_latex
 
 LONG_META = PaperMeta(
@@ -31,10 +31,18 @@ FAILING = {
 }
 
 
+# arXiv lists a paper also when its text cannot be read.
+LISTED_ONLY = [
+    PaperMeta(key, "A Paper Without Text", ("Gil Eta",), 2025, "hep-ph", "Its abstract.")
+    for key, kind in FAILING.items()
+    if kind in (ErrorKind.NO_FULL_TEXT, ErrorKind.PARSE_ERROR)
+]
+
+
 @pytest.fixture
 def source() -> FixtureSource:
     papers = [paper_from_latex(SAMPLE_META, SAMPLE_LATEX), paper_from_latex(LONG_META, LONG_LATEX)]
-    return FixtureSource(papers, FAILING)
+    return FixtureSource(papers, FAILING, LISTED_ONLY)
 
 
 @pytest.fixture
@@ -120,6 +128,26 @@ async def test_search_without_matches_is_a_result_that_says_what_to_change(clien
     assert "fewer or different words" in advice
 
 
+@pytest.mark.anyio
+async def test_a_year_range_that_ends_before_it_starts_is_answered_without_a_search(client, source):
+    text = await failure(client, "search_papers", query="sample", year_from=2026, year_to=2020)
+    assert text.startswith("[bad_query] year_from (2026) is later than year_to (2020)")
+    assert source.calls == []
+
+    await call(client, "search_papers", query="sample", year_from=2025, year_to=2025)
+
+
+@pytest.mark.anyio
+async def test_a_search_that_arxiv_cannot_read_says_how_to_write_one():
+    class Refusing(FixtureSource):
+        def search(self, query):
+            raise SourceError(ErrorKind.BAD_QUERY, query.query)
+
+    async with Client(build_server(Refusing([])), raise_exceptions=True) as connected:
+        text = await failure(connected, "search_papers", query="dark matter")
+    assert text.startswith("[bad_query] 'dark matter': arXiv could not read this search.")
+
+
 # --- get_outline -------------------------------------------------------------------------
 
 
@@ -146,6 +174,37 @@ async def test_outline_shows_abstract_and_every_section_with_its_size(client, so
 async def test_identifier_without_version_is_answered_with_the_full_identifier(client):
     text = await call(client, "get_outline", arxiv_id="2501.00001")
     assert text.startswith("outline | 2501.00001v2 | ")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("arxiv_id", "kind"), [("2503.00001v1", "no_full_text"), ("2503.00002v1", "parse_error")]
+)
+async def test_outline_of_a_paper_without_readable_text_still_shows_the_abstract(
+    client, arxiv_id, kind
+):
+    # A result, not an error: the listing was found, and it is all there is to show.
+    lines = (await call(client, "get_outline", arxiv_id=arxiv_id)).splitlines()
+
+    assert lines[0] == f"outline | {arxiv_id} | no sections | {kind}"
+    assert lines[1:5] == [
+        "Title: A Paper Without Text",
+        "Authors: Gil Eta",
+        "Listed: 2025 | hep-ph",
+        "Abstract: Its abstract.",
+    ]
+    assert lines[5].startswith(f"Sections: none. [{kind}] {arxiv_id!r}: ")
+    assert "full text is unavailable" in lines[5]
+    assert len(lines) == 6
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("arxiv_id", "kind"), [("2503.00003v1", "upstream_busy"), ("2503.00004v1", "timeout")]
+)
+async def test_outline_fails_when_arxiv_itself_does_not_answer(client, arxiv_id, kind):
+    text = await failure(client, "get_outline", arxiv_id=arxiv_id)
+    assert text.startswith(f"[{kind}] {arxiv_id!r}: ")
 
 
 # --- read_section ------------------------------------------------------------------------
@@ -194,6 +253,13 @@ async def test_start_past_the_end_returns_an_empty_piece(client):
     assert text.splitlines()[0] == "section | 2501.00001v2 | 2.1 | chars 10-10 of 10 | partial"
 
 
+@pytest.mark.anyio
+@pytest.mark.parametrize(("typed", "real"), [("a", "A"), ("2.U1", "2.u1"), (" U1 ", "u1")])
+async def test_section_identifier_in_the_wrong_case_is_understood(client, typed, real):
+    text = await call(client, "read_section", arxiv_id="2501.00001v2", section_id=typed)
+    assert text.splitlines()[0].startswith(f"section | 2501.00001v2 | {real} | ")
+
+
 # --- errors ------------------------------------------------------------------------------
 
 
@@ -233,9 +299,19 @@ async def test_unknown_section_lists_the_sections_that_exist(client):
 @pytest.mark.anyio
 @pytest.mark.parametrize(("arxiv_id", "kind"), [(key, kind.value) for key, kind in FAILING.items()])
 async def test_every_source_failure_carries_its_kind_and_a_next_step(client, arxiv_id, kind):
-    text = await failure(client, "get_outline", arxiv_id=arxiv_id)
+    text = await failure(client, "read_section", arxiv_id=arxiv_id, section_id="1")
     assert text.startswith(f"[{kind}] {arxiv_id!r}: ")
     assert len(text) > len(f"[{kind}] {arxiv_id!r}: ") + 40  # a sentence follows, not just the kind
+
+
+@pytest.mark.parametrize(
+    "kind", [kind for kind in ErrorKind if kind is not ErrorKind.NO_SUCH_SECTION]
+)
+def test_every_kind_a_source_can_raise_has_its_own_sentence(kind):
+    # NO_SUCH_SECTION is not raised by a source: the server writes that sentence itself.
+    text = explain(SourceError(kind, "x"))
+    assert text.startswith(f"[{kind.value}] 'x'")
+    assert "the request failed" not in text  # the fallback for a kind nobody wrote a sentence for
 
 
 @pytest.mark.anyio

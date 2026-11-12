@@ -60,12 +60,19 @@ def test_an_open_year_range_is_closed_at_the_ends_of_arxiv():
             "all:ti AND all:excess AND all:all AND all:x",
         ),  # no query language from outside
         ("gamma-ray  Fermi's", "all:gamma-ray AND all:Fermi's"),
+        ("B - L ' . -- U(1)", "all:B AND all:L AND all:U AND all:1"),  # no word without a letter
+        ('"- dark . matter -"', 'all:"dark matter"'),
         ('"" ()', None),  # nothing left to search for
     ],
 )
 def test_characters_of_the_query_language_never_reach_arxiv(typed, sent):
     built = search_params(SearchQuery(typed))
     assert (built and built["search_query"]) == sent
+
+
+def test_an_author_filter_without_a_letter_is_dropped():
+    assert query_string(query="x", author=" - . ' ") == "all:x"
+    assert query_string(query="x", author="O'Brien-Smith, J.") == 'all:x AND au:"O\'Brien-Smith J."'
 
 
 def test_lookup_asks_for_one_identifier():
@@ -92,6 +99,12 @@ def test_feed_is_read_into_papers_in_order():
 def test_error_feed_raises_with_arxivs_message():
     with pytest.raises(FeedError, match="incorrect id format for 1234.12345"):
         parse_feed((FIXTURES / "api_error.xml").read_bytes())
+
+
+@pytest.mark.parametrize("body", [b"<html><body>Rate exceeded.</body></html>", b"<feed/>"])
+def test_xml_that_is_not_an_atom_feed_is_not_an_empty_result(body):
+    with pytest.raises(ValueError, match="not an Atom feed"):
+        parse_feed(body)
 
 
 def test_feed_without_entries_is_an_empty_result():

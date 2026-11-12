@@ -2,6 +2,7 @@
 
     search_papers   who wrote what           -> identifiers
     get_outline     one paper                -> abstract, section identifiers and sizes
+                                                (the abstract alone when the text cannot be read)
     read_section    one section of one paper -> its text
 
 Each tool returns one piece of text and nothing else. Hosts differ in what they pass
@@ -28,6 +29,7 @@ from hepph_paper_miner.sources.arxiv import ArxivSource
 from hepph_paper_miner.sources.base import (
     ErrorKind,
     Paper,
+    PaperMeta,
     PaperSource,
     SearchQuery,
     Section,
@@ -39,7 +41,7 @@ SERVER_NAME = "hepph-paper-miner"
 
 # Names the tool descriptions, the argument descriptions and the form of every result.
 # A change to any of them changes what the model reads, so it is a different experiment.
-TOOLSET_VERSION = "staged-1"
+TOOLSET_VERSION = "staged-2"
 
 SECTION_CHAR_LIMIT = 20_000  # the most text one read_section call returns
 _ECHO_LIMIT = 80  # the most of a bad argument that is repeated back
@@ -54,17 +56,22 @@ _NEXT_STEP = {
     ErrorKind.NOT_FOUND: (
         "arXiv has no such paper or version. Check the identifier with search_papers."
     ),
+    ErrorKind.BAD_QUERY: (
+        "arXiv could not read this search. Use plain words, and put a phrase in double quotes."
+    ),
     ErrorKind.NO_FULL_TEXT: (
         "This paper has no TeX source, so its sections cannot be read. "
-        "search_papers gives its title and authors; if that is not enough, "
+        "get_outline still shows its abstract; if the question needs more, "
         "say that the full text is unavailable."
     ),
     ErrorKind.PARSE_ERROR: (
         "The TeX source of this paper could not be split into sections, so it cannot be read. "
-        "If the question needs its full text, say that it is unavailable."
+        "get_outline still shows its abstract; if the question needs more, "
+        "say that the full text is unavailable."
     ),
     ErrorKind.UPSTREAM_BUSY: (
-        "arXiv did not answer after several tries. Try once more later, or use another paper."
+        "arXiv is busy or refused the request, so there is no answer. "
+        "Try once more later, or use another paper."
     ),
     ErrorKind.TIMEOUT: "arXiv took too long to answer. Try once more later, or use another paper.",
 }
@@ -73,8 +80,10 @@ _NEXT_STEP = {
 def explain(error: SourceError) -> str:
     """Turn an expected failure into a sentence that says what went wrong and what to do next.
 
-    The sentence starts with the error kind in brackets, so that a client can
-    classify the failure without understanding the prose.
+    The sentence starts with the error kind in brackets, so that a program can
+    classify the failure without understanding the prose. The SDK puts its own
+    words in front ("Error executing tool <name>: "), so a program has to look for
+    the bracketed kind in the text, not at its start.
     """
     kind = error.kind.value
     if error.kind is ErrorKind.INVALID_ID:
@@ -111,12 +120,29 @@ def _find_section(paper: Paper, section_id: str) -> Section:
     for section in paper.sections:
         if section.section_id == wanted:
             return section
+    # No exact match: "a" for "A", "2.U1" for "2.u1". The answer names the real identifier.
+    close = [s for s in paper.sections if s.section_id.casefold() == wanted.casefold()]
+    if len(close) == 1:
+        return close[0]
     known = ", ".join(section.section_id for section in paper.sections)
     raise ToolError(
         f"[{ErrorKind.NO_SUCH_SECTION.value}] {paper.meta.arxiv_id} has no section "
         f"{_quoted(section_id)}. "
         f"Its sections are: {known}."
     )
+
+
+# Failures that concern the full text only. get_outline still answers with the listing.
+_NO_TEXT = (ErrorKind.NO_FULL_TEXT, ErrorKind.PARSE_ERROR)
+
+
+def _listing_lines(meta: PaperMeta) -> list[str]:
+    return [
+        f"Title: {meta.title}",
+        f"Authors: {_authors(meta.authors)}",
+        f"Listed: {meta.year} | {meta.primary_category}",
+        f"Abstract: {meta.abstract}",
+    ]
 
 
 def _authors(names: tuple[str, ...]) -> str:
@@ -169,6 +195,11 @@ def build_server(source: PaperSource) -> MCPServer:
         paper's listing (title, abstract, authors, comments). Abstracts are not
         returned; get_outline shows the abstract of one paper.
         """
+        if year_from is not None and year_to is not None and year_from > year_to:
+            raise ToolError(
+                f"[{ErrorKind.BAD_QUERY.value}] year_from ({year_from}) is later than "
+                f"year_to ({year_to}), so no paper can match. Swap them, or drop one."
+            )
         with _expected_failures():
             found = source.search(
                 SearchQuery(query, author, category, year_from, year_to, max_results)
@@ -212,16 +243,27 @@ def build_server(source: PaperSource) -> MCPServer:
         Use the sizes (in characters) to decide what to read. The size of a section
         includes its subsections. Without a version in the identifier, the latest
         version is used and its full identifier is shown on the first line.
+        When the text of a paper cannot be read, the title and abstract are still
+        shown, and the last line says why there are no sections.
         """
         with _expected_failures():
-            paper = source.paper(parse_arxiv_id(arxiv_id))
-        meta = paper.meta
+            # The listing first: it names the version, and it is there even when the text is not.
+            meta = source.listing(parse_arxiv_id(arxiv_id))
+            try:
+                paper = source.paper(parse_arxiv_id(meta.arxiv_id))
+            except SourceError as error:
+                if error.kind not in _NO_TEXT:
+                    raise
+                return "\n".join(
+                    [
+                        f"outline | {meta.arxiv_id} | no sections | {error.kind.value}",
+                        *_listing_lines(meta),
+                        f"Sections: none. {explain(error)}",
+                    ]
+                )
         lines = [
             f"outline | {meta.arxiv_id} | {paper.chars} chars | {len(paper.sections)} sections | parser {paper.parser_version}",
-            f"Title: {meta.title}",
-            f"Authors: {_authors(meta.authors)}",
-            f"Listed: {meta.year} | {meta.primary_category}",
-            f"Abstract: {meta.abstract}",
+            *_listing_lines(meta),
             "Sections (id | chars | title). A section's chars include its subsections.",
         ]
         for section in paper.sections:

@@ -5,6 +5,9 @@
 Sends real requests to arXiv, three seconds apart (two per paper the first time,
 none once the answers are cached). Prints identifiers, counts and titles only: no
 paper text. The output can be pasted into an issue or a chat as it is.
+
+"largest" is the largest piece a reader has to take in one go: a subsection, or a
+section that has no subsections.
 """
 
 from __future__ import annotations
@@ -34,13 +37,16 @@ def main() -> int:
             paper = source.paper(parse_arxiv_id(target))
         except SourceError as error:
             print(
-                f"{target:<14} {error.kind.value:<14} {'-':>8} {'-':>5} {'-':>8} {'-':>8}  {error.detail[:60]}"
+                f"{target:<14} {error.kind.value:<14} {'-':>8} {'-':>5} {'-':>8} {'-':>8}  {error.detail}"
             )
             continue
         split += 1
         top = [section for section in paper.sections if section.level == 1]
+        divided = {s.section_id.split(".")[0] for s in paper.sections if s.level == 2}
         largest = max(
-            section.chars for section in paper.sections if section.level == 2 or section in top
+            section.chars
+            for section in paper.sections
+            if section.level == 2 or section.section_id not in divided
         )
         print(
             f"{paper.meta.arxiv_id:<14} {'ok':<14} {len(top):>8} {len(paper.sections) - len(top):>5} "

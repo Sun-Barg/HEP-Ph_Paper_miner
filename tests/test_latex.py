@@ -291,6 +291,8 @@ def test_without_a_list_the_file_with_documentclass_wins_then_the_longest():
     }
     assert find_main(files) == "paper.tex"
     assert find_main({"00README.json": "not json", **files}) == "paper.tex"
+    for unusable in ('{"sources": null}', "[1]", '{"sources": [3]}', "null"):
+        assert find_main({"00README.json": unusable, **files}) == "paper.tex"
 
 
 def test_no_file_with_a_document_is_a_parse_error():

@@ -31,6 +31,14 @@ class FeedError(Exception):
     """The API answered with its error feed, for example for an identifier it cannot read."""
 
 
+def _words(text: str) -> list[str]:
+    """The search words in a piece of text. What holds no letter and no digit is not a word:
+    the "-" of "B - L" would otherwise be sent as a word that nothing matches."""
+    return [
+        each for each in _NOT_A_WORD.sub(" ", text).split() if any(char.isalnum() for char in each)
+    ]
+
+
 def search_params(query: SearchQuery) -> dict[str, str] | None:
     """Turn the tool's arguments into arXiv's query language. None when nothing is left to search for.
 
@@ -39,14 +47,14 @@ def search_params(query: SearchQuery) -> dict[str, str] | None:
     """
     clauses = []
     for phrase, word in _PHRASE_OR_WORD.findall(query.query):
-        words = _NOT_A_WORD.sub(" ", phrase or word).split()
+        words = _words(phrase or word)
         if phrase and len(words) > 1:
             clauses.append(f'all:"{" ".join(words)}"')
         else:
             # The operators of the query language are not search words.
             clauses.extend(f"all:{each}" for each in words if each not in _OPERATORS)
     if query.author:
-        author = " ".join(_NOT_A_WORD.sub(" ", query.author).split())
+        author = " ".join(_words(query.author))
         if author:
             clauses.append(f'au:"{author}"')
     if query.category:
@@ -72,8 +80,16 @@ def lookup_params(arxiv_id: str) -> dict[str, str]:
 
 
 def parse_feed(body: bytes) -> SearchResult:
-    """Read an Atom answer. Raises FeedError when it is the API's error feed."""
+    """Read an Atom answer. Raises FeedError when it is the API's error feed.
+
+    A body that is not XML raises ElementTree.ParseError. XML that is not an Atom feed
+    (a web page can be well-formed XML) and a date that does not start with a year
+    raise ValueError. The caller decides what these mean.
+    """
     feed = ElementTree.fromstring(body)
+    if feed.tag != f"{_ATOM}feed":
+        # Read as a feed, a page would look like a search that found nothing.
+        raise ValueError(f"not an Atom feed: <{feed.tag}>")
     papers = []
     for entry in feed.findall(f"{_ATOM}entry"):
         entry_id = _text(entry, f"{_ATOM}id")

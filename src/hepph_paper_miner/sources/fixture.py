@@ -22,14 +22,28 @@ def paper_from_latex(meta: PaperMeta, latex: str) -> Paper:
     return Paper(meta, parse_source(latex.encode("utf-8")), PARSER_VERSION)
 
 
+# Failures that concern the full text only: the listing of such a paper can still be read.
+_TEXT_ONLY = (ErrorKind.NO_FULL_TEXT, ErrorKind.PARSE_ERROR)
+
+
 class FixtureSource:
-    """Serves the given papers. `failures` makes chosen identifiers fail in a chosen way."""
+    """Serves the given papers.
+
+    `failures` makes chosen identifiers fail in a chosen way. `listings` are papers
+    that are listed but have no text here: give one for every identifier that fails
+    with NO_FULL_TEXT or PARSE_ERROR, as arXiv lists such papers too.
+    """
 
     def __init__(
-        self, papers: Iterable[Paper], failures: Mapping[str, ErrorKind] | None = None
+        self,
+        papers: Iterable[Paper],
+        failures: Mapping[str, ErrorKind] | None = None,
+        listings: Iterable[PaperMeta] = (),
     ) -> None:
         self._papers = {paper.meta.arxiv_id: paper for paper in papers}
         self._failures = dict(failures or {})
+        self._listings = {meta.arxiv_id: meta for meta in listings}
+        self._listings.update({key: paper.meta for key, paper in self._papers.items()})
         self.calls: list[tuple[str, str]] = []  # what was asked, for tests to inspect
 
     def paper_by_id(self, arxiv_id: str) -> Paper:
@@ -55,18 +69,30 @@ class FixtureSource:
             matches.append(meta)
         return SearchResult(tuple(matches[: query.max_results]), len(matches))
 
+    def listing(self, arxiv_id: ArxivId) -> PaperMeta:
+        self.calls.append(("listing", str(arxiv_id)))
+        kind = self._failures.get(str(arxiv_id))
+        if kind is not None and kind not in _TEXT_ONLY:
+            raise SourceError(kind, str(arxiv_id))
+        return self._find(arxiv_id)
+
     def paper(self, arxiv_id: ArxivId) -> Paper:
         self.calls.append(("paper", str(arxiv_id)))
         if str(arxiv_id) in self._failures:
             raise SourceError(self._failures[str(arxiv_id)], str(arxiv_id))
-        # Without a version: the latest one, as arXiv does.
+        found = self._find(arxiv_id)
+        if found.arxiv_id not in self._papers:
+            raise SourceError(ErrorKind.NO_FULL_TEXT, found.arxiv_id)
+        return self._papers[found.arxiv_id]
+
+    def _find(self, arxiv_id: ArxivId) -> PaperMeta:
+        """The listed paper with this identifier. Without a version: the latest one, as arXiv does."""
         versions = [
-            (parse_arxiv_id(key).version or 0, paper)
-            for key, paper in self._papers.items()
+            (parse_arxiv_id(key).version or 0, meta)
+            for key, meta in self._listings.items()
             if parse_arxiv_id(key).base == arxiv_id.base
             and arxiv_id.version in (None, parse_arxiv_id(key).version)
         ]
-        found = max(versions, key=lambda pair: pair[0])[1] if versions else None
-        if found is None:
+        if not versions:
             raise SourceError(ErrorKind.NOT_FOUND, str(arxiv_id))
-        return found
+        return max(versions, key=lambda pair: pair[0])[1]

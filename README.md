@@ -37,8 +37,10 @@ The server speaks MCP over stdio. Started by hand it prints nothing and waits fo
 client on stdin (stop it with Ctrl-C):
 
 ```
-uv run python -m hepph_paper_miner.server
+uv run hepph-paper-miner
 ```
+
+`uv run python -m hepph_paper_miner.server` does the same.
 
 ## Paper text and the cache
 

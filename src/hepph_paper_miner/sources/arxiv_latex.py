@@ -127,7 +127,7 @@ def find_main(files: dict[str, str]) -> str:
             for entry in json.loads(manifest).get("sources", []):
                 if entry.get("usage") == "toplevel" and entry.get("filename") in files:
                     return entry["filename"]
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError, TypeError):
             pass  # an unreadable list is the same as no list
 
     candidates = []
@@ -266,10 +266,10 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
     missing = _missing_inputs(body)
     if missing:
         listed = ", ".join(missing[:5]) + (" ..." if len(missing) > 5 else "")
+        # Short, and the names last: this is what a person reads to see what was lost.
         raise SourceError(
             ErrorKind.PARSE_ERROR,
-            f"{len(missing)} file(s) named by \\input are not among the TeX files "
-            f"of the download, so text would be missing: {listed}",
+            f"text is missing, {len(missing)} \\input file(s) not in the download: {listed}",
         )
     body = _BIBLIOGRAPHY.sub("", body)
 

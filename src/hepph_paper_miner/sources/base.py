@@ -18,6 +18,7 @@ class ErrorKind(str, Enum):
 
     INVALID_ID = "invalid_id"
     NOT_FOUND = "not_found"
+    BAD_QUERY = "bad_query"
     NO_SUCH_SECTION = "no_such_section"
     NO_FULL_TEXT = "no_full_text"
     PARSE_ERROR = "parse_error"
@@ -195,9 +196,16 @@ class SearchResult:
 class PaperSource(Protocol):
     """Where papers come from. The server knows nothing else about a source.
 
-    Both methods report expected failures by raising SourceError.
+    All methods report expected failures by raising SourceError.
     """
 
     def search(self, query: SearchQuery) -> SearchResult: ...
+
+    def listing(self, arxiv_id: ArxivId) -> PaperMeta:
+        """What the listing says about one paper; without a version, about its latest version.
+
+        Works also for a paper whose full text cannot be read.
+        """
+        ...
 
     def paper(self, arxiv_id: ArxivId) -> Paper: ...

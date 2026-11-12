@@ -120,7 +120,7 @@ class Flaky(FakeArxiv):
     [
         ("api", EMPTY, SourceError),  # 200, but lists nothing
         ("api", ERROR, SourceError),  # 200, but the API's error feed
-        ("api", b"<html><body>Rate exceeded.</body>", Exception),  # 200, but not a feed
+        ("api", b"<html><body>Rate exceeded.</body>", SourceError),  # 200, but not a feed
         ("source", b"<html><body>Not the paper.</body></html>", SourceError),
         ("source", b"\x1f\x8b broken gzip", SourceError),
     ],
@@ -162,6 +162,58 @@ def test_a_real_download_that_cannot_be_read_stays_in_the_cache(tmp_path, downlo
         with pytest.raises(SourceError):
             arxiv.make(tmp_path).paper(parse_arxiv_id("2610.26648v1"))
     assert [url.path for url in arxiv.requests] == ["/api/query", "/e-print/2610.26648v1"]
+
+
+@pytest.mark.parametrize(
+    ("api", "kind"),
+    [
+        ((200, ERROR), ErrorKind.BAD_QUERY),  # the API's error feed
+        ((400, b""), ErrorKind.BAD_QUERY),
+        ((403, b""), ErrorKind.UPSTREAM_BUSY),  # arXiv refuses this client
+        ((200, b"<html>Rate exceeded.</html>"), ErrorKind.UPSTREAM_BUSY),  # not a feed
+        ((200, FEED.replace(b"<published>20", b"<published>soon 20")), ErrorKind.UPSTREAM_BUSY),
+        ((503, b""), ErrorKind.UPSTREAM_BUSY),
+    ],
+)
+def test_a_failed_search_is_reported_in_the_sources_terms(tmp_path, api, kind):
+    with pytest.raises(SourceError) as caught:
+        FakeArxiv(api=api).make(tmp_path).search(SearchQuery("dark matter"))
+    assert caught.value.kind is kind
+    assert caught.value.detail == "dark matter"
+
+
+def test_a_refused_lookup_is_not_taken_for_a_missing_paper(tmp_path):
+    with pytest.raises(SourceError) as caught:
+        FakeArxiv(api=(403, b"")).make(tmp_path).paper(parse_arxiv_id("2610.26648v1"))
+    assert caught.value.kind is ErrorKind.UPSTREAM_BUSY
+
+
+def test_the_latest_version_is_asked_for_every_time(tmp_path):
+    # "Latest" changes when the paper is replaced, and the cache never expires.
+    arxiv = FakeArxiv()
+    source = arxiv.make(tmp_path)
+
+    for _ in range(2):
+        assert source.listing(parse_arxiv_id("2610.26648")).arxiv_id == "2610.26648v1"
+    assert [url.params["id_list"] for url in arxiv.requests] == ["2610.26648", "2610.26648"]
+
+    for _ in range(2):
+        source.listing(parse_arxiv_id("2610.26648v1"))  # a pinned version: kept as before
+    assert len(arxiv.requests) == 3
+
+
+def test_an_answer_about_the_latest_version_kept_by_an_older_program_is_not_used(tmp_path):
+    arxiv = FakeArxiv()
+    source = arxiv.make(tmp_path)
+    Fetcher(tmp_path, transport=httpx2.MockTransport(arxiv.handler)).get(
+        API_URL, {"id_list": "2610.26648", "max_results": "1"}
+    )
+    assert len(arxiv.requests) == 1  # now in the cache, as the older program left it
+
+    source.listing(parse_arxiv_id("2610.26648"))
+
+    assert len(arxiv.requests) == 2
+    assert list(tmp_path.glob("*/*")) == []  # and it is gone from the cache
 
 
 def test_timeout_is_reported_as_timeout(tmp_path):
