@@ -1,48 +1,33 @@
 """The server through the SDK's in-memory client: real protocol layer, no process, no network."""
 
 import pytest
-from conftest import SAMPLE_LATEX, SAMPLE_META, filler
+from conftest import (
+    FAILING,
+    SAMPLE_LATEX,
+    SAMPLE_META,
+    call,
+    failure,
+    only_text,
+    sample_source,
+)
 from mcp import Client
-from mcp.types import TextContent
 
-from hepph_paper_miner import __version__
-from hepph_paper_miner.server import SECTION_CHAR_LIMIT, SERVER_NAME, build_server, explain
+from hepph_paper_miner.result_text import END, MORE_FOLLOWS, read_first_line
+from hepph_paper_miner.server import (
+    SECTION_CHAR_LIMIT,
+    SERVER_NAME,
+    TOOLSET_VERSION,
+    _stop,
+    build_server,
+    explain,
+)
 from hepph_paper_miner.sources.base import ErrorKind, PaperMeta, SourceError
 from hepph_paper_miner.sources.fixture import FixtureSource, paper_from_latex
-
-LONG_META = PaperMeta(
-    "2502.00002v1",
-    "A Long Paper",
-    ("Cy Gamma", "Di Delta", "Ed Eps", "Flo Zeta"),
-    2024,
-    "astro-ph.HE",
-    "Long.",
-)
-LONG_LATEX = (
-    "\\documentclass{article}\\begin{document}\n"
-    "\\section{Big}\nStart. " + filler(6000) + "\n\\subsection{Part}\nPart text.\n"
-    "\\section{Small}\nSmall text.\n\\end{document}"
-)
-FAILING = {
-    "2503.00001v1": ErrorKind.NO_FULL_TEXT,
-    "2503.00002v1": ErrorKind.PARSE_ERROR,
-    "2503.00003v1": ErrorKind.UPSTREAM_BUSY,
-    "2503.00004v1": ErrorKind.TIMEOUT,
-}
-
-
-# arXiv lists a paper also when its text cannot be read.
-LISTED_ONLY = [
-    PaperMeta(key, "A Paper Without Text", ("Gil Eta",), 2025, "hep-ph", "Its abstract.")
-    for key, kind in FAILING.items()
-    if kind in (ErrorKind.NO_FULL_TEXT, ErrorKind.PARSE_ERROR)
-]
 
 
 @pytest.fixture
 def source() -> FixtureSource:
-    papers = [paper_from_latex(SAMPLE_META, SAMPLE_LATEX), paper_from_latex(LONG_META, LONG_LATEX)]
-    return FixtureSource(papers, FAILING, LISTED_ONLY)
+    return sample_source()
 
 
 @pytest.fixture
@@ -52,33 +37,17 @@ async def client(source):
         yield connected
 
 
-def only_text(result) -> str:
-    """The text the model would read: exactly one text block, and no second channel."""
-    assert len(result.content) == 1
-    block = result.content[0]
-    assert isinstance(block, TextContent)
-    assert result.structured_content is None
-    return block.text
-
-
-async def call(client, tool: str, **arguments) -> str:
-    result = await client.call_tool(tool, arguments)
-    assert result.is_error is False, only_text(result)
-    return only_text(result)
-
-
-async def failure(client, tool: str, **arguments) -> str:
-    result = await client.call_tool(tool, arguments)
-    assert result.is_error is True
-    text = only_text(result)
-    assert text.startswith(f"Error executing tool {tool}: ")
-    return text.removeprefix(f"Error executing tool {tool}: ")
-
-
 @pytest.mark.anyio
-async def test_server_reports_its_name_and_version(client):
+async def test_server_reports_its_name_and_the_name_of_its_tool_texts(client):
+    # The version a client sees is the name of what the model reads, not of the package:
+    # a run record has to say which tool texts were in front of the model.
     assert client.server_info.name == SERVER_NAME
-    assert client.server_info.version == __version__
+    assert client.server_info.version == TOOLSET_VERSION["staged"] == "staged-3"
+
+
+def test_a_layout_that_does_not_exist_is_refused():
+    with pytest.raises(ValueError, match="unknown toolset 'nested'"):
+        build_server(FixtureSource([]), "nested")
 
 
 @pytest.mark.anyio
@@ -245,14 +214,22 @@ async def test_long_section_is_read_in_pieces_that_add_up_to_the_whole(client, s
             client, "read_section", arxiv_id="2502.00002v1", section_id="1", start=start
         )
         header, _title, _blank, *rest = text.split("\n")
-        stop = min(start + SECTION_CHAR_LIMIT, section.chars)
-        assert (
-            header
-            == f"section | 2502.00002v1 | 1 | chars {start}-{stop} of {section.chars} | partial"
-        )
+        said = read_first_line(text)
+        stop = said["stop"]
+        assert (said["start"], said["chars"]) == (start, section.chars)
+        assert start < stop <= start + SECTION_CHAR_LIMIT
         if stop == section.chars:
+            # The last piece is partial too, and says that nothing follows it.
+            assert said["extent"] == END
+            assert header.endswith(
+                f"chars {start}-{stop} of {section.chars} | partial, end of section"
+            )
             pieces.append("\n".join(rest))
             break
+        assert said["extent"] == MORE_FOLLOWS
+        assert header.endswith(f"chars {start}-{stop} of {section.chars} | partial, more follows")
+        # This text is one long line, so a piece ends after a space: no word is cut in two.
+        assert section.text[stop - 1] == " "
         # The last line says how to go on, and names the subsections as the other way.
         assert rest[-1] == (
             f"[cut at character {stop} of {section.chars}. To continue, call read_section with start={stop}, "
@@ -266,9 +243,53 @@ async def test_long_section_is_read_in_pieces_that_add_up_to_the_whole(client, s
 
 
 @pytest.mark.anyio
+async def test_a_piece_ends_at_a_line_break_and_never_inside_a_number():
+    # 400 lines of 61 characters, line break included. A cut at exactly 20000 would fall
+    # inside "0.7910" on line 328 and leave "0.79" at the end of the first piece: a number
+    # that reads as complete.
+    line = "The branching fraction into b quarks is measured ".ljust(49) + "0.7910" + " here"
+    assert len(line) == 60
+    latex = (
+        "\\documentclass{article}\\begin{document}\n\\section{Lines}\n"
+        + "\n".join([line] * 400)
+        + "\n\\end{document}"
+    )
+    meta = PaperMeta("2504.00001v1", "Lines", ("Hal Theta",), 2025, "hep-ph", "Lines.")
+    source = FixtureSource([paper_from_latex(meta, latex)])
+    section = source.paper_by_id("2504.00001v1").sections[0]
+    assert section.text == "\n".join([line] * 400)
+    assert section.text[SECTION_CHAR_LIMIT - 4 : SECTION_CHAR_LIMIT + 2] == "0.7910"
+
+    async with Client(build_server(source), raise_exceptions=True) as client:
+        text = await call(client, "read_section", arxiv_id="2504.00001v1", section_id="1")
+
+    said = read_first_line(text)
+    assert said["stop"] == 327 * 61 < SECTION_CHAR_LIMIT  # after the line break of line 327
+    body = text.split("\n", 3)[3].rsplit("\n\n", 1)[0]
+    assert body == section.text[: said["stop"]]
+    assert body.endswith("0.7910 here\n")
+
+
+def test_where_a_piece_ends():
+    assert _stop("x" * 50, 0, 100) == 50  # all of it fits
+    assert _stop("x" * 50, 40, 100) == 50
+    assert _stop("ab\ncd ef" + "x" * 100, 0, 10) == 3  # after the line break, not the later space
+    assert _stop("ab cd ef" + "x" * 100, 0, 10) == 6  # no line break: after the last space
+    assert _stop("x" * 300, 0, 100) == 100  # nowhere to break: exactly at the limit
+    assert _stop("ab\ncd" + "x" * 100, 3, 10) == 13  # counted from where the piece begins
+    # Only the last stretch before the limit is searched, so a piece is never much
+    # shorter than the limit: the break near the start of these texts is not used.
+    assert _stop("a\nb" + "x" * 30000, 0, 20000) == 20000
+    assert _stop("a b" + "x" * 30000, 0, 20000) == 20000
+
+
+@pytest.mark.anyio
 async def test_start_past_the_end_returns_an_empty_piece(client):
     text = await call(client, "read_section", arxiv_id="2501.00001v2", section_id="2.1", start=999)
-    assert text.splitlines()[0] == "section | 2501.00001v2 | 2.1 | chars 10-10 of 10 | partial"
+    assert (
+        text.splitlines()[0]
+        == "section | 2501.00001v2 | 2.1 | chars 10-10 of 10 | partial, end of section"
+    )
 
 
 @pytest.mark.anyio
@@ -287,7 +308,7 @@ async def test_invalid_identifier_is_an_error_result_the_model_can_read(client, 
     text = await failure(client, "get_outline", arxiv_id=bad)
 
     assert text.startswith(f"[invalid_id] {bad!r} is not a valid arXiv identifier")
-    assert "'2610.26648v1'" in text  # what to pass instead
+    assert "'2301.01234v2'" in text  # what to pass instead
     assert source.calls == []  # the source was never asked
 
 

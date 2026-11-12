@@ -35,3 +35,23 @@ async def test_server_starts_over_stdio_and_answers_a_tool_call(tmp_path):
         assert "[invalid_id]" in result.content[0].text
 
     assert not any(tmp_path.iterdir())  # nothing was fetched, nothing was cached
+
+
+@pytest.mark.anyio
+async def test_the_other_layout_is_chosen_on_the_command_line(tmp_path):
+    launch = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "hepph_paper_miner.server", "--toolset", "flat"],
+        env={CACHE_ENV: str(tmp_path)},
+    )
+
+    async with Client(launch, read_timeout_seconds=30) as client:
+        assert client.server_info.version == "flat-1"
+        tools = (await client.list_tools()).tools
+        assert [tool.name for tool in tools] == ["search_papers", "read_paper"]
+
+        result = await client.call_tool("read_paper", {"arxiv_id": "not an identifier"})
+        assert result.is_error is True
+        assert "[invalid_id]" in result.content[0].text
+
+    assert not any(tmp_path.iterdir())

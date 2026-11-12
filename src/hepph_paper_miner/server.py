@@ -1,21 +1,32 @@
-"""The MCP server: three tools for finding a paper and reading it one section at a time.
+"""The MCP server: tools for finding a paper and reading it, in one of two layouts.
 
-    search_papers   who wrote what           -> identifiers
-    get_outline     one paper                -> abstract, section identifiers and sizes
-                                                (the abstract alone when the text cannot be read)
-    read_section    one section of one paper -> its text
+    staged (the default)
+        search_papers   who wrote what           -> identifiers
+        get_outline     one paper                -> abstract, section identifiers and sizes
+                                                    (the abstract alone when the text cannot be read)
+        read_section    one section of one paper -> its text
+
+    flat
+        search_papers   who wrote what           -> identifiers and abstracts
+        read_paper      one paper                -> its whole text, every section marked
+
+The two layouts exist to be compared: does a model that sees an outline first and
+then reads single sections get by with less text than one that reads whole papers,
+and are its answers as good? A server offers one layout, chosen when it is started.
 
 Each tool returns one piece of text and nothing else. Hosts differ in what they pass
 to the model when a result has both text and structured data, so there is only text.
-Its first line has a fixed form ("search | ...", "outline | ...", "section | ...")
-that a program can read; the rest is for the model.
+Its first line has a fixed form ("search | ...", "outline | ...", "section | ...",
+"paper | ...", written in result_text.py) that a program can read; the rest is for
+the model.
 
-Start it with:  python -m hepph_paper_miner.server
+Start it with:  python -m hepph_paper_miner.server [--toolset flat]
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+import argparse
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import Annotated
 
@@ -25,6 +36,14 @@ from pydantic import Field
 
 from hepph_paper_miner import __version__
 from hepph_paper_miner.http import Fetcher, default_cache_dir
+from hepph_paper_miner.result_text import (
+    outline_line,
+    outline_without_sections_line,
+    paper_line,
+    paper_without_text_line,
+    search_line,
+    section_line,
+)
 from hepph_paper_miner.sources.arxiv import ArxivSource
 from hepph_paper_miner.sources.base import (
     ErrorKind,
@@ -39,18 +58,32 @@ from hepph_paper_miner.sources.base import (
 
 SERVER_NAME = "hepph-paper-miner"
 
-# Names the tool descriptions, the argument descriptions and the form of every result.
-# A change to any of them changes what the model reads, so it is a different experiment.
-TOOLSET_VERSION = "staged-2"
+# One name for everything the model reads from a layout: the tool descriptions, the
+# argument descriptions and the form of every result. A change to any of them changes
+# what the model reads, so it is a different experiment and the name has to change.
+# The server reports this name as its version, which is how a client learns it, and
+# tests/test_toolset_pin.py fails when the texts change and the name does not.
+TOOLSET_VERSION = {"staged": "staged-3", "flat": "flat-1"}
 
 SECTION_CHAR_LIMIT = 20_000  # the most text one read_section call returns
+# The largest paper of the evaluation has 187,527 characters, so every one of them
+# comes back whole. The limit is for whatever else a search may lead to: the text of
+# a paper is sent to the model again with every later turn of a conversation.
+PAPER_CHAR_LIMIT = 400_000  # the most text one read_paper call returns
+_CUT_WINDOW = 2_000  # how far back from a limit a line break is looked for
 _ECHO_LIMIT = 80  # the most of a bad argument that is repeated back
 
-_INSTRUCTIONS = (
-    "Search arXiv and read papers. Find a paper with search_papers, look at its sections "
-    "with get_outline, then read only the sections you need with read_section. "
-    "Pass identifiers exactly as a tool returned them."
-)
+_INSTRUCTIONS = {
+    "staged": (
+        "Search arXiv and read papers. Find a paper with search_papers, look at its sections "
+        "with get_outline, then read only the sections you need with read_section. "
+        "Pass identifiers exactly as a tool returned them."
+    ),
+    "flat": (
+        "Search arXiv and read papers. Find a paper with search_papers, then read it with "
+        "read_paper. Pass identifiers exactly as a tool returned them."
+    ),
+}
 
 _NEXT_STEP = {
     ErrorKind.NOT_FOUND: (
@@ -76,8 +109,22 @@ _NEXT_STEP = {
     ErrorKind.TIMEOUT: "arXiv took too long to answer. Try once more later, or use another paper.",
 }
 
+# The flat layout has no get_outline to point to.
+_NEXT_STEP_FLAT = {
+    ErrorKind.NO_FULL_TEXT: (
+        "This paper has no TeX source, so its text cannot be read. "
+        "The abstract is all there is; if the question needs more, "
+        "say that the full text is unavailable."
+    ),
+    ErrorKind.PARSE_ERROR: (
+        "The TeX source of this paper could not be split into sections, so it cannot be read. "
+        "The abstract is all there is; if the question needs more, "
+        "say that the full text is unavailable."
+    ),
+}
 
-def explain(error: SourceError) -> str:
+
+def explain(error: SourceError, toolset: str = "staged") -> str:
     """Turn an expected failure into a sentence that says what went wrong and what to do next.
 
     The sentence starts with the error kind in brackets, so that a program can
@@ -87,14 +134,17 @@ def explain(error: SourceError) -> str:
     """
     kind = error.kind.value
     if error.kind is ErrorKind.INVALID_ID:
+        # The examples are identifiers no evaluation question is about: a tool text
+        # that names a paper invites the model to go and read it.
         return (
             f"[{kind}] {_quoted(error.detail)} is not a valid arXiv identifier: the form is wrong, "
             "or it names a month, a number or an archive that arXiv never used. "
-            "Expected forms: '2610.26648v1' or '2610.26648' (papers from 2007-04 on), "
+            "Expected forms: '2301.01234v2' or '2301.01234' (papers from 2007-04 on), "
             "'hep-ph/0404175v2' or 'hep-ph/0404175' (earlier papers). "
             "Pass the identifier only, not a URL."
         )
-    return f"[{kind}] {_quoted(error.detail)}: {_NEXT_STEP.get(error.kind, 'the request failed.')}"
+    steps = _NEXT_STEP if toolset == "staged" else {**_NEXT_STEP, **_NEXT_STEP_FLAT}
+    return f"[{kind}] {_quoted(error.detail)}: {steps.get(error.kind, 'the request failed.')}"
 
 
 def _quoted(value: str) -> str:
@@ -103,7 +153,7 @@ def _quoted(value: str) -> str:
 
 
 @contextmanager
-def _expected_failures() -> Iterator[None]:
+def _expected_failures(toolset: str) -> Iterator[None]:
     """Inside a tool: report a SourceError to the model as an error result it can read.
 
     ToolError reaches the model as a result with is_error=True and this text. Any
@@ -112,7 +162,7 @@ def _expected_failures() -> Iterator[None]:
     try:
         yield
     except SourceError as error:
-        raise ToolError(explain(error)) from error
+        raise ToolError(explain(error, toolset)) from error
 
 
 def _find_section(paper: Paper, section_id: str) -> Section:
@@ -132,7 +182,7 @@ def _find_section(paper: Paper, section_id: str) -> Section:
     )
 
 
-# Failures that concern the full text only. get_outline still answers with the listing.
+# Failures that concern the full text only. The listing of such a paper is still shown.
 _NO_TEXT = (ErrorKind.NO_FULL_TEXT, ErrorKind.PARSE_ERROR)
 
 
@@ -151,42 +201,168 @@ def _authors(names: tuple[str, ...]) -> str:
     )
 
 
-def build_server(source: PaperSource) -> MCPServer:
-    """Create the server and register its tools.
+def _stop(text: str, start: int, limit: int) -> int:
+    """Where a piece that begins at `start` ends when at most `limit` characters may come back.
+
+    Not always exactly at the limit: a cut in the middle of a number leaves a
+    shorter number that reads as a complete one, and only a model that reads in
+    pieces would ever see it. So the piece ends after the last line break in the
+    final stretch before the limit, or after the last space when that stretch is one
+    long line. The result says where it stopped, so the caller needs no arithmetic.
+    """
+    hard = start + limit
+    if hard >= len(text):
+        return len(text)
+    earliest = max(start, hard - _CUT_WINDOW)
+    for mark in ("\n", " "):
+        found = text.rfind(mark, earliest, hard)
+        if found != -1:
+            return found + 1
+    return hard
+
+
+def _marker(section: Section) -> str:
+    return f"=== {section.section_id} | {section.title} | {section.chars} chars ==="
+
+
+def full_text(paper: Paper) -> str:
+    """The whole paper as one text, with a marker line in front of every section and subsection.
+
+    The marker carries the section identifier, which is what a reader needs to say
+    where a fact stands.
+    """
+    blocks = []
+    for index, section in enumerate(paper.sections):
+        if section.level != 1:
+            continue
+        subsections = []
+        for later in paper.sections[index + 1 :]:
+            if later.level == 1:
+                break
+            subsections.append(later)
+        blocks.append(f"{_marker(section)}\n{_with_subsection_markers(section.text, subsections)}")
+    return "\n\n".join(blocks)
+
+
+def _with_subsection_markers(text: str, subsections: list[Section]) -> str:
+    """Put a marker line in front of each subsection inside the text of its section.
+
+    The text of a section holds its subsections, their LaTeX headings included, so
+    each subsection is found by its own text, and its marker goes in front of the line
+    with its heading. Text is only ever added: a subsection that cannot be found (an
+    empty one, say) gets no marker, and nothing is dropped or repeated to make one fit.
+    """
+    pieces, written, search_from = [], 0, 0
+    for subsection in subsections:
+        at = text.find(subsection.text, search_from) if subsection.text else -1
+        if at == -1:
+            continue
+        heading = text.rfind("\\subsection", search_from, at)
+        line_start = text.rfind("\n", 0, at if heading == -1 else heading) + 1
+        cut = max(line_start, written)
+        pieces.append(text[written:cut])
+        pieces.append(_marker(subsection) + "\n")
+        written = cut
+        search_from = at + len(subsection.text)
+    pieces.append(text[written:])
+    return "".join(pieces)
+
+
+# The arguments of search_papers, which both layouts have. They stand at module level
+# because the SDK resolves a tool's annotations by name in the module.
+_Query = Annotated[
+    str,
+    Field(
+        min_length=1,
+        description='Words that must all appear. Put a phrase in double quotes: "dark matter".',
+    ),
+]
+_Author = Annotated[
+    str | None,
+    Field(description="A name the author list must contain, for example 'Hooper'."),
+]
+_Category = Annotated[
+    str | None,
+    Field(
+        pattern=r"^[a-z-]+(\.[A-Za-z-]+)?$",
+        description="An arXiv category, for example 'hep-ph' or 'astro-ph.HE'.",
+    ),
+]
+_YearFrom = Annotated[
+    int | None, Field(ge=1991, le=2099, description="First year of submission to include.")
+]
+_YearTo = Annotated[
+    int | None, Field(ge=1991, le=2099, description="Last year of submission to include.")
+]
+_MaxResults = Annotated[int, Field(ge=1, le=10)]
+
+
+def _search(source: PaperSource, toolset: str, query: SearchQuery) -> str:
+    if (
+        query.year_from is not None
+        and query.year_to is not None
+        and query.year_from > query.year_to
+    ):
+        raise ToolError(
+            f"[{ErrorKind.BAD_QUERY.value}] year_from ({query.year_from}) is later than "
+            f"year_to ({query.year_to}), so no paper can match. Swap them, or drop one."
+        )
+    with _expected_failures(toolset):
+        found = source.search(query)
+    asked = f"query={query.query!r}"
+    asked += "".join(
+        f" {name}={value!r}"
+        for name, value in (
+            ("author", query.author),
+            ("category", query.category),
+            ("year_from", query.year_from),
+            ("year_to", query.year_to),
+        )
+        if value is not None
+    )
+    lines = [search_line(len(found.papers), found.total, asked)]
+    for rank, meta in enumerate(found.papers, start=1):
+        lines.append(
+            f"{rank}. {meta.arxiv_id} | {meta.year} | {meta.primary_category} | {_authors(meta.authors)} | {meta.title}"
+        )
+        if toolset == "flat":
+            # On one line, whatever the listing holds: a program reads the identifiers
+            # from the lines that begin with a rank.
+            lines.append(f"   Abstract: {' '.join(meta.abstract.split())}")
+    if not found.papers:
+        lines.append(
+            "No paper matched. Every word has to occur, so try fewer or different words, "
+            "or drop the author, category or year filter."
+        )
+    return "\n".join(lines)
+
+
+def build_server(source: PaperSource, toolset: str = "staged") -> MCPServer:
+    """Create the server and register the tools of one layout.
 
     The source is passed in: the real server gets arXiv, tests get papers held in memory.
     """
-    mcp = MCPServer(SERVER_NAME, version=__version__, instructions=_INSTRUCTIONS)
+    if toolset not in TOOLSET_VERSION:
+        raise ValueError(f"unknown toolset {toolset!r}: expected one of {sorted(TOOLSET_VERSION)}")
+    mcp = MCPServer(
+        SERVER_NAME, version=TOOLSET_VERSION[toolset], instructions=_INSTRUCTIONS[toolset]
+    )
+    if toolset == "staged":
+        _add_staged_tools(mcp, source)
+    else:
+        _add_flat_tools(mcp, source)
+    return mcp
 
+
+def _add_staged_tools(mcp: MCPServer, source: PaperSource) -> None:
     @mcp.tool(structured_output=False)
     def search_papers(
-        query: Annotated[
-            str,
-            Field(
-                min_length=1,
-                description=(
-                    'Words that must all appear. Put a phrase in double quotes: "dark matter".'
-                ),
-            ),
-        ],
-        author: Annotated[
-            str | None,
-            Field(description="A name the author list must contain, for example 'Hooper'."),
-        ] = None,
-        category: Annotated[
-            str | None,
-            Field(
-                pattern=r"^[a-z-]+(\.[A-Za-z-]+)?$",
-                description="An arXiv category, for example 'hep-ph' or 'astro-ph.HE'.",
-            ),
-        ] = None,
-        year_from: Annotated[
-            int | None, Field(ge=1991, le=2099, description="First year of submission to include.")
-        ] = None,
-        year_to: Annotated[
-            int | None, Field(ge=1991, le=2099, description="Last year of submission to include.")
-        ] = None,
-        max_results: Annotated[int, Field(ge=1, le=10)] = 5,
+        query: _Query,
+        author: _Author = None,
+        category: _Category = None,
+        year_from: _YearFrom = None,
+        year_to: _YearTo = None,
+        max_results: _MaxResults = 5,
     ) -> str:
         """Search arXiv by keyword. Returns identifiers, years, categories, authors and titles.
 
@@ -195,37 +371,8 @@ def build_server(source: PaperSource) -> MCPServer:
         paper's listing (title, abstract, authors, comments). Abstracts are not
         returned; get_outline shows the abstract of one paper.
         """
-        if year_from is not None and year_to is not None and year_from > year_to:
-            raise ToolError(
-                f"[{ErrorKind.BAD_QUERY.value}] year_from ({year_from}) is later than "
-                f"year_to ({year_to}), so no paper can match. Swap them, or drop one."
-            )
-        with _expected_failures():
-            found = source.search(
-                SearchQuery(query, author, category, year_from, year_to, max_results)
-            )
-        asked = f"query={query!r}"
-        asked += "".join(
-            f" {name}={value!r}"
-            for name, value in (
-                ("author", author),
-                ("category", category),
-                ("year_from", year_from),
-                ("year_to", year_to),
-            )
-            if value is not None
-        )
-        lines = [f"search | {len(found.papers)} of {found.total} results | {asked}"]
-        for rank, meta in enumerate(found.papers, start=1):
-            lines.append(
-                f"{rank}. {meta.arxiv_id} | {meta.year} | {meta.primary_category} | {_authors(meta.authors)} | {meta.title}"
-            )
-        if not found.papers:
-            lines.append(
-                "No paper matched. Every word has to occur, so try fewer or different words, "
-                "or drop the author, category or year filter."
-            )
-        return "\n".join(lines)
+        asked = SearchQuery(query, author, category, year_from, year_to, max_results)
+        return _search(source, "staged", asked)
 
     @mcp.tool(structured_output=False)
     def get_outline(
@@ -233,7 +380,7 @@ def build_server(source: PaperSource) -> MCPServer:
             str,
             Field(
                 description=(
-                    "An arXiv identifier as returned by search_papers, for example '2610.26648v1'."
+                    "An arXiv identifier as returned by search_papers, for example '2301.01234v2'."
                 )
             ),
         ],
@@ -246,7 +393,7 @@ def build_server(source: PaperSource) -> MCPServer:
         When the text of a paper cannot be read, the title and abstract are still
         shown, and the last line says why there are no sections.
         """
-        with _expected_failures():
+        with _expected_failures("staged"):
             # The listing first: it names the version, and it is there even when the text is not.
             meta = source.listing(parse_arxiv_id(arxiv_id))
             try:
@@ -256,13 +403,13 @@ def build_server(source: PaperSource) -> MCPServer:
                     raise
                 return "\n".join(
                     [
-                        f"outline | {meta.arxiv_id} | no sections | {error.kind.value}",
+                        outline_without_sections_line(meta.arxiv_id, error.kind.value),
                         *_listing_lines(meta),
                         f"Sections: none. {explain(error)}",
                     ]
                 )
         lines = [
-            f"outline | {meta.arxiv_id} | {paper.chars} chars | {len(paper.sections)} sections | parser {paper.parser_version}",
+            outline_line(meta.arxiv_id, paper.chars, len(paper.sections), paper.parser_version),
             *_listing_lines(meta),
             "Sections (id | chars | title). A section's chars include its subsections.",
         ]
@@ -295,23 +442,16 @@ def build_server(source: PaperSource) -> MCPServer:
         come back per call; when a section is longer, the first line says so and the
         last line says how to get the rest.
         """
-        with _expected_failures():
+        with _expected_failures("staged"):
             paper = source.paper(parse_arxiv_id(arxiv_id))
         section = _find_section(paper, section_id)
         start = min(start, section.chars)
-        stop = min(start + SECTION_CHAR_LIMIT, section.chars)
-        text = section.text[start:stop]
-        whole = start == 0 and stop == section.chars
-        extent = (
-            f"{section.chars} chars | complete"
-            if whole
-            else f"chars {start}-{stop} of {section.chars} | partial"
-        )
+        stop = _stop(section.text, start, SECTION_CHAR_LIMIT)
         lines = [
-            f"section | {paper.meta.arxiv_id} | {section.section_id} | {extent}",
+            section_line(paper.meta.arxiv_id, section.section_id, start, stop, section.chars),
             f"Title: {section.title}",
             "",
-            text,
+            section.text[start:stop],
         ]
         if stop < section.chars:
             smaller = [
@@ -330,13 +470,105 @@ def build_server(source: PaperSource) -> MCPServer:
             )
         return "\n".join(lines)
 
-    return mcp
+
+def _add_flat_tools(mcp: MCPServer, source: PaperSource) -> None:
+    @mcp.tool(structured_output=False)
+    def search_papers(
+        query: _Query,
+        author: _Author = None,
+        category: _Category = None,
+        year_from: _YearFrom = None,
+        year_to: _YearTo = None,
+        max_results: _MaxResults = 5,
+    ) -> str:
+        """Search arXiv by keyword. Returns identifiers, years, categories, authors, titles and abstracts.
+
+        The best match comes first.
+        This is a keyword search, not a semantic one: every word has to occur in the
+        paper's listing (title, abstract, authors, comments).
+        """
+        asked = SearchQuery(query, author, category, year_from, year_to, max_results)
+        return _search(source, "flat", asked)
+
+    @mcp.tool(structured_output=False)
+    def read_paper(
+        arxiv_id: Annotated[
+            str,
+            Field(
+                description=(
+                    "An arXiv identifier as returned by search_papers, for example '2301.01234v2'."
+                )
+            ),
+        ],
+        start: Annotated[
+            int,
+            Field(
+                ge=0,
+                description="Character to start from. Only needed to continue a truncated read.",
+            ),
+        ] = 0,
+    ) -> str:
+        """Read one whole paper: its title, authors and abstract, then its full text (LaTeX source).
+
+        Every section and subsection of the text starts with a line of the form
+        "=== <section id> | <title> | <size> chars ===". The size of a section
+        includes its subsections. At most 400000 characters of text come back per
+        call; when a paper is longer, the first line says so and the last line says
+        how to get the rest. Without a version in the identifier, the latest version
+        is used and its full identifier is shown on the first line. When the text of
+        a paper cannot be read, the title and abstract are still shown, and the last
+        line says why there is no text.
+        """
+        with _expected_failures("flat"):
+            # The listing first: it names the version, and it is there even when the text is not.
+            meta = source.listing(parse_arxiv_id(arxiv_id))
+            try:
+                paper = source.paper(parse_arxiv_id(meta.arxiv_id))
+            except SourceError as error:
+                if error.kind not in _NO_TEXT:
+                    raise
+                return "\n".join(
+                    [
+                        paper_without_text_line(meta.arxiv_id, error.kind.value),
+                        *_listing_lines(meta),
+                        f"Text: none. {explain(error, 'flat')}",
+                    ]
+                )
+        text = full_text(paper)
+        start = min(start, len(text))
+        stop = _stop(text, start, PAPER_CHAR_LIMIT)
+        lines = [
+            paper_line(
+                meta.arxiv_id, start, stop, len(text), len(paper.sections), paper.parser_version
+            ),
+            *_listing_lines(meta),
+            "Text:",
+            "",
+            text[start:stop],
+        ]
+        if stop < len(text):
+            lines.append("")
+            lines.append(
+                f"[cut at character {stop} of {len(text)}. To continue, call read_paper with start={stop}.]"
+            )
+        return "\n".join(lines)
 
 
-def main() -> None:
-    # No arguments: serve over stdio. stdout carries the protocol, so nothing here may print.
+def main(argv: Sequence[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="hepph-paper-miner",
+        description="Serve the paper tools over stdio (MCP). Without arguments: the staged layout.",
+    )
+    parser.add_argument(
+        "--toolset",
+        choices=sorted(TOOLSET_VERSION),
+        default="staged",
+        help="staged: outline first, then single sections. flat: whole papers at once.",
+    )
+    arguments = parser.parse_args(argv)
+    # From here on stdout carries the protocol, so nothing may print.
     fetcher = Fetcher(default_cache_dir(), user_agent=f"{SERVER_NAME}/{__version__}")
-    build_server(ArxivSource(fetcher)).run()
+    build_server(ArxivSource(fetcher), arguments.toolset).run()
 
 
 if __name__ == "__main__":

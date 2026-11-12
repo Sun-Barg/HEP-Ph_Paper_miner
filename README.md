@@ -10,10 +10,22 @@ sections.
 ## Status
 
 - [x] Project skeleton; tests run without network
-- [x] arXiv search, LaTeX section parsing, and the three reading tools
-      (`search_papers`, `get_outline`, `read_section`)
+- [x] arXiv search, LaTeX section parsing, and the reading tools in two layouts
 - [ ] Tool-calling loop and run records
 - [ ] Evaluation set, graders, results
+
+## The two tool layouts
+
+A server offers one of them, chosen when it is started.
+
+| Layout | Tools | What the model reads |
+|---|---|---|
+| `staged` (default) | `search_papers`, `get_outline`, `read_section` | titles from a search, then an outline with section sizes, then single sections (at most 20,000 characters per call) |
+| `flat` | `search_papers`, `read_paper` | titles and abstracts from a search, then a whole paper with every section marked |
+
+Every result is one piece of text. Its first line has a fixed form that a program can
+read (`section | 2501.00001v2 | 3.2 | chars 0-19980 of 25531 | partial, more follows`);
+`src/hepph_paper_miner/result_text.py` writes and reads these lines.
 
 ## Development
 
@@ -46,6 +58,7 @@ client on stdin (stop it with Ctrl-C):
 
 ```
 uv run hepph-paper-miner
+uv run hepph-paper-miner --toolset flat
 ```
 
 `uv run python -m hepph_paper_miner.server` does the same.
