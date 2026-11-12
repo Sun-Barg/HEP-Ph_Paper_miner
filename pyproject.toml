@@ -14,6 +14,9 @@ dependencies = [
     # Lower bound: the version this was written and tested against.
     # Upper bound: the SDK makes breaking changes only in a new major.
     "mcp>=2.3,<3",
+    # Both come with mcp. They are named because this project imports them itself.
+    "httpx2>=2.16,<3",
+    "pydantic>=2,<3",
 ]
 
 [dependency-groups]
@@ -23,3 +26,10 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Tests marked "network" send real requests to arXiv. Run them on purpose: uv run pytest -m network
+addopts = "-m 'not network'"
+markers = ["network: sends real requests to arXiv (not run by default)"]
+
+[tool.ruff]
+# The code is formatted with "ruff format". ruff is not a dependency: run it with uvx.
+line-length = 100

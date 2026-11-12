@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Written by hand: a feed without entries. -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title type="html">ArXiv Query: search_query=&amp;id_list=2610.99999v1</title>
+  <id>http://arxiv.org/api/empty</id>
+  <updated>2026-11-12T00:00:00-05:00</updated>
+  <opensearch:totalResults xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:totalResults>
+  <opensearch:startIndex xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:startIndex>
+  <opensearch:itemsPerPage xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">1</opensearch:itemsPerPage>
+</feed>

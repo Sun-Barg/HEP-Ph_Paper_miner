@@ -1,14 +1,11 @@
-"""What every paper source shares: identifiers and expected failures.
-
-This first version holds only what the placeholder tool needs. The paper data
-types and the source protocol are added together with the first real source.
-"""
+"""What every paper source shares: identifiers, expected failures, paper data, the source protocol."""
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
 from enum import Enum
+from typing import Protocol
 
 
 class ErrorKind(str, Enum):
@@ -133,3 +130,74 @@ def parse_arxiv_id(text: str) -> ArxivId:
 
 def _as_version(digits: str | None) -> int | None:
     return None if digits is None else int(digits)
+
+
+@dataclass(frozen=True)
+class PaperMeta:
+    """What the arXiv listing says about a paper. No full text."""
+
+    arxiv_id: str  # with the version when it is known: "2610.26648v1"
+    title: str
+    authors: tuple[str, ...]
+    year: int  # year of the first version
+    primary_category: str
+    abstract: str
+
+
+@dataclass(frozen=True)
+class Section:
+    """One section or subsection of the full text.
+
+    The text of a section includes its subsections, so reading "3" gives all of
+    "3.1", "3.2" and so on as well.
+    """
+
+    section_id: str  # "3", "3.2", "A", "u1" (unnumbered)
+    title: str
+    level: int  # 1 for a section, 2 for a subsection
+    text: str
+
+    @property
+    def chars(self) -> int:
+        return len(self.text)
+
+
+@dataclass(frozen=True)
+class Paper:
+    """A paper with its full text split into sections."""
+
+    meta: PaperMeta
+    sections: tuple[Section, ...]  # in document order
+    parser_version: str
+
+    @property
+    def chars(self) -> int:
+        """Size of the full text. Subsections are part of their section, so count level 1 only."""
+        return sum(section.chars for section in self.sections if section.level == 1)
+
+
+@dataclass(frozen=True)
+class SearchQuery:
+    query: str
+    author: str | None = None
+    category: str | None = None
+    year_from: int | None = None
+    year_to: int | None = None
+    max_results: int = 5
+
+
+@dataclass(frozen=True)
+class SearchResult:
+    papers: tuple[PaperMeta, ...]
+    total: int  # how many papers matched, which can be more than were returned
+
+
+class PaperSource(Protocol):
+    """Where papers come from. The server knows nothing else about a source.
+
+    Both methods report expected failures by raising SourceError.
+    """
+
+    def search(self, query: SearchQuery) -> SearchResult: ...
+
+    def paper(self, arxiv_id: ArxivId) -> Paper: ...

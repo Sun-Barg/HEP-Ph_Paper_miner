@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Written by hand after the example in the arXiv API user manual
+     (https://info.arxiv.org/help/api/user-manual.html), not saved from a real answer.
+     Listing data is CC0. -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <link href="http://arxiv.org/api/query?search_query=all:galactic AND all:excess&amp;id_list=&amp;start=0&amp;max_results=2" rel="self" type="application/atom+xml"/>
+  <title type="html">ArXiv Query: search_query=all:galactic AND all:excess&amp;id_list=&amp;start=0&amp;max_results=2</title>
+  <id>http://arxiv.org/api/cHxbiOdZaP56ODnBPIenZhzg5f8</id>
+  <updated>2026-11-12T00:00:00-05:00</updated>
+  <opensearch:totalResults xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">37</opensearch:totalResults>
+  <opensearch:startIndex xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:startIndex>
+  <opensearch:itemsPerPage xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">2</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/2610.26648v1</id>
+    <updated>2026-10-19T12:00:00Z</updated>
+    <published>2026-10-19T12:00:00Z</published>
+    <title>Dark Matter Interpretations of the Galactic Center Gamma-Ray Excess
+  with 18 Years of Fermi-LAT Data and the FL16Y Source Catalog</title>
+    <summary>  An invented abstract for the test.
+It runs over two lines.
+</summary>
+    <author><name>Sang Hwan Kim</name></author>
+    <author><name>Hae Barg Kang</name></author>
+    <author><name>Seodong Shin</name></author>
+    <link href="http://arxiv.org/abs/2610.26648v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2610.26648v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="hep-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="hep-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="astro-ph.HE" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/hep-ph/0404175v2</id>
+    <updated>2004-06-01T10:00:00Z</updated>
+    <published>2004-04-21T09:00:00Z</published>
+    <title>An older paper with an old identifier</title>
+    <summary>Another invented abstract.</summary>
+    <author><name>A. Author</name></author>
+    <author><name>B. Author</name></author>
+    <author><name>C. Author</name></author>
+    <author><name>D. Author</name></author>
+    <author><name>E. Author</name></author>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="hep-ph" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="hep-ph" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+</feed>
