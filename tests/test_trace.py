@@ -42,9 +42,25 @@ def test_private_records_go_outside_the_repository_unless_told_otherwise(monkeyp
 
 
 def test_no_run_writes_into_the_file_of_another(tmp_path):
-    Trace("run-1", tmp_path / "public", tmp_path / "private")
+    first = Trace("run-1", tmp_path / "public", tmp_path / "private")
     with pytest.raises(FileExistsError):
         Trace("run-1", tmp_path / "public", tmp_path / "private")
+    # The run that was refused takes nothing away from the one whose files these are.
+    assert first.public_path.exists() and first.private_path.exists()
+
+
+def test_a_run_that_cannot_make_both_files_leaves_neither(tmp_path):
+    # The private file is there already, so the run cannot start. The public file, made
+    # first, must not stay behind: empty, it would read as a run that died.
+    private = tmp_path / "private" / "run-1.jsonl"
+    private.parent.mkdir()
+    private.write_text("the record of another run\n", encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        Trace("run-1", tmp_path / "public", tmp_path / "private")
+
+    assert not (tmp_path / "public" / "run-1.jsonl").exists()
+    assert private.read_text(encoding="utf-8") == "the record of another run\n"
 
 
 def test_without_a_private_folder_only_the_public_file_is_written(tmp_path):

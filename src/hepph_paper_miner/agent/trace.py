@@ -111,10 +111,20 @@ class Trace:
         self._tool_result_chars = 0
         self._tokens = {"input_tokens": 0, "output_tokens": 0}
         self._parsers: list[str] = []
-        for path in (self.public_path, self.private_path):
-            if path is not None:
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.open("x", encoding="utf-8").close()  # a run never writes into another's file
+        # "x": a run never writes into another's file. When one of the two cannot be
+        # made, the one this run has made goes again, for the reason given in
+        # __main__.py: left behind and empty, it would read as a run that died.
+        made: list[Path] = []
+        try:
+            for path in (self.public_path, self.private_path):
+                if path is not None:
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.open("x", encoding="utf-8").close()
+                    made.append(path)
+        except OSError:
+            for path in made:
+                path.unlink(missing_ok=True)
+            raise
 
     def start(self, facts: dict[str, Any], private: dict[str, Any]) -> None:
         """The first line: what was run. `private` is added in the private file only."""

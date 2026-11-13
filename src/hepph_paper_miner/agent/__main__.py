@@ -96,14 +96,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         question_id, question = arguments.question_id, known[arguments.question_id].question
 
+    try:
+        limits = Limits(max_turns=arguments.max_turns)
+    except ValueError as error:
+        print(f"--max-turns {arguments.max_turns}: {error}", file=sys.stderr)
+        return 2
+    model = ClaudeModel(arguments.model, effort=arguments.effort)
+    # The files of the record are made last, when nothing can refuse the run any more:
+    # a file without an "end" line reads as a run that died.
     trace = Trace(
         new_run_id(question_id, arguments.toolset),
         arguments.out,
         arguments.private,
         labels={"question_id": question_id, "toolset": arguments.toolset},
     )
-    limits = Limits(max_turns=arguments.max_turns)
-    model = ClaudeModel(arguments.model, effort=arguments.effort)
     print(f"run       {trace.run_id}")
     outcome = anyio.run(_ask, question, arguments.toolset, model, trace, limits)
 

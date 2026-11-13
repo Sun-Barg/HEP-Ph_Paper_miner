@@ -30,6 +30,15 @@ def test_without_a_key_nothing_is_started(monkeypatch, capsys, tmp_path, folders
     assert not any(tmp_path.iterdir())
 
 
+def test_a_turn_limit_below_one_is_refused_before_anything_is_written(
+    monkeypatch, capsys, tmp_path, folders
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    assert command.main(["--question", "Q?", "--max-turns", "0", *folders]) == 2
+    assert "--max-turns 0: max_turns has to be at least 1" in capsys.readouterr().err
+    assert not any(tmp_path.iterdir())  # before, two empty record files stayed behind
+
+
 def test_a_question_that_is_not_in_the_file_is_refused_before_anything_is_written(
     monkeypatch, capsys, tmp_path, tmp_path_factory, folders
 ):
