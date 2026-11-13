@@ -157,6 +157,9 @@ class Section:
     title: str
     level: int  # 1 for a section, 2 for a subsection
     text: str
+    # For a subsection: where its heading begins in the text of the section that holds
+    # it. The parser knows the place; looking for it afterwards can find the wrong one.
+    heading_at: int | None = None
 
     @property
     def chars(self) -> int:

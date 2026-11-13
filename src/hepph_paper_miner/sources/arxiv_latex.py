@@ -407,6 +407,7 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
     in_appendix = False
     numbered = lettered = unnumbered = 0
     parent, sub_numbered, sub_unnumbered = "0", 0, 0
+    holder_start = front_end  # where the text of the section begins that holds what follows
 
     # What comes before the first \section or \appendix, subsections included.
     first_section = next((mark[0] for mark in marks if mark[1] <= 1), len(body))
@@ -431,12 +432,14 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
                 # No heading, so no number: the next of the identifiers that say so.
                 unnumbered += 1
                 parent, sub_numbered, sub_unnumbered = f"u{unnumbered}", 0, 0
+                holder_start = text_start
                 title = "(text after \\appendix, without a section heading)"
                 sections.append(Section(parent, title, 1, text))
             continue
 
         if level == 1:
             sub_numbered = sub_unnumbered = 0
+            holder_start = text_start
             if starred:
                 unnumbered += 1
                 parent = f"u{unnumbered}"
@@ -446,14 +449,20 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
             else:
                 numbered += 1
                 parent = str(numbered)
-            section_id = parent
-        elif starred:
+            sections.append(Section(parent, title, 1, text))
+            continue
+
+        if starred:
             sub_unnumbered += 1
             section_id = f"{parent}.u{sub_unnumbered}"
         else:
             sub_numbered += 1
             section_id = f"{parent}.{sub_numbered}"
-        sections.append(Section(section_id, title, level, text))
+        # Where the heading begins in the text of its section. That text is tidied, so
+        # the heading stands after what comes before it, tidied the same way. It is
+        # no white space, so no run of line breaks that _tidy shortens is cut in two.
+        before = _squeeze(body[holder_start:position]).lstrip()
+        sections.append(Section(section_id, title, 2, text, heading_at=len(before)))
     return tuple(sections)
 
 
@@ -505,7 +514,11 @@ def _closing_brace(text: str, opening: int) -> int:
 
 
 def _tidy(text: str) -> str:
-    return re.sub(r"\n{3,}", "\n\n", text).strip()
+    return _squeeze(text).strip()
+
+
+def _squeeze(text: str) -> str:
+    return re.sub(r"\n{3,}", "\n\n", text)
 
 
 # --- check ---------------------------------------------------------------------------
@@ -527,6 +540,14 @@ def check(sections: tuple[Section, ...]) -> tuple[bool, str]:
             holder = section
         elif holder is None or section.text not in holder.text:
             return False, f"subsection {section.section_id} is not part of the section before it"
+        elif section.heading_at is None or not holder.text.startswith(
+            "\\subsection", section.heading_at
+        ):
+            # The flat layout puts the marker of a subsection in front of this place.
+            return (
+                False,
+                f"the heading of subsection {section.section_id} is not where it should be",
+            )
     total = sum(section.chars for section in sections if section.level == 1)
     if total < _MIN_TOTAL_CHARS:
         return False, f"only {total} characters of text were found"

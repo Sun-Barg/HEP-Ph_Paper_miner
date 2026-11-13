@@ -39,7 +39,7 @@ PINNED = {
         "2894e85cc947d591dc3e5d54e7040d0e7ccd6a997af8f6f19c3cda018d6e3a41",
         "3412b052aae5dbf8c159c78b558c66a17d646846ba0da758ca986f388bf52d4d",
     ),
-    "flat-2": (
+    "flat-3": (
         "5ad3886f3fe1fe8dc11162c12ca5e4a73588041cef0701bffdec3bcfb57e9dc9",
         "686b64159140d06015dd5269bf0d5148882b19f4063aae41057094fd68a1d16f",
     ),
@@ -49,6 +49,7 @@ LINE = "A line of text that is exactly sixty characters long, here.\n"
 assert len(LINE) == 60
 LONG = (LINE * (SECTION_CHAR_LIMIT // 60 + 40)).strip()
 
+METHODS = "Overview.\n\\subsection{Data}\nData text.\n\\subsection*{Aside}\nAside."
 PAPER = Paper(
     PaperMeta(
         "2501.00001v2",
@@ -60,14 +61,10 @@ PAPER = Paper(
     ),
     (
         Section("0", "(text before the first section)", 1, "Front text."),
-        Section(
-            "1",
-            "Methods",
-            1,
-            "Overview.\n\\subsection{Data}\nData text.\n\\subsection*{Aside}\nAside.",
-        ),
-        Section("1.1", "Data", 2, "Data text."),
-        Section("1.u1", "Aside", 2, "Aside."),
+        Section("1", "Methods", 1, METHODS),
+        # As the parser would say it: where the heading of each subsection begins.
+        Section("1.1", "Data", 2, "Data text.", METHODS.index("\\subsection{Data}")),
+        Section("1.u1", "Aside", 2, "Aside.", METHODS.index("\\subsection*{Aside}")),
         Section("2", "A Long Section", 1, LONG),
         Section("A", "Tables", 1, "Appendix text."),
     ),

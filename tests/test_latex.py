@@ -567,13 +567,43 @@ def test_check_reports_ok_and_a_message():
 def test_a_subsection_outside_the_section_before_it_is_not_trusted():
     # The text of a paper is the text of its sections, which hold their subsections.
     # A subsection that lies in none would be missing from the paper read as a whole.
-    whole = Section("1", "One", 1, "Lead.\n\\subsection{Part}\nPart text. " + filler(300))
-    part = Section("1.1", "Part", 2, "Part text. " + filler(300))
+    lead = "Lead.\n"
+    whole = Section("1", "One", 1, lead + "\\subsection{Part}\nPart text. " + filler(300))
+    part = Section("1.1", "Part", 2, "Part text. " + filler(300), heading_at=len(lead))
     assert check((whole, part))[0] is True
 
-    stray = Section("1.1", "Part", 2, "Text that section 1 does not hold.")
+    stray = Section("1.1", "Part", 2, "Text that section 1 does not hold.", heading_at=len(lead))
     assert check((whole, stray)) == (False, "subsection 1.1 is not part of the section before it")
     assert check((part, whole)) == (False, "subsection 1.1 is not part of the section before it")
+
+    # Where its heading begins is checked too: the flat layout puts a marker there.
+    for elsewhere in (None, 0, len(lead) + 1):
+        moved = Section("1.1", "Part", 2, part.text, heading_at=elsewhere)
+        assert check((whole, moved)) == (
+            False,
+            "the heading of subsection 1.1 is not where it should be",
+        )
+
+
+def test_a_subsection_says_where_its_heading_begins_in_the_text_of_its_section():
+    # The text of a section is tidied: line breaks at its start go, long runs of them
+    # shrink. The place of a heading is counted in the text as it is after that.
+    body = (
+        "\\section{One}\n\n\n\nFirst.\n\n\n\n\\subsection{Part}\nPart."
+        "\n\n\n\n\n\\subsection*{More}\nMore."
+    )
+    one, part, more = sections_of(document(body))
+    assert one.text == "First.\n\n\\subsection{Part}\nPart.\n\n\\subsection*{More}\nMore."
+    assert one.heading_at is None  # a section holds no place: its text begins after its heading
+    assert one.text[part.heading_at :].startswith("\\subsection{Part}")
+    assert one.text[more.heading_at :].startswith("\\subsection*{More}")
+
+    holder = None
+    for section in sections_of(SAMPLE_LATEX):
+        if section.level == 1:
+            holder = section
+        else:
+            assert holder.text.startswith("\\subsection", section.heading_at), section.section_id
 
 
 def test_a_paper_whose_text_stands_under_no_section_heading_is_read_whole():

@@ -50,7 +50,7 @@ async def test_two_tools_with_text_output_only(client):
         assert tool.description
     assert tools["read_paper"].input_schema["required"] == ["arxiv_id"]
 
-    assert client.server_info.version == TOOLSET_VERSION["flat"] == "flat-2"
+    assert client.server_info.version == TOOLSET_VERSION["flat"] == "flat-3"
     # Nothing a model reads in this layout may name a tool it does not have.
     told = client.instructions + "".join(tool.description for tool in tools.values())
     assert "read_paper" in told
@@ -170,7 +170,36 @@ def test_text_under_no_section_heading_is_part_of_the_whole_paper():
     assert without_markers(text) == whole and paper.chars == len(whole) - 2 * 2
 
 
-def test_a_subsection_that_cannot_be_found_gets_no_marker_and_no_text_is_lost():
+def test_a_marker_stands_at_its_heading_also_when_the_same_text_stands_earlier():
+    # The place of a marker used to be looked for: the first place where the text of the
+    # subsection stood. Here that is the first line of the section, not the subsection.
+    latex = (
+        "\\documentclass{article}\\begin{document}\n"
+        "\\section{Results}\nSee Table 1.\n" + filler(200) + "\n"
+        "\\subsection{Summary}\nSee Table 1.\n"
+        "\\subsection{Empty}\n\\subsection{Last}\nDone.\n\\end{document}"
+    )
+    meta = PaperMeta("2504.00006v1", "T", ("A",), 2025, "hep-ph", "A.")
+    lines = full_text(paper_from_latex(meta, latex)).split("\n")
+
+    assert lines[0].startswith("=== 1 | Results | ") and lines[1] == "See Table 1."
+    assert lines[-8:] == [
+        "=== 1.1 | Summary | 12 chars ===",
+        "\\subsection{Summary}",
+        "See Table 1.",
+        # A subsection without text has its marker as well: its heading is there.
+        "=== 1.2 | Empty | 0 chars ===",
+        "\\subsection{Empty}",
+        "=== 1.3 | Last | 5 chars ===",
+        "\\subsection{Last}",
+        "Done.",
+    ]
+    assert sum(line.startswith("=== ") for line in lines) == 4
+
+
+def test_a_subsection_made_by_hand_without_a_place_gets_no_marker_and_no_text_is_lost():
+    # The parser says where the heading of a subsection begins. Sections put together
+    # by hand may not say it; then nothing is guessed.
     sections = (
         Section("1", "One", 1, "Own text.\n\\subsection{Empty}\n\\subsection{Odd}\nReal text."),
         Section("1.1", "Empty", 2, ""),

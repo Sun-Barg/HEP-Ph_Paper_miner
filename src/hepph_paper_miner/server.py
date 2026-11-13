@@ -64,10 +64,10 @@ SERVER_NAME = "hepph-paper-miner"
 # what the model reads, so it is a different experiment and the name has to change.
 # The server reports this name as its version, which is how a client learns it, and
 # tests/test_toolset_pin.py fails when the texts change and the name does not.
-# The name also goes up when a tool answers the same call differently, which no test
-# can see: staged-4 and flat-2 have the texts of staged-3 and flat-1, but their search
-# no longer sends the words that arXiv does not look up (arxiv_search._NOT_SEARCHED).
-TOOLSET_VERSION = {"staged": "staged-4", "flat": "flat-2"}
+# The name also goes up when a tool answers the same call differently although no text
+# has changed, which no test can see: a search that sends other words to arXiv, a
+# marker in the whole text of a paper that stands in another place.
+TOOLSET_VERSION = {"staged": "staged-4", "flat": "flat-3"}
 
 SECTION_CHAR_LIMIT = 20_000  # the most text one read_section call returns
 # The largest paper of the evaluation has 187,527 characters, so every one of them
@@ -264,23 +264,20 @@ def full_text(paper: Paper) -> str:
 def _with_subsection_markers(text: str, subsections: list[Section]) -> str:
     """Put a marker line in front of each subsection inside the text of its section.
 
-    The text of a section holds its subsections, their LaTeX headings included, so
-    each subsection is found by its own text, and its marker goes in front of the line
-    with its heading. Text is only ever added: a subsection that cannot be found (an
-    empty one, say) gets no marker, and nothing is dropped or repeated to make one fit.
+    The text of a section holds its subsections, their LaTeX headings included. The
+    parser says where each heading begins (Section.heading_at), and the marker goes in
+    front of the line with that heading. Text is only ever added: a subsection without
+    such a place (one made by hand) gets no marker, and nothing is dropped or repeated.
     """
-    pieces, written, search_from = [], 0, 0
+    pieces, written = [], 0
     for subsection in subsections:
-        at = text.find(subsection.text, search_from) if subsection.text else -1
-        if at == -1:
+        if subsection.heading_at is None:
             continue
-        heading = text.rfind("\\subsection", search_from, at)
-        line_start = text.rfind("\n", 0, at if heading == -1 else heading) + 1
+        line_start = text.rfind("\n", 0, subsection.heading_at) + 1
         cut = max(line_start, written)
         pieces.append(text[written:cut])
         pieces.append(_marker(subsection) + "\n")
         written = cut
-        search_from = at + len(subsection.text)
     pieces.append(text[written:])
     return "".join(pieces)
 
