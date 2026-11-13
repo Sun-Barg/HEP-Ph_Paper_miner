@@ -35,8 +35,12 @@ All of them: model `claude-sonnet-5-5`, effort `high`, prompt `p1`, at most 12 t
 - In `diag-2/` the request left out the form of the answer (`answer_format` is null in
   the first line of a record). This was a diagnosis: with the form, seven of the twelve
   runs of `diag-1/` went on asking for tools until the turn limit; without it, all
-  twelve ended their turn after two to seven responses. What they ended with is plain
-  text, which the loop does not take for an answer, so these records hold none. The
-  text is in the private records only.
+  twelve ended their turn after two to seven responses. The system prompt stayed in the
+  request, and it asks for the sections an answer rests on: eleven of the twelve last
+  texts name them under the word "Evidence", and two of the texts close with a JSON
+  object of their own that has the three fields of an answer and lists its evidence as
+  strings. None of the twelve is an answer of the form the loop reads, as a whole or in
+  that last part, so these records hold no answer. The texts are in the private records
+  only.
 - A file is named after its run: `<UTC time>_<question id>_<layout>_<four random
   characters>.jsonl`.
