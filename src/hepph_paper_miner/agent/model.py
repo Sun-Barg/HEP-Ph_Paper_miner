@@ -74,6 +74,11 @@ class Model(Protocol):
         ...
 
 
+# What a request says to have the API keep the conversation so far. Given once for the
+# whole request, the API sets the mark at its end and moves it on as the run grows.
+_CACHE = {"type": "ephemeral"}
+
+
 class ClaudeModel:
     """A Claude model through the Messages API.
 
@@ -87,6 +92,15 @@ class ClaudeModel:
     Retries after rate limits, overload and timeouts are the SDK's, with its
     waits; `max_retries` and `request_seconds` are its defaults, written out for
     the same reason as above.
+
+    With `cache`, every request asks the API to keep the conversation so far for five
+    minutes. The next request of the run then pays a fraction of the price for what
+    this one sent, and a quarter more for what is new. The model reads the same
+    either way. What changes is the bill, and how usage is counted: `input_tokens`
+    is then only the part of a prompt that was neither written to the cache nor read
+    from it. It is off unless asked for, because it does not always pay: a long tool
+    result costs more when the run ends with the next response, and less when the
+    run goes on.
     """
 
     def __init__(
@@ -95,6 +109,7 @@ class ClaudeModel:
         *,
         max_tokens: int = 16_000,
         effort: str = "high",
+        cache: bool = False,
         max_retries: int = 2,
         request_seconds: float = 600.0,
         client: anthropic.AsyncAnthropic | None = None,
@@ -102,6 +117,7 @@ class ClaudeModel:
         self.name = name
         self._max_tokens = max_tokens
         self._effort = effort
+        self._cache = cache
         self._max_retries = max_retries
         self._request_seconds = request_seconds
         # Without a client given, the key is read from ANTHROPIC_API_KEY. It is never
@@ -117,6 +133,7 @@ class ClaudeModel:
             "max_tokens": self._max_tokens,
             "thinking": {"type": "adaptive"},
             "effort": self._effort,
+            "cache_control": dict(_CACHE) if self._cache else None,
             "max_retries": self._max_retries,
             "request_seconds": self._request_seconds,
             "sdk": f"anthropic {anthropic.__version__}",
@@ -141,6 +158,8 @@ class ClaudeModel:
                     "effort": self._effort,
                     "format": {"type": "json_schema", "schema": answer_schema},
                 },
+                # Left out of the request altogether when the cache is not asked for.
+                **({"cache_control": _CACHE} if self._cache else {}),
             )
         except anthropic.APIError as error:
             status = getattr(error, "status_code", None)

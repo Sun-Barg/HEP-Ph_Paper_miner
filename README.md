@@ -74,6 +74,7 @@ the tools the model asks for, and stops with a named reason (`answered`, `turn_l
 uv run python -m hepph_paper_miner.agent --question-id dev-01
 uv run python -m hepph_paper_miner.agent --question-id dev-01 --toolset flat
 uv run python -m hepph_paper_miner.agent --question "Which paper ...?"
+uv run python -m hepph_paper_miner.agent --question-id dev-01 --cache
 ```
 
 A run writes two files with the same name:
@@ -83,6 +84,16 @@ A run writes two files with the same name:
 - `~/hepph-paper-miner-runs/<run id>.jsonl` (set `HEPPH_PAPER_MINER_RUNS` to use
   another folder): the same with the full conversation. It holds paper text and stays
   outside this repository.
+
+With `--cache` every request asks the API to keep the conversation so far for five
+minutes (the API's own cache; it has nothing to do with the folder of downloads
+below). The next request of the run then pays a fraction of the price for what was
+sent before, and a quarter more for what is new. The model reads the same either way,
+so this is a matter of cost only, and it is off unless asked for: after a long tool
+result it is cheaper when the run goes on for two more responses or longer, and dearer
+when the run ends with the next one, as a run that reads a whole paper often does.
+With it on, `input_tokens` in a record counts only what was neither written to that
+cache nor read from it; the two cache counts stand beside it.
 
 The questions are in `eval_data/questions_dev.jsonl`. These five are for development:
 tool texts and the prompt may be tuned on them, so they are not part of the evaluation.

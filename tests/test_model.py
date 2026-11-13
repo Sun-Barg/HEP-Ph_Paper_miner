@@ -128,6 +128,28 @@ async def test_the_settings_a_caller_chooses_reach_the_request():
 
 
 @pytest.mark.anyio
+async def test_the_cache_is_asked_for_only_when_a_caller_says_so():
+    # Without it the request has no such field at all (the first test above). With it,
+    # one mark for the whole request: the API sets it at the end of the conversation.
+    counted = {
+        "input_tokens": 12,
+        "output_tokens": 340,
+        "cache_creation_input_tokens": 900,
+        "cache_read_input_tokens": 300,
+    }
+    api = Api(ok({**message([THINKING, TOOL_USE], "tool_use"), "usage": counted}))
+    model = api.model(cache=True)
+
+    reply = await model.reply(SYSTEM_PROMPT, QUESTION, TOOLS, ANSWER_SCHEMA)
+
+    (request,) = api.requests
+    assert request["cache_control"] == {"type": "ephemeral"}
+    assert model.settings["cache_control"] == {"type": "ephemeral"}  # and the record says so
+    # What the API counted comes back whole: the two cache counts are input tokens too.
+    assert {name: reply.usage[name] for name in counted} == counted
+
+
+@pytest.mark.anyio
 async def test_a_response_that_asks_for_tools_is_read():
     api = Api(ok(message([THINKING, TOOL_USE], "tool_use")))
 
@@ -243,6 +265,7 @@ def test_the_settings_for_the_record_name_the_defaults_in_use():
         "max_tokens": 16000,
         "thinking": {"type": "adaptive"},
         "effort": "high",
+        "cache_control": None,
         "max_retries": 2,
         "request_seconds": 600.0,
         "sdk": f"anthropic {anthropic.__version__}",

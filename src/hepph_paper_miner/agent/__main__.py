@@ -53,6 +53,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--effort", default="high", choices=["low", "medium", "high", "xhigh", "max"]
     )
+    parser.add_argument(
+        "--cache",
+        action="store_true",
+        help="have the API keep the conversation between the turns of the run "
+        "(cheaper for a long run, dearer for a short one: see the README)",
+    )
     parser.add_argument("--max-turns", type=int, default=Limits().max_turns)
     parser.add_argument(
         "--out",
@@ -101,7 +107,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as error:
         print(f"--max-turns {arguments.max_turns}: {error}", file=sys.stderr)
         return 2
-    model = ClaudeModel(arguments.model, effort=arguments.effort)
+    model = ClaudeModel(arguments.model, effort=arguments.effort, cache=arguments.cache)
     # The files of the record are made last, when nothing can refuse the run any more:
     # a file without an "end" line reads as a run that died.
     trace = Trace(
@@ -125,6 +131,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"read      {last['tool_result_chars']} characters in {last['tool_calls']} tool results; "
         f"{last['input_tokens']} input and {last['output_tokens']} output tokens"
     )
+    written, reread = last["cache_creation_input_tokens"], last["cache_read_input_tokens"]
+    if written or reread:
+        # With the cache on, these are input tokens too: "input" above is the rest.
+        print(f"cache     {written} tokens written to it, {reread} read from it")
     print(f"public    {trace.public_path}")
     print(f"private   {trace.private_path}")
     return 0 if outcome.reason is EndReason.ANSWERED else 1

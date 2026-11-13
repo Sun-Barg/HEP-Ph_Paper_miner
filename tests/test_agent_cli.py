@@ -4,6 +4,7 @@ The run uses a model that replies from a script and papers held in memory, put i
 place of the real ones. The real ones cost money and send requests.
 """
 
+import dataclasses
 import json
 
 import pytest
@@ -84,8 +85,8 @@ def test_one_question_from_the_command_line_to_the_two_files(
     scripted = ScriptedModel(asks(section), says(json.dumps(ANSWER)))
     made = {}
 
-    def model(name, effort):
-        made.update(name=name, effort=effort)
+    def model(name, effort, cache):
+        made.update(name=name, effort=effort, cache=cache)
         return scripted
 
     monkeypatch.setattr(command, "ClaudeModel", model)
@@ -97,11 +98,12 @@ def test_one_question_from_the_command_line_to_the_two_files(
     )
 
     assert code == 0
-    assert made == {"name": "claude-sonnet-5-5", "effort": "medium"}
+    assert made == {"name": "claude-sonnet-5-5", "effort": "medium", "cache": False}
     shown = capsys.readouterr().out
     assert "ended     answered" in shown and "answer    Ten." in shown
     assert "evidence  2501.00001v2 2.1" in shown
     assert "read      74 characters in 1 tool results" in shown
+    assert "cache" not in shown  # nothing went through the cache, so nothing is said of it
     (public,) = (tmp_path / "public").iterdir()
     (private,) = (tmp_path / "private").iterdir()
     assert public.name == private.name and "_adhoc_staged_" in public.name
@@ -115,9 +117,40 @@ def test_one_question_from_the_command_line_to_the_two_files(
     assert "Data text." in private.read_text(encoding="utf-8")
 
 
+def test_with_the_cache_asked_for_the_model_is_told_and_the_counts_are_shown(
+    monkeypatch, capsys, folders
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    # As the API counts a second request with the cache on: most of the prompt read
+    # from the cache, what is new written to it, and little left that is neither.
+    usage = {
+        "input_tokens": 12,
+        "output_tokens": 10,
+        "cache_creation_input_tokens": 900,
+        "cache_read_input_tokens": 300,
+    }
+    answer = dataclasses.replace(says(json.dumps(ANSWER)), usage=usage)
+    made = {}
+
+    def model(name, effort, cache):
+        made.update(cache=cache)
+        return ScriptedModel(answer)
+
+    monkeypatch.setattr(command, "ClaudeModel", model)
+    monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
+    monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
+
+    assert command.main(["--question", "Q?", "--cache", *folders]) == 0
+
+    assert made == {"cache": True}
+    shown = capsys.readouterr().out
+    assert "12 input and 10 output tokens" in shown
+    assert "cache     900 tokens written to it, 300 read from it" in shown
+
+
 def test_a_run_without_an_answer_ends_with_a_code_that_says_so(monkeypatch, capsys, folders):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
-    monkeypatch.setattr(command, "ClaudeModel", lambda name, effort: ScriptedModel(says("")))
+    monkeypatch.setattr(command, "ClaudeModel", lambda name, effort, cache: ScriptedModel(says("")))
     monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
     monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
     assert command.main(["--question-id", "dev-05", "--toolset", "flat", *folders]) == 1

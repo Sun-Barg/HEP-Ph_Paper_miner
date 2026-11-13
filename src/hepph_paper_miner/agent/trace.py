@@ -109,7 +109,15 @@ class Trace:
         self._now = now
         self._tool_calls = 0
         self._tool_result_chars = 0
-        self._tokens = {"input_tokens": 0, "output_tokens": 0}
+        # What the API counted, added up over the turns. input_tokens is the part of
+        # every prompt that was billed in full. With the cache on (model.py), the rest
+        # of a prompt is in the two cache counts, and its size is the sum of the three.
+        self._tokens = {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+        }
         self._parsers: list[str] = []
         # "x": a run never writes into another's file. When one of the two cannot be
         # made, the one this run has made goes again, for the reason given in

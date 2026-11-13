@@ -1,5 +1,6 @@
 """The files of a run: their names, where they go, and that no run writes into another's."""
 
+import dataclasses
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -99,3 +100,29 @@ def test_totals_count_every_text_the_model_was_given(tmp_path):
     end = json.loads(trace.public_path.read_text(encoding="utf-8").splitlines()[-1])
     assert (end["tool_calls"], end["tool_result_chars"]) == (1, len(TEXT))
     assert (end["input_tokens"], end["output_tokens"]) == (100, 10)
+    # Nothing went through the cache, and the record says so with a number.
+    assert (end["cache_creation_input_tokens"], end["cache_read_input_tokens"]) == (0, 0)
+
+
+def test_with_the_cache_on_the_totals_hold_all_three_parts_of_the_input(tmp_path):
+    # input_tokens is then only the part of a prompt that was billed in full. The size
+    # of what the model read is the sum of the three, so the record keeps all of them.
+    trace = Trace("run-1", tmp_path, None)
+    trace.start({}, private={})
+    first = {"input_tokens": 1200, "output_tokens": 10, "cache_creation_input_tokens": 0}
+    second = {
+        "input_tokens": 12,
+        "output_tokens": 30,
+        "cache_creation_input_tokens": 900,
+        "cache_read_input_tokens": 1200,
+    }
+    for number, usage in enumerate((first, second), start=1):
+        trace.turn(number, dataclasses.replace(says("{}"), usage=usage), 0.1, [])
+    trace.end("answered", "", None, turns=2, seconds=0.2)
+    end = json.loads(trace.public_path.read_text(encoding="utf-8").splitlines()[-1])
+    assert {name: end[name] for name in second} == {
+        "input_tokens": 1212,
+        "output_tokens": 40,
+        "cache_creation_input_tokens": 900,
+        "cache_read_input_tokens": 1200,
+    }
