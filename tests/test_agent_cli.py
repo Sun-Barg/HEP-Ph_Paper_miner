@@ -5,12 +5,15 @@ place of the real ones. The real ones cost money and send requests.
 """
 
 import dataclasses
+import hashlib
 import json
+from pathlib import Path
 
 import pytest
 from conftest import ScriptedModel, asks, sample_source, says
 
 from hepph_paper_miner.agent import __main__ as command
+from hepph_paper_miner.agent.origin import code_version
 
 ANSWER = {
     "answer": "Ten.",
@@ -38,6 +41,15 @@ def test_a_turn_limit_below_one_is_refused_before_anything_is_written(
     assert command.main(["--question", "Q?", "--max-turns", "0", *folders]) == 2
     assert "--max-turns 0: max_turns has to be at least 1" in capsys.readouterr().err
     assert not any(tmp_path.iterdir())  # before, two empty record files stayed behind
+
+
+def test_a_repetition_below_one_is_refused_before_anything_is_written(
+    monkeypatch, capsys, tmp_path, folders
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    assert command.main(["--question", "Q?", "--repeat", "0", *folders]) == 2
+    assert "--repeat 0: repetitions are counted from 1" in capsys.readouterr().err
+    assert not any(tmp_path.iterdir())
 
 
 def test_a_question_that_is_not_in_the_file_is_refused_before_anything_is_written(
@@ -118,6 +130,10 @@ def test_one_question_from_the_command_line_to_the_two_files(
         "staged",
         "staged-5",
     )
+    # A question typed on the command line comes from no file, and nobody said which
+    # repetition this is. The code that ran is named all the same.
+    assert (first["questions"], first["repeat"]) == (None, None)
+    assert first["code"] == code_version()
     assert "Data text." not in public.read_text(encoding="utf-8")
     assert "Data text." in private.read_text(encoding="utf-8")
 
@@ -168,6 +184,30 @@ def test_with_the_thinking_asked_for_the_model_is_told(monkeypatch, folders):
     assert command.main(["--question", "Q?", "--show-thinking", *folders]) == 0
 
     assert made == {"show_thinking": True}
+
+
+def test_the_record_names_the_question_file_and_the_repetition(monkeypatch, tmp_path, folders):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    monkeypatch.setattr(
+        command,
+        "ClaudeModel",
+        lambda name, effort, cache, show_thinking: ScriptedModel(says(json.dumps(ANSWER))),
+    )
+    monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
+    monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
+
+    assert command.main(["--question-id", "dev-04", "--repeat", "3", *folders]) == 0
+
+    (public,) = (tmp_path / "public").iterdir()
+    first = json.loads(public.read_text(encoding="utf-8").splitlines()[0])
+    assert (first["question_id"], first["repeat"]) == ("dev-04", 3)
+    # An id says nothing once the file has been edited, so the file is named as it lay
+    # on the disk: two records with the same digest were asked the same question.
+    file = Path("eval_data/questions_dev.jsonl")
+    assert first["questions"] == {
+        "file": "questions_dev.jsonl",
+        "sha256": hashlib.sha256(file.read_bytes()).hexdigest(),
+    }
 
 
 def test_a_run_without_an_answer_ends_with_a_code_that_says_so(monkeypatch, capsys, folders):

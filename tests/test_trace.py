@@ -87,6 +87,21 @@ def test_what_the_model_thought_is_in_the_private_file_only(tmp_path):
     assert thought in trace.private_path.read_text(encoding="utf-8")
 
 
+def test_the_record_names_the_model_that_answered(tmp_path):
+    # The first line has the name a request asked for. Each turn has what the API says
+    # it got, and the last line lists them: more than one name would be worth a look.
+    trace = Trace("run-1", tmp_path, None)
+    trace.start({}, private={})
+    for number, name in enumerate(("model-a", "model-a", "model-b", None), start=1):
+        trace.turn(number, dataclasses.replace(says("{}"), model=name), 0.1, [])
+    trace.end("answered", "", None, turns=4, seconds=0.4)
+    _, *turns, end = (
+        json.loads(line) for line in trace.public_path.read_text(encoding="utf-8").splitlines()
+    )
+    assert [turn["response_model"] for turn in turns] == ["model-a", "model-a", "model-b", None]
+    assert end["response_models"] == ["model-a", "model-b"]
+
+
 def test_the_public_facts_of_a_tool_call_leave_its_text_out():
     facts = ToolRecord(CALL, OK, TEXT, 1.23456).public()
     assert "Data text." not in json.dumps(facts)

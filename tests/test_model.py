@@ -185,6 +185,7 @@ async def test_a_response_that_asks_for_tools_is_read():
     assert reply.usage["output_tokens_details"] == {"thinking_tokens": 300}
     assert reply.stop_details is None
     assert reply.raw["id"] == "msg_01"
+    assert reply.model == "claude-sonnet-5-5"  # the model that answered, as the response names it
 
 
 @pytest.mark.anyio

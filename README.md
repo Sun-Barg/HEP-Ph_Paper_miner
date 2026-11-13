@@ -75,7 +75,7 @@ uv run python -m hepph_paper_miner.agent --question-id dev-01
 uv run python -m hepph_paper_miner.agent --question-id dev-01 --toolset flat
 uv run python -m hepph_paper_miner.agent --question "Which paper ...?"
 uv run python -m hepph_paper_miner.agent --question-id dev-01 --cache
-uv run python -m hepph_paper_miner.agent --question-id dev-01 --show-thinking
+uv run python -m hepph_paper_miner.agent --question-id dev-01 --show-thinking --repeat 2
 ```
 
 A run writes two files with the same name:
@@ -106,6 +106,12 @@ of a run:
 ```
 uv run python scripts/show_thinking.py "results/runs/20261113T*.jsonl" --out thinking.txt
 ```
+
+The first line of a record says what was run: the names of the tool texts, the prompt
+and the parser, the settings of the model, and which code it was (`code`: the commit,
+and whether a file the repository keeps had been changed). For a question from a file
+it names the file and its SHA-256 (`questions`), and with `--repeat` the repetition.
+Every turn names the model that answered (`response_model`).
 
 The questions are in `eval_data/questions_dev.jsonl`. These five are for development:
 tool texts and the prompt may be tuned on them, so they are not part of the evaluation.

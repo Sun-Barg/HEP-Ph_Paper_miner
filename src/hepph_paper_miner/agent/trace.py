@@ -119,6 +119,7 @@ class Trace:
             "cache_read_input_tokens": 0,
         }
         self._parsers: list[str] = []
+        self._models: list[str] = []
         # "x": a run never writes into another's file. When one of the two cannot be
         # made, the one this run has made goes again, for the reason given in
         # __main__.py: left behind and empty, it would read as a run that died.
@@ -158,10 +159,15 @@ class Trace:
             parser = (facts.get("first_line") or {}).get("parser")
             if parser and parser not in self._parsers:
                 self._parsers.append(parser)
+        if reply.model and reply.model not in self._models:
+            self._models.append(reply.model)
         line = {
             "record": "turn",
             "turn": number,
             "seconds": round(seconds, 3),
+            # The model that answered, as the response names it. The first line of the
+            # record has the name that was asked for; this is what the API says it got.
+            "response_model": reply.model,
             "stop_reason": reply.stop_reason,
             "stop_details": reply.stop_details,
             "blocks": list(reply.blocks),
@@ -196,6 +202,7 @@ class Trace:
             "tool_result_chars": self._tool_result_chars,
             **self._tokens,
             "parser_versions": self._parsers,
+            "response_models": self._models,
             "ended_at": self._stamp(),
         }
         self._write(self.public_path, line)

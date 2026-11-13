@@ -40,6 +40,9 @@ class Reply:
     content: Any
     stop_details: dict[str, Any] | None = None
     raw: dict[str, Any] | None = None  # the whole response, for the private record
+    # The model that answered, as the response names it. A request names the model it
+    # wants; this is what the API says it got.
+    model: str | None = None
 
 
 class ModelError(Exception):
@@ -201,4 +204,5 @@ def reply_from(response: anthropic.types.Message) -> Reply:
             response.stop_details.model_dump(mode="json") if response.stop_details else None
         ),
         raw=response.model_dump(mode="json"),
+        model=response.model,
     )

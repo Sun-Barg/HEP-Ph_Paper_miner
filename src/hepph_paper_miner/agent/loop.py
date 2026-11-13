@@ -28,6 +28,7 @@ from mcp import Client, MCPError
 from mcp.types import REQUEST_TIMEOUT
 
 from hepph_paper_miner.agent.model import Model, ModelError, Reply, ToolCall
+from hepph_paper_miner.agent.origin import code_version
 from hepph_paper_miner.agent.prompt import (
     ANSWER_SCHEMA,
     PROMPT_VERSION,
@@ -158,6 +159,9 @@ async def run(
             "model": model.settings,
             "limits": asdict(limits),
             "packages": {name: version(name) for name in _WRITE_FOR_THE_MODEL},
+            # The names above say what the model reads. This says which code ran:
+            # the commit, and whether a file of it had been changed (origin.py).
+            "code": code_version(),
         },
         private={
             "system": SYSTEM_PROMPT,

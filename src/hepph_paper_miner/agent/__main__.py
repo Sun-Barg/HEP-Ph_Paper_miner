@@ -27,6 +27,7 @@ from mcp import Client
 from hepph_paper_miner import __version__
 from hepph_paper_miner.agent.loop import EndReason, Limits, Outcome, run
 from hepph_paper_miner.agent.model import ClaudeModel
+from hepph_paper_miner.agent.origin import file_digest
 from hepph_paper_miner.agent.trace import Trace, default_private_dir, new_run_id
 from hepph_paper_miner.eval.questions import QuestionFileError, load_questions
 from hepph_paper_miner.http import Fetcher, default_cache_dir
@@ -67,6 +68,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--max-turns", type=int, default=Limits().max_turns)
     parser.add_argument(
+        "--repeat",
+        type=int,
+        help="which repetition of the question this run is (1, 2, ...), for the record",
+    )
+    parser.add_argument(
         "--out",
         type=Path,
         default=Path("results/runs"),
@@ -93,7 +99,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     if arguments.question is not None:
-        question_id, question = "adhoc", arguments.question
+        question_id, question, questions = "adhoc", arguments.question, None
     else:
         try:
             known = {item.id: item for item in load_questions(arguments.questions)}
@@ -107,11 +113,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             return 2
         question_id, question = arguments.question_id, known[arguments.question_id].question
+        # A record names its question by id, and an id says nothing once the file has
+        # been edited. So the record also names the file as it lay on the disk.
+        questions = {"file": arguments.questions.name, "sha256": file_digest(arguments.questions)}
 
     try:
         limits = Limits(max_turns=arguments.max_turns)
     except ValueError as error:
         print(f"--max-turns {arguments.max_turns}: {error}", file=sys.stderr)
+        return 2
+    if arguments.repeat is not None and arguments.repeat < 1:
+        print(f"--repeat {arguments.repeat}: repetitions are counted from 1", file=sys.stderr)
         return 2
     model = ClaudeModel(
         arguments.model,
@@ -125,7 +137,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         new_run_id(question_id, arguments.toolset),
         arguments.out,
         arguments.private,
-        labels={"question_id": question_id, "toolset": arguments.toolset},
+        labels={
+            "question_id": question_id,
+            "toolset": arguments.toolset,
+            "repeat": arguments.repeat,
+            "questions": questions,
+        },
     )
     print(f"run       {trace.run_id}")
     outcome = anyio.run(_ask, question, arguments.toolset, model, trace, limits)

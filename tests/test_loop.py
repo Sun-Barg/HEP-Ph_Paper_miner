@@ -20,6 +20,7 @@ from mcp.types import CONNECTION_CLOSED, REQUEST_TIMEOUT
 
 from hepph_paper_miner.agent.loop import EndReason, Limits, run
 from hepph_paper_miner.agent.model import ModelError, Reply
+from hepph_paper_miner.agent.origin import code_version
 from hepph_paper_miner.agent.prompt import (
     ANSWER_SCHEMA,
     PROMPT_VERSION,
@@ -150,6 +151,10 @@ async def test_the_record_says_what_was_run_and_what_each_result_was(client, tra
     # The SDK and pydantic write a part of what the model reads (the sentence for
     # arguments that break a schema, say), so the record names the versions in use.
     assert start["packages"] == {"mcp": version("mcp"), "pydantic": version("pydantic")}
+    # And which code ran: the commit, and whether a kept file differed from it. The
+    # names above say what the model read, not what the loop was (test_origin.py).
+    assert start["code"] == code_version()
+    assert set(start["code"]) == {"commit", "modified"}
 
     assert [turn["turn"] for turn in turns] == [1, 2, 3, 4]
     assert turns[0]["blocks"] == ["thinking", "tool_use"] and turns[0]["stop_reason"] == "tool_use"
