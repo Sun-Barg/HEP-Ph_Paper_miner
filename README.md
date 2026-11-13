@@ -37,7 +37,7 @@ uv sync
 uv run pytest
 ```
 
-The default test run sends no requests. Two further tests and one script talk to arXiv,
+The default test run sends no requests. Four further tests and one script talk to arXiv,
 three seconds apart:
 
 ```

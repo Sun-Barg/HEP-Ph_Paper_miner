@@ -49,7 +49,7 @@ async def test_two_tools_with_text_output_only(client):
         assert tool.description
     assert tools["read_paper"].input_schema["required"] == ["arxiv_id"]
 
-    assert client.server_info.version == TOOLSET_VERSION["flat"] == "flat-1"
+    assert client.server_info.version == TOOLSET_VERSION["flat"] == "flat-2"
     # Nothing a model reads in this layout may name a tool it does not have.
     told = client.instructions + "".join(tool.description for tool in tools.values())
     assert "read_paper" in told

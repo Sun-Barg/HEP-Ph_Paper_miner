@@ -70,6 +70,40 @@ def test_characters_of_the_query_language_never_reach_arxiv(typed, sent):
     assert (built and built["search_query"]) == sent
 
 
+@pytest.mark.parametrize(
+    ("typed", "sent"),
+    [
+        # A title typed as it stands. With its small words sent along, arXiv found nothing.
+        (
+            "Dark Matter Interpretations of the Galactic Center Gamma-Ray Excess with 18 Years "
+            "of Fermi-LAT Data and the FL16Y Source Catalog",
+            "all:Dark AND all:Matter AND all:Interpretations AND all:Galactic AND all:Center "
+            "AND all:Gamma-Ray AND all:Excess AND all:18 AND all:Years AND all:Fermi-LAT "
+            "AND all:Data AND all:FL16Y AND all:Source AND all:Catalog",
+        ),
+        ("A Tale of Tails", "all:Tale AND all:Tails"),
+        ("IN THE galaxy", "all:galaxy"),  # in capitals too
+        # Only whole words: these merely contain one, or join one to another word.
+        (
+            "theory android often no-scale",
+            "all:theory AND all:android AND all:often AND all:no-scale",
+        ),
+        # A phrase stays as it was typed: inside one, arXiv copes with these words.
+        ('"The Fermi Bubbles" and "an excess"', 'all:"The Fermi Bubbles" AND all:"an excess"'),
+        ('"the"', None),  # one word in quotes is a word
+        ("of the and", None),  # nothing left to search for
+    ],
+)
+def test_words_that_arxiv_does_not_look_up_are_left_out(typed, sent):
+    built = search_params(SearchQuery(typed))
+    assert (built and built["search_query"]) == sent
+
+
+def test_an_author_filter_keeps_such_a_word_because_it_can_be_a_name():
+    assert query_string(query="excess", author="An") == 'all:excess AND au:"An"'
+    assert query_string(query="of", author="Will") == 'au:"Will"'  # the filter alone is searched
+
+
 def test_an_author_filter_without_a_letter_is_dropped():
     assert query_string(query="x", author=" - . ' ") == "all:x"
     assert query_string(query="x", author="O'Brien-Smith, J.") == 'all:x AND au:"O\'Brien-Smith J."'

@@ -63,7 +63,10 @@ SERVER_NAME = "hepph-paper-miner"
 # what the model reads, so it is a different experiment and the name has to change.
 # The server reports this name as its version, which is how a client learns it, and
 # tests/test_toolset_pin.py fails when the texts change and the name does not.
-TOOLSET_VERSION = {"staged": "staged-3", "flat": "flat-1"}
+# The name also goes up when a tool answers the same call differently, which no test
+# can see: staged-4 and flat-2 have the texts of staged-3 and flat-1, but their search
+# no longer sends the words that arXiv does not look up (arxiv_search._NOT_SEARCHED).
+TOOLSET_VERSION = {"staged": "staged-4", "flat": "flat-2"}
 
 SECTION_CHAR_LIMIT = 20_000  # the most text one read_section call returns
 # The largest paper of the evaluation has 187,527 characters, so every one of them

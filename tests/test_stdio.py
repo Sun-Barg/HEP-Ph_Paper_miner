@@ -46,7 +46,7 @@ async def test_the_other_layout_is_chosen_on_the_command_line(tmp_path):
     )
 
     async with Client(launch, read_timeout_seconds=30) as client:
-        assert client.server_info.version == "flat-1"
+        assert client.server_info.version == "flat-2"
         tools = (await client.list_tools()).tools
         assert [tool.name for tool in tools] == ["search_papers", "read_paper"]
 

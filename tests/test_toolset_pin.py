@@ -35,11 +35,11 @@ from hepph_paper_miner.sources.base import ErrorKind, Paper, PaperMeta, Section
 from hepph_paper_miner.sources.fixture import FixtureSource
 
 PINNED = {
-    "staged-3": (
+    "staged-4": (
         "2894e85cc947d591dc3e5d54e7040d0e7ccd6a997af8f6f19c3cda018d6e3a41",
         "3412b052aae5dbf8c159c78b558c66a17d646846ba0da758ca986f388bf52d4d",
     ),
-    "flat-1": (
+    "flat-2": (
         "5ad3886f3fe1fe8dc11162c12ca5e4a73588041cef0701bffdec3bcfb57e9dc9",
         "686b64159140d06015dd5269bf0d5148882b19f4063aae41057094fd68a1d16f",
     ),

@@ -25,6 +25,21 @@ _PHRASE_OR_WORD = re.compile(r'"([^"]*)"|(\S+)')
 # Characters that mean something in the query language (: ( ) " [ ]) must not reach it.
 _NOT_A_WORD = re.compile(r"[^\w.'-]+")
 _OPERATORS = {"AND", "OR", "ANDNOT"}
+# Words that arXiv does not look up in titles and abstracts. They are the standard
+# English stop words of Lucene, and each was tried on arXiv in November 2026: asked for
+# alone, "all:of" returned 214 papers and "all:the" 9,189, where "all:from" returned
+# 1.4 million. Every word of a search has to match, so one such word was enough to
+# empty the answer: the title of a paper, typed as it stands, found no paper at all.
+# "a" is on the list although "all:a" alone returns a million papers: with it, a title
+# that begins with "A" still found nothing. Inside a quoted phrase these words do no
+# harm. A few of them are also names (An, To, Will); the author argument takes a name
+# as it is.
+_NOT_SEARCHED = frozenset(
+    """
+    a an and are as at be but by for if in into is it no not of on or such that the
+    their then there these they this to was will with
+    """.split()
+)
 
 
 class FeedError(Exception):
@@ -43,7 +58,8 @@ def search_params(query: SearchQuery) -> dict[str, str] | None:
     """Turn the tool's arguments into arXiv's query language. None when nothing is left to search for.
 
     Every word must match (AND). A "quoted phrase" must match as a phrase. The
-    words are looked up in all fields; this is a keyword search.
+    words are looked up in all fields; this is a keyword search. The small words that
+    arXiv does not look up (_NOT_SEARCHED) are left out, except inside a phrase.
     """
     clauses = []
     for phrase, word in _PHRASE_OR_WORD.findall(query.query):
@@ -51,8 +67,13 @@ def search_params(query: SearchQuery) -> dict[str, str] | None:
         if phrase and len(words) > 1:
             clauses.append(f'all:"{" ".join(words)}"')
         else:
-            # The operators of the query language are not search words.
-            clauses.extend(f"all:{each}" for each in words if each not in _OPERATORS)
+            # Neither the operators of the query language nor the words that arXiv
+            # does not look up are search words.
+            clauses.extend(
+                f"all:{each}"
+                for each in words
+                if each not in _OPERATORS and each.lower() not in _NOT_SEARCHED
+            )
     if query.author:
         author = " ".join(_words(query.author))
         if author:

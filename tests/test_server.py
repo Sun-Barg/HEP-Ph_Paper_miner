@@ -42,7 +42,7 @@ async def test_server_reports_its_name_and_the_name_of_its_tool_texts(client):
     # The version a client sees is the name of what the model reads, not of the package:
     # a run record has to say which tool texts were in front of the model.
     assert client.server_info.name == SERVER_NAME
-    assert client.server_info.version == TOOLSET_VERSION["staged"] == "staged-3"
+    assert client.server_info.version == TOOLSET_VERSION["staged"] == "staged-4"
 
 
 def test_a_layout_that_does_not_exist_is_refused():

@@ -139,7 +139,7 @@ async def test_the_record_says_what_was_run_and_what_each_result_was(client, tra
 
     start, *turns, end = records(trace.public_path)
     assert start["record"] == "run" and start["run_id"] == "run-1" and start["question_id"] == "q1"
-    assert start["toolset_version"] == "staged-3"  # as the server reported it over MCP
+    assert start["toolset_version"] == "staged-4"  # as the server reported it over MCP
     assert start["tools"] == ["search_papers", "get_outline", "read_section"]
     assert start["prompt_version"] == PROMPT_VERSION
     assert start["model"] == {"model": "scripted"}
