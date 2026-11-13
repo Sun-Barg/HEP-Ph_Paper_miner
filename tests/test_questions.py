@@ -17,6 +17,8 @@ from hepph_paper_miner.sources.base import Paper, PaperMeta, parse_arxiv_id
 DEV = Path(__file__).parent.parent / "eval_data" / "questions_dev.jsonl"
 OWN_ID = "2610.26648v1"
 
+ID = "2501.00001v2"
+PLACE = {"arxiv_id": ID, "section_id": "2.1"}
 LINE = {
     "id": "q1",
     "question": "What?",
@@ -147,6 +149,48 @@ def test_a_good_line_loads_and_blank_lines_are_skipped(tmp_path):
             "which gold_papers does not list",
         ),
         ({"expect_found": "yes"}, "expect_found has to be true or false"),
+        # A value of the wrong form. Each of these used to load, or to end in an error
+        # that named no line.
+        ({"id": 7}, "line 1: id has to be text, and not empty"),
+        ({"id": "a/b"}, "the id 'a/b' has to be made of letters, digits"),
+        ({"id": "dev_01"}, "the id 'dev_01' has to be made of letters, digits"),
+        ({"question": "  "}, "question has to be text, and not empty"),
+        ({"reference_answer": ""}, "reference_answer has to be text, and not empty"),
+        ({"abstract_sufficient": 0}, "abstract_sufficient has to be true or false"),
+        ({"answer_key": "0.79"}, "answer_key has to be an object"),
+        ({"notes": ["checked by hand"]}, "notes has to be an object with text values"),
+        ({"notes": {"checked": True}}, "notes has to be an object with text values"),
+        ({"gold_papers": 5}, "gold_papers has to be a list of arXiv identifiers"),
+        ({"gold_papers": [2501.00001]}, "gold_papers has to be a list of arXiv identifiers"),
+        (
+            {"gold_evidence": {"need": "all", "items": {"arxiv_id": ID}}},
+            "gold_evidence needs 'need'",
+        ),
+        (
+            {"gold_evidence": {"need": "all", "items": [{**PLACE}], "min": 1}},
+            r"unknown field\(s\) in gold_evidence: min",
+        ),
+        # A misspelt "anchor" loaded without one, and its check was never made.
+        (
+            {"gold_evidence": {"need": "all", "items": [{**PLACE, "anchr": "0.7910"}]}},
+            r"unknown field\(s\) in an evidence item: anchr",
+        ),
+        (
+            {"gold_evidence": {"need": "all", "items": [{**PLACE, "anchor": ""}]}},
+            "anchor of an evidence item has to be text, and not empty",
+        ),
+        (
+            {"gold_evidence": {"need": "all", "items": [{**PLACE, "anchor": None}]}},
+            "anchor of an evidence item has to be text, and not empty",
+        ),
+        (
+            {"gold_evidence": {"need": "all", "items": [{**PLACE, "section_id": 2.1}]}},
+            "section_id of an evidence item has to be text, and not empty",
+        ),
+        (
+            {"gold_evidence": {"need": "all", "items": [{**PLACE, "arxiv_id": 2501}]}},
+            "arxiv_id of an evidence item has to be text, and not empty",
+        ),
     ],
 )
 def test_a_wrong_line_stops_the_whole_file(tmp_path, change, message):
@@ -154,6 +198,21 @@ def test_a_wrong_line_stops_the_whole_file(tmp_path, change, message):
     line.pop(line.pop("_drop", ""), None)
     with pytest.raises(QuestionFileError, match=message):
         load_questions(write(tmp_path, line))
+
+
+def test_an_anchor_and_notes_of_the_right_form_load(tmp_path):
+    place = {**PLACE, "anchor": " 0.7910 "}  # kept as it stands, spaces included
+    line = {**LINE, "gold_evidence": {"need": "any", "items": [place]}, "notes": {"a": "b"}}
+    (question,) = load_questions(write(tmp_path, line))
+    assert question.evidence[0].anchor == " 0.7910 "
+    assert (question.need, question.notes) == ("any", {"a": "b"})
+
+
+def test_a_file_that_is_not_utf8_is_refused_like_any_other_wrong_file(tmp_path):
+    path = tmp_path / "questions.jsonl"
+    path.write_bytes(json.dumps(LINE).encode("utf-8") + "\n# 질문".encode("cp949"))
+    with pytest.raises(QuestionFileError, match="questions.jsonl: not UTF-8 text"):
+        load_questions(path)
 
 
 def test_lines_that_are_not_objects_and_repeated_ids_are_refused(tmp_path):

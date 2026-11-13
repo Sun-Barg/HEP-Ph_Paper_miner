@@ -31,7 +31,7 @@ def test_without_a_key_nothing_is_started(monkeypatch, capsys, tmp_path, folders
 
 
 def test_a_question_that_is_not_in_the_file_is_refused_before_anything_is_written(
-    monkeypatch, capsys, tmp_path, folders
+    monkeypatch, capsys, tmp_path, tmp_path_factory, folders
 ):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
     assert command.main(["--question-id", "dev-99", *folders]) == 2
@@ -41,6 +41,29 @@ def test_a_question_that_is_not_in_the_file_is_refused_before_anything_is_writte
         == 2
     )
     assert "cannot read the questions" in capsys.readouterr().err
+    # A file with a value of the wrong form is refused in the same way, with its line named.
+    line = {
+        "id": 7,
+        "question": "What?",
+        "type": "single_section",
+        "gold_papers": ["2501.00001v2"],
+        "gold_evidence": {
+            "need": "all",
+            "items": [{"arxiv_id": "2501.00001v2", "section_id": "2.1"}],
+        },
+        "expect_found": True,
+        "reference_answer": "That.",
+        "answer_key": {},
+        "accept_note": "That, or close to it.",
+        "abstract_sufficient": False,
+    }
+    wrong = tmp_path_factory.mktemp("questions") / "wrong.jsonl"
+    wrong.write_text(json.dumps(line) + "\n", encoding="utf-8")
+    assert command.main(["--question-id", "7", "--questions", str(wrong), *folders]) == 2
+    assert (
+        "cannot read the questions: wrong.jsonl line 1: id has to be text"
+        in capsys.readouterr().err
+    )
     assert not any(tmp_path.iterdir())
 
 

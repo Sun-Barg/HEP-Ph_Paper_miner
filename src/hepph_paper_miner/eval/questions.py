@@ -6,7 +6,8 @@ parser can leave a question pointing at nothing. `problems_with_evidence` finds 
 
 The fields of one line:
 
-    id                   a name for the question, unique in its file
+    id                   a name for the question, unique in its file: letters, digits,
+                         "." and "-" (it becomes part of the name of a run's files)
     question             what the model is asked, in English
     type                 what the question is meant to test, in a word or two
     gold_papers          the papers that hold the answer
@@ -28,6 +29,7 @@ paper, so they cannot go stale when the way a long section is cut changes.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -47,6 +49,10 @@ _REQUIRED = (
     "accept_note",
     "abstract_sufficient",
 )
+_TEXTS = ("id", "question", "type", "reference_answer", "accept_note")
+_EVIDENCE_FIELDS = ("arxiv_id", "section_id", "anchor")
+# An id goes into the name of a run and of its files, where "_" stands between the parts.
+_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9.-]*")
 
 
 @dataclass(frozen=True)
@@ -84,9 +90,13 @@ def load_questions(path: Path) -> tuple[Question, ...]:
     A question that is half right would be asked and graded like any other, and its
     result would mean nothing.
     """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as error:
+        raise QuestionFileError(f"{path.name}: not UTF-8 text ({error})") from error
     questions: list[Question] = []
     seen: set[str] = set()
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+    for number, line in enumerate(text.splitlines(), start=1):
         if not line.strip():
             continue
         where = f"{path.name} line {number}"
@@ -112,20 +122,41 @@ def _question(data: dict[str, Any], where: str) -> Question:
     if unknown:
         raise QuestionFileError(f"{where}: unknown field(s) {', '.join(unknown)}")
 
+    # Every value has to have the form its field stands for. One that has not would
+    # load all the same and go wrong later, somewhere else: a number as an id, an
+    # empty question, an anchor under a misspelt name, whose check is then never made.
+    for name in _TEXTS:
+        if not _is_text(data[name]):
+            raise QuestionFileError(f"{where}: {name} has to be text, and not empty")
+    if not _ID.fullmatch(data["id"]):
+        raise QuestionFileError(
+            f"{where}: the id {data['id']!r} has to be made of letters, digits, '.' and '-'"
+        )
+    for name in ("expect_found", "abstract_sufficient"):
+        if not isinstance(data[name], bool):
+            raise QuestionFileError(f"{where}: {name} has to be true or false")
+    if not isinstance(data["answer_key"], dict):
+        raise QuestionFileError(f"{where}: answer_key has to be an object")
+    notes = data.get("notes", {})
+    if not isinstance(notes, dict) or not all(isinstance(value, str) for value in notes.values()):
+        raise QuestionFileError(f"{where}: notes has to be an object with text values")
+    papers = data["gold_papers"]
+    if not isinstance(papers, list) or not all(isinstance(each, str) for each in papers):
+        raise QuestionFileError(f"{where}: gold_papers has to be a list of arXiv identifiers")
+
     gold = data["gold_evidence"]
     if (
         not isinstance(gold, dict)
         or gold.get("need") not in ("all", "any")
-        or not gold.get("items")
+        or not isinstance(gold.get("items"), list)
+        or not gold["items"]
     ):
         raise QuestionFileError(f"{where}: gold_evidence needs 'need' (all or any) and 'items'")
-    evidence = []
-    for item in gold["items"]:
-        if not isinstance(item, dict) or not {"arxiv_id", "section_id"} <= set(item):
-            raise QuestionFileError(f"{where}: an evidence item needs arxiv_id and section_id")
-        evidence.append(Evidence(item["arxiv_id"], item["section_id"], item.get("anchor")))
+    unknown = sorted(set(gold) - {"need", "items"})
+    if unknown:
+        raise QuestionFileError(f"{where}: unknown field(s) in gold_evidence: {', '.join(unknown)}")
+    evidence = [_evidence(item, where) for item in gold["items"]]
 
-    papers = tuple(data["gold_papers"])
     for arxiv_id in (*papers, *(item.arxiv_id for item in evidence)):
         # With a version: another version of a paper may be cut into other sections.
         try:
@@ -137,15 +168,12 @@ def _question(data: dict[str, Any], where: str) -> Question:
     outside = sorted({item.arxiv_id for item in evidence} - set(papers))
     if outside:
         raise QuestionFileError(f"{where}: evidence in {outside}, which gold_papers does not list")
-    for name in ("expect_found", "abstract_sufficient"):
-        if not isinstance(data[name], bool):
-            raise QuestionFileError(f"{where}: {name} has to be true or false")
 
     return Question(
         id=data["id"],
         question=data["question"],
         type=data["type"],
-        gold_papers=papers,
+        gold_papers=tuple(papers),
         need=gold["need"],
         evidence=tuple(evidence),
         expect_found=data["expect_found"],
@@ -153,8 +181,28 @@ def _question(data: dict[str, Any], where: str) -> Question:
         answer_key=data["answer_key"],
         accept_note=data["accept_note"],
         abstract_sufficient=data["abstract_sufficient"],
-        notes=dict(data.get("notes", {})),
+        notes=dict(notes),
     )
+
+
+def _evidence(item: Any, where: str) -> Evidence:
+    if not isinstance(item, dict) or not {"arxiv_id", "section_id"} <= set(item):
+        raise QuestionFileError(f"{where}: an evidence item needs arxiv_id and section_id")
+    unknown = sorted(set(item) - set(_EVIDENCE_FIELDS))
+    if unknown:
+        raise QuestionFileError(
+            f"{where}: unknown field(s) in an evidence item: {', '.join(unknown)}"
+        )
+    for name, value in item.items():  # an anchor that is given has to say something, too
+        if not _is_text(value):
+            raise QuestionFileError(
+                f"{where}: {name} of an evidence item has to be text, and not empty"
+            )
+    return Evidence(item["arxiv_id"], item["section_id"], item.get("anchor"))
+
+
+def _is_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
 
 
 def problems_with_evidence(question: Question, papers: Mapping[str, Paper]) -> list[str]:
