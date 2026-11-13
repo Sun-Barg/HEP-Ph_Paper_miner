@@ -85,8 +85,8 @@ def test_one_question_from_the_command_line_to_the_two_files(
     scripted = ScriptedModel(asks(section), says(json.dumps(ANSWER)))
     made = {}
 
-    def model(name, effort, cache):
-        made.update(name=name, effort=effort, cache=cache)
+    def model(name, effort, cache, show_thinking):
+        made.update(name=name, effort=effort, cache=cache, show_thinking=show_thinking)
         return scripted
 
     monkeypatch.setattr(command, "ClaudeModel", model)
@@ -98,7 +98,12 @@ def test_one_question_from_the_command_line_to_the_two_files(
     )
 
     assert code == 0
-    assert made == {"name": "claude-sonnet-5-5", "effort": "medium", "cache": False}
+    assert made == {
+        "name": "claude-sonnet-5-5",
+        "effort": "medium",
+        "cache": False,
+        "show_thinking": False,
+    }
     shown = capsys.readouterr().out
     assert "ended     answered" in shown and "answer    Ten." in shown
     assert "evidence  2501.00001v2 2.1" in shown
@@ -132,7 +137,7 @@ def test_with_the_cache_asked_for_the_model_is_told_and_the_counts_are_shown(
     answer = dataclasses.replace(says(json.dumps(ANSWER)), usage=usage)
     made = {}
 
-    def model(name, effort, cache):
+    def model(name, effort, cache, show_thinking):
         made.update(cache=cache)
         return ScriptedModel(answer)
 
@@ -148,9 +153,28 @@ def test_with_the_cache_asked_for_the_model_is_told_and_the_counts_are_shown(
     assert "cache     900 tokens written to it, 300 read from it" in shown
 
 
+def test_with_the_thinking_asked_for_the_model_is_told(monkeypatch, folders):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    made = {}
+
+    def model(name, effort, cache, show_thinking):
+        made.update(show_thinking=show_thinking)
+        return ScriptedModel(says(json.dumps(ANSWER)))
+
+    monkeypatch.setattr(command, "ClaudeModel", model)
+    monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
+    monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
+
+    assert command.main(["--question", "Q?", "--show-thinking", *folders]) == 0
+
+    assert made == {"show_thinking": True}
+
+
 def test_a_run_without_an_answer_ends_with_a_code_that_says_so(monkeypatch, capsys, folders):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
-    monkeypatch.setattr(command, "ClaudeModel", lambda name, effort, cache: ScriptedModel(says("")))
+    monkeypatch.setattr(
+        command, "ClaudeModel", lambda name, effort, cache, show_thinking: ScriptedModel(says(""))
+    )
     monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
     monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
     assert command.main(["--question-id", "dev-05", "--toolset", "flat", *folders]) == 1

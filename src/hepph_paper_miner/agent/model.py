@@ -78,6 +78,11 @@ class Model(Protocol):
 # whole request, the API sets the mark at its end and moves it on as the run grows.
 _CACHE = {"type": "ephemeral"}
 
+# How the model is to think. "adaptive" is what this model does anyway; the second form
+# also asks for the text of the thinking blocks, as a summary (the default is "omitted").
+_THINKING = {"type": "adaptive"}
+_THINKING_SHOWN = {"type": "adaptive", "display": "summarized"}
+
 
 class ClaudeModel:
     """A Claude model through the Messages API.
@@ -101,6 +106,15 @@ class ClaudeModel:
     from it. It is off unless asked for, because it does not always pay: a long tool
     result costs more when the run ends with the next response, and less when the
     run goes on.
+
+    With `show_thinking`, the API returns a summary of what the model thought. On this
+    model the reasoning and the short notes it writes before a tool call both come as
+    thinking blocks, and their text is left out unless a request asks for it, so a
+    record could not say why a tool was asked for a second time. The model reads the
+    same and pays the same either way: a block carries the same signature with or
+    without its text, and the signature is what the API reads when the block is sent
+    back. The text is for the private record only (trace.py): a summary can quote a
+    paper. Without `show_thinking` a request holds what it held before.
     """
 
     def __init__(
@@ -110,6 +124,7 @@ class ClaudeModel:
         max_tokens: int = 16_000,
         effort: str = "high",
         cache: bool = False,
+        show_thinking: bool = False,
         max_retries: int = 2,
         request_seconds: float = 600.0,
         client: anthropic.AsyncAnthropic | None = None,
@@ -118,6 +133,7 @@ class ClaudeModel:
         self._max_tokens = max_tokens
         self._effort = effort
         self._cache = cache
+        self._thinking = dict(_THINKING_SHOWN if show_thinking else _THINKING)
         self._max_retries = max_retries
         self._request_seconds = request_seconds
         # Without a client given, the key is read from ANTHROPIC_API_KEY. It is never
@@ -131,7 +147,7 @@ class ClaudeModel:
         return {
             "model": self.name,
             "max_tokens": self._max_tokens,
-            "thinking": {"type": "adaptive"},
+            "thinking": dict(self._thinking),
             "effort": self._effort,
             "cache_control": dict(_CACHE) if self._cache else None,
             "max_retries": self._max_retries,
@@ -153,7 +169,7 @@ class ClaudeModel:
                 system=system,
                 messages=messages,
                 tools=tools,
-                thinking={"type": "adaptive"},
+                thinking=self._thinking,
                 output_config={
                     "effort": self._effort,
                     "format": {"type": "json_schema", "schema": answer_schema},

@@ -75,6 +75,7 @@ uv run python -m hepph_paper_miner.agent --question-id dev-01
 uv run python -m hepph_paper_miner.agent --question-id dev-01 --toolset flat
 uv run python -m hepph_paper_miner.agent --question "Which paper ...?"
 uv run python -m hepph_paper_miner.agent --question-id dev-01 --cache
+uv run python -m hepph_paper_miner.agent --question-id dev-01 --show-thinking
 ```
 
 A run writes two files with the same name:
@@ -94,6 +95,17 @@ result it is cheaper when the run goes on for two more responses or longer, and 
 when the run ends with the next one, as a run that reads a whole paper often does.
 With it on, `input_tokens` in a record counts only what was neither written to that
 cache nor read from it; the two cache counts stand beside it.
+
+With `--show-thinking` the API returns a summary of what the model thought: its
+reasoning, and the short notes it writes before a tool call. Without it these blocks
+come back empty, and a record cannot say why a tool was asked for a second time. The
+model reads the same and pays the same either way. The summaries go into the private
+record only, because a summary can quote a paper. To read them beside the tool calls
+of a run:
+
+```
+uv run python scripts/show_thinking.py "results/runs/20261113T*.jsonl" --out thinking.txt
+```
 
 The questions are in `eval_data/questions_dev.jsonl`. These five are for development:
 tool texts and the prompt may be tuned on them, so they are not part of the evaluation.

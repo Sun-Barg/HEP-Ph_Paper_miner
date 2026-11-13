@@ -59,6 +59,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="have the API keep the conversation between the turns of the run "
         "(cheaper for a long run, dearer for a short one: see the README)",
     )
+    parser.add_argument(
+        "--show-thinking",
+        action="store_true",
+        help="have the API return a summary of the model's thinking, for the private "
+        "record only (the model reads and pays the same: see the README)",
+    )
     parser.add_argument("--max-turns", type=int, default=Limits().max_turns)
     parser.add_argument(
         "--out",
@@ -107,7 +113,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as error:
         print(f"--max-turns {arguments.max_turns}: {error}", file=sys.stderr)
         return 2
-    model = ClaudeModel(arguments.model, effort=arguments.effort, cache=arguments.cache)
+    model = ClaudeModel(
+        arguments.model,
+        effort=arguments.effort,
+        cache=arguments.cache,
+        show_thinking=arguments.show_thinking,
+    )
     # The files of the record are made last, when nothing can refuse the run any more:
     # a file without an "end" line reads as a run that died.
     trace = Trace(

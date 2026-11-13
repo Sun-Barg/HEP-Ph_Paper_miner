@@ -150,6 +150,26 @@ async def test_the_cache_is_asked_for_only_when_a_caller_says_so():
 
 
 @pytest.mark.anyio
+async def test_the_text_of_the_thinking_is_asked_for_only_when_a_caller_says_so():
+    # Without it the request says "adaptive" and no more (the first test above), and the
+    # blocks come back empty. With it the API returns a summary of what the model thought.
+    thought = {**THINKING, "thinking": "The outline lists a data section; reading it."}
+    api = Api(ok(message([thought, TOOL_USE], "tool_use")))
+    model = api.model(show_thinking=True)
+
+    reply = await model.reply(SYSTEM_PROMPT, QUESTION, TOOLS, ANSWER_SCHEMA)
+
+    (request,) = api.requests
+    assert request["thinking"] == {"type": "adaptive", "display": "summarized"}
+    assert model.settings["thinking"] == request["thinking"]  # and the record says so
+    # The text is in the whole response, which only the private record keeps, and the
+    # block goes back to the API as it came.
+    assert reply.raw["content"][0]["thinking"] == thought["thinking"]
+    assert reply.content[0].thinking == thought["thinking"]
+    assert reply.blocks == ("thinking", "tool_use") and reply.text == ""
+
+
+@pytest.mark.anyio
 async def test_a_response_that_asks_for_tools_is_read():
     api = Api(ok(message([THINKING, TOOL_USE], "tool_use")))
 

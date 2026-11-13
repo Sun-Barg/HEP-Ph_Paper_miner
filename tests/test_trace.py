@@ -74,6 +74,19 @@ def test_without_a_private_folder_only_the_public_file_is_written(tmp_path):
     assert "system" not in trace.public_path.read_text(encoding="utf-8")
 
 
+def test_what_the_model_thought_is_in_the_private_file_only(tmp_path):
+    # With the thinking shown (model.py), the whole response holds a summary of it. A
+    # summary can quote a paper, so it is kept where the paper text is kept.
+    thought = "Section 2.1 gives the exposure; that answers it."
+    raw = {"content": [{"type": "thinking", "thinking": thought, "signature": "c2ln"}]}
+    trace = Trace("run-1", tmp_path / "public", tmp_path / "private")
+    trace.start({"question": "Q?"}, private={})
+    trace.turn(1, dataclasses.replace(asks(("read_section", {})), raw=raw), 0.5, [])
+    trace.end("turn_limit", "", None, turns=1, seconds=0.5)
+    assert thought not in trace.public_path.read_text(encoding="utf-8")
+    assert thought in trace.private_path.read_text(encoding="utf-8")
+
+
 def test_the_public_facts_of_a_tool_call_leave_its_text_out():
     facts = ToolRecord(CALL, OK, TEXT, 1.23456).public()
     assert "Data text." not in json.dumps(facts)
