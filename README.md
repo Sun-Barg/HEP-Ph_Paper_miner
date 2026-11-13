@@ -122,6 +122,34 @@ Every turn names the model that answered (`response_model`).
 The questions are in `eval_data/questions_dev.jsonl`. These five are for development:
 tool texts and the prompt may be tuned on them, so they are not part of the evaluation.
 
+## Grading a run
+
+`src/hepph_paper_miner/eval/grade.py` grades a finished run from its public record, the
+question and the parsed papers, without a model:
+
+```
+uv run python -m hepph_paper_miner.eval.grade "results/runs/dev/diag-1/*.jsonl"
+uv run python -m hepph_paper_miner.eval.grade "results/runs/dev/*/*.jsonl" --out grades.jsonl
+```
+
+It prints one line for each run and says four things:
+
+- `search`: how many searches came back, how many of them empty, and the turn and rank at
+  which a search first listed the paper that holds the answer.
+- `access`: the turn in which the passage the answer rests on had been given to the
+  model, and how many more responses the run took from there. A record holds no paper
+  text, so the place of the passage is worked out from the parsed paper and the anchor
+  of the question; the papers are read through the folder of downloads (and asked of
+  arXiv when they are not in it).
+- `cited`: whether the evidence the answer lists names the sections of the question,
+  section for section (`strict`) or with the section around a subsection taken for it
+  (`loose`), and how many other places it lists.
+- `answer`: what a rule can check. `wrong` when there is no answer, when "found" is the
+  wrong way round, or when a number or a phrase of the answer key is missing; `by_hand`
+  when nothing is missing but the question leaves something to a person; `right`
+  otherwise. This is not the verdict: a person grades every answer, and the rule is kept
+  beside that grade to see how far the two agree.
+
 ## Paper text and the cache
 
 Downloads from arXiv are kept in `~/.cache/hepph-paper-miner` (set

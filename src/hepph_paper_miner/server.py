@@ -238,7 +238,12 @@ def _stop(text: str, start: int, limit: int) -> int:
     return hard
 
 
-def _marker(section: Section) -> str:
+def section_marker(section: Section) -> str:
+    """The line that stands in front of a section in the whole text of a paper.
+
+    The grader looks for these lines to tell where a section stands in that text
+    (eval/grade.py), so the form is written in one place.
+    """
     return f"=== {section.section_id} | {section.title} | {section.chars} chars ==="
 
 
@@ -257,7 +262,9 @@ def full_text(paper: Paper) -> str:
             if later.level == 1:
                 break
             subsections.append(later)
-        blocks.append(f"{_marker(section)}\n{_with_subsection_markers(section.text, subsections)}")
+        blocks.append(
+            f"{section_marker(section)}\n{_with_subsection_markers(section.text, subsections)}"
+        )
     return "\n\n".join(blocks)
 
 
@@ -276,7 +283,7 @@ def _with_subsection_markers(text: str, subsections: list[Section]) -> str:
         line_start = text.rfind("\n", 0, subsection.heading_at) + 1
         cut = max(line_start, written)
         pieces.append(text[written:cut])
-        pieces.append(_marker(subsection) + "\n")
+        pieces.append(section_marker(subsection) + "\n")
         written = cut
     pieces.append(text[written:])
     return "".join(pieces)
