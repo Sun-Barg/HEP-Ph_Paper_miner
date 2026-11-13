@@ -1,5 +1,8 @@
 """The server through the SDK's in-memory client: real protocol layer, no process, no network."""
 
+import threading
+import time
+
 import pytest
 from conftest import (
     FAILING,
@@ -10,7 +13,8 @@ from conftest import (
     only_text,
     sample_source,
 )
-from mcp import Client
+from mcp import Client, MCPError
+from mcp.types import REQUEST_TIMEOUT
 
 from hepph_paper_miner.result_text import END, MORE_FOLLOWS, read_first_line
 from hepph_paper_miner.server import (
@@ -62,6 +66,35 @@ async def test_three_tools_with_text_output_only(client):
     assert search["required"] == ["query"]
     assert search["properties"]["max_results"]["maximum"] == 10
     assert tools["read_section"].input_schema["required"] == ["arxiv_id", "section_id"]
+
+
+@pytest.mark.anyio
+async def test_a_caller_that_stops_waiting_is_not_held_by_a_tool_that_hangs():
+    # A request to arXiv that does not come back, played by a source that waits. The
+    # work of a tool runs in a thread, and the call ends when the caller's time is up.
+    release = threading.Event()
+
+    class Hanging(FixtureSource):
+        def listing(self, arxiv_id):
+            release.wait(30)
+            return super().listing(arxiv_id)
+
+    began = time.monotonic()
+    try:
+        async with Client(build_server(Hanging([]))) as connected:
+            with pytest.raises(MCPError) as caught:
+                await connected.call_tool(
+                    "get_outline", {"arxiv_id": "2501.00001v2"}, read_timeout_seconds=0.2
+                )
+            waited = time.monotonic() - began
+            # The server goes on answering while that thread is still out.
+            text = await failure(connected, "get_outline", arxiv_id="not an identifier")
+    finally:
+        release.set()  # the thread was let go, not stopped: let it end
+
+    assert caught.value.code == REQUEST_TIMEOUT
+    assert waited < 10  # and not the 30 s that the source would have taken
+    assert text.startswith("[invalid_id] ")
 
 
 # --- search_papers ---------------------------------------------------------------------

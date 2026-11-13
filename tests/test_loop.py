@@ -8,6 +8,8 @@ takes its place.
 import dataclasses
 import hashlib
 import json
+import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -320,6 +322,36 @@ async def test_a_tool_call_without_any_result_ends_the_run(trace, error, reason)
     _, turn, end = records(trace.public_path)
     assert turn["tools"][0]["status"] == "failed" and "result_chars" not in turn["tools"][0]
     assert end["reason"] == reason.value
+
+
+@pytest.mark.anyio
+async def test_a_tool_of_the_real_server_that_hangs_is_ended_by_the_time_limit(trace):
+    # Nothing here raises the timeout by hand: the real client waits for the real
+    # server, whose tool waits for a source that does not answer.
+    release = threading.Event()
+
+    class Hanging(FixtureSource):
+        def listing(self, arxiv_id):
+            release.wait(30)
+            return super().listing(arxiv_id)
+
+    model = ScriptedModel(asks(OUTLINE), says(json.dumps(ANSWER)))
+    began = time.monotonic()
+    try:
+        async with Client(build_server(Hanging([]))) as connected:
+            outcome = await run(
+                "Q?", client=connected, model=model, trace=trace, limits=Limits(tool_seconds=0.2)
+            )
+        waited = time.monotonic() - began
+    finally:
+        release.set()  # the thread of the tool was let go, not stopped: let it end
+
+    assert outcome.reason is EndReason.TOOL_TIMEOUT and "get_outline" in outcome.detail
+    assert waited < 10  # and not the 30 s that the source would have taken
+    assert len(model.asked) == 1
+    _, turn, end = records(trace.public_path)
+    assert turn["tools"][0]["status"] == "failed"
+    assert end["reason"] == "tool_timeout"
 
 
 @pytest.mark.anyio

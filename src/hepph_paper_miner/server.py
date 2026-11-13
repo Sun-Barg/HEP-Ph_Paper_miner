@@ -26,10 +26,11 @@ Start it with:  python -m hepph_paper_miner.server [--toolset flat]
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from typing import Annotated
 
+import anyio.to_thread
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
@@ -168,6 +169,19 @@ def _expected_failures(toolset: str) -> Iterator[None]:
         raise ToolError(explain(error, toolset)) from error
 
 
+async def _in_a_thread(work: Callable[..., str], *arguments: object) -> str:
+    """Do the work of a tool in a thread, and stop waiting for it when the caller does.
+
+    The work blocks: it waits for arXiv, and for its turn to ask. The SDK runs a tool
+    that is a plain function in a thread too, but then waits for that thread whatever
+    happens, so that a caller's time limit ends nothing (the loop's tool_seconds never
+    fired). Here the call ends as soon as the caller gives up. The thread itself
+    cannot be stopped: it finishes its request, keeps its turn in the queue to arXiv
+    until then, and what it fetched goes into the cache.
+    """
+    return await anyio.to_thread.run_sync(work, *arguments, abandon_on_cancel=True)
+
+
 def _find_section(paper: Paper, section_id: str) -> Section:
     wanted = section_id.strip()
     for section in paper.sections:
@@ -300,6 +314,8 @@ _YearTo = Annotated[
 _MaxResults = Annotated[int, Field(ge=1, le=10)]
 
 
+# The work of each tool. It blocks while it waits for arXiv, so the tools further down
+# hand it to a thread (_in_a_thread) and hold only the texts that a model reads.
 def _search(source: PaperSource, toolset: str, query: SearchQuery) -> str:
     if (
         query.year_from is not None
@@ -340,6 +356,95 @@ def _search(source: PaperSource, toolset: str, query: SearchQuery) -> str:
     return "\n".join(lines)
 
 
+def _outline(source: PaperSource, arxiv_id: str) -> str:
+    with _expected_failures("staged"):
+        # The listing first: it names the version, and it is there even when the text is not.
+        meta = source.listing(parse_arxiv_id(arxiv_id))
+        try:
+            paper = source.paper(parse_arxiv_id(meta.arxiv_id))
+        except SourceError as error:
+            if error.kind not in _NO_TEXT:
+                raise
+            return "\n".join(
+                [
+                    outline_without_sections_line(meta.arxiv_id, error.kind.value),
+                    *_listing_lines(meta),
+                    f"Sections: none. {explain(error)}",
+                ]
+            )
+    lines = [
+        outline_line(meta.arxiv_id, paper.chars, len(paper.sections), paper.parser_version),
+        *_listing_lines(meta),
+        "Sections (id | chars | title). A section's chars include its subsections.",
+    ]
+    for section in paper.sections:
+        indent = "  " if section.level == 2 else ""
+        lines.append(f"{indent}{section.section_id} | {section.chars} | {section.title}")
+    return "\n".join(lines)
+
+
+def _section(source: PaperSource, arxiv_id: str, section_id: str, start: int) -> str:
+    with _expected_failures("staged"):
+        paper = source.paper(parse_arxiv_id(arxiv_id))
+    section = _find_section(paper, section_id)
+    start = min(start, section.chars)
+    stop = _stop(section.text, start, SECTION_CHAR_LIMIT)
+    lines = [
+        section_line(paper.meta.arxiv_id, section.section_id, start, stop, section.chars),
+        f"Title: {section.title}",
+        "",
+        section.text[start:stop],
+    ]
+    if stop < section.chars:
+        smaller = [
+            other.section_id
+            for other in paper.sections
+            if other.level == 2 and other.section_id.startswith(section.section_id + ".")
+        ]
+        lines.append("")
+        lines.append(
+            f"[cut at character {stop} of {section.chars}. To continue, call read_section with start={stop}"
+            + (f", or read its subsections one by one: {', '.join(smaller)}.]" if smaller else ".]")
+        )
+    return "\n".join(lines)
+
+
+def _whole_paper(source: PaperSource, arxiv_id: str, start: int) -> str:
+    with _expected_failures("flat"):
+        # The listing first: it names the version, and it is there even when the text is not.
+        meta = source.listing(parse_arxiv_id(arxiv_id))
+        try:
+            paper = source.paper(parse_arxiv_id(meta.arxiv_id))
+        except SourceError as error:
+            if error.kind not in _NO_TEXT:
+                raise
+            return "\n".join(
+                [
+                    paper_without_text_line(meta.arxiv_id, error.kind.value),
+                    *_listing_lines(meta),
+                    f"Text: none. {explain(error, 'flat')}",
+                ]
+            )
+    text = full_text(paper)
+    start = min(start, len(text))
+    stop = _stop(text, start, PAPER_CHAR_LIMIT)
+    lines = [
+        paper_line(
+            meta.arxiv_id, start, stop, len(text), len(paper.sections), paper.parser_version
+        ),
+        *_listing_lines(meta),
+        "Text:",
+        "",
+        text[start:stop],
+    ]
+    if stop < len(text):
+        lines.append("")
+        lines.append(
+            f"[cut at character {stop} of {len(text)}. To continue, call read_paper with start={stop}.]"
+        )
+    return "\n".join(lines)
+
+
 def build_server(source: PaperSource, toolset: str = "staged") -> MCPServer:
     """Create the server and register the tools of one layout.
 
@@ -359,7 +464,7 @@ def build_server(source: PaperSource, toolset: str = "staged") -> MCPServer:
 
 def _add_staged_tools(mcp: MCPServer, source: PaperSource) -> None:
     @mcp.tool(structured_output=False)
-    def search_papers(
+    async def search_papers(
         query: _Query,
         author: _Author = None,
         category: _Category = None,
@@ -375,10 +480,10 @@ def _add_staged_tools(mcp: MCPServer, source: PaperSource) -> None:
         returned; get_outline shows the abstract of one paper.
         """
         asked = SearchQuery(query, author, category, year_from, year_to, max_results)
-        return _search(source, "staged", asked)
+        return await _in_a_thread(_search, source, "staged", asked)
 
     @mcp.tool(structured_output=False)
-    def get_outline(
+    async def get_outline(
         arxiv_id: Annotated[
             str,
             Field(
@@ -396,33 +501,10 @@ def _add_staged_tools(mcp: MCPServer, source: PaperSource) -> None:
         When the text of a paper cannot be read, the title and abstract are still
         shown, and the last line says why there are no sections.
         """
-        with _expected_failures("staged"):
-            # The listing first: it names the version, and it is there even when the text is not.
-            meta = source.listing(parse_arxiv_id(arxiv_id))
-            try:
-                paper = source.paper(parse_arxiv_id(meta.arxiv_id))
-            except SourceError as error:
-                if error.kind not in _NO_TEXT:
-                    raise
-                return "\n".join(
-                    [
-                        outline_without_sections_line(meta.arxiv_id, error.kind.value),
-                        *_listing_lines(meta),
-                        f"Sections: none. {explain(error)}",
-                    ]
-                )
-        lines = [
-            outline_line(meta.arxiv_id, paper.chars, len(paper.sections), paper.parser_version),
-            *_listing_lines(meta),
-            "Sections (id | chars | title). A section's chars include its subsections.",
-        ]
-        for section in paper.sections:
-            indent = "  " if section.level == 2 else ""
-            lines.append(f"{indent}{section.section_id} | {section.chars} | {section.title}")
-        return "\n".join(lines)
+        return await _in_a_thread(_outline, source, arxiv_id)
 
     @mcp.tool(structured_output=False)
-    def read_section(
+    async def read_section(
         arxiv_id: Annotated[
             str,
             Field(description="An arXiv identifier as returned by search_papers or get_outline."),
@@ -445,38 +527,12 @@ def _add_staged_tools(mcp: MCPServer, source: PaperSource) -> None:
         come back per call; when a section is longer, the first line says so and the
         last line says how to get the rest.
         """
-        with _expected_failures("staged"):
-            paper = source.paper(parse_arxiv_id(arxiv_id))
-        section = _find_section(paper, section_id)
-        start = min(start, section.chars)
-        stop = _stop(section.text, start, SECTION_CHAR_LIMIT)
-        lines = [
-            section_line(paper.meta.arxiv_id, section.section_id, start, stop, section.chars),
-            f"Title: {section.title}",
-            "",
-            section.text[start:stop],
-        ]
-        if stop < section.chars:
-            smaller = [
-                other.section_id
-                for other in paper.sections
-                if other.level == 2 and other.section_id.startswith(section.section_id + ".")
-            ]
-            lines.append("")
-            lines.append(
-                f"[cut at character {stop} of {section.chars}. To continue, call read_section with start={stop}"
-                + (
-                    f", or read its subsections one by one: {', '.join(smaller)}.]"
-                    if smaller
-                    else ".]"
-                )
-            )
-        return "\n".join(lines)
+        return await _in_a_thread(_section, source, arxiv_id, section_id, start)
 
 
 def _add_flat_tools(mcp: MCPServer, source: PaperSource) -> None:
     @mcp.tool(structured_output=False)
-    def search_papers(
+    async def search_papers(
         query: _Query,
         author: _Author = None,
         category: _Category = None,
@@ -491,10 +547,10 @@ def _add_flat_tools(mcp: MCPServer, source: PaperSource) -> None:
         paper's listing (title, abstract, authors, comments).
         """
         asked = SearchQuery(query, author, category, year_from, year_to, max_results)
-        return _search(source, "flat", asked)
+        return await _in_a_thread(_search, source, "flat", asked)
 
     @mcp.tool(structured_output=False)
-    def read_paper(
+    async def read_paper(
         arxiv_id: Annotated[
             str,
             Field(
@@ -522,39 +578,7 @@ def _add_flat_tools(mcp: MCPServer, source: PaperSource) -> None:
         a paper cannot be read, the title and abstract are still shown, and the last
         line says why there is no text.
         """
-        with _expected_failures("flat"):
-            # The listing first: it names the version, and it is there even when the text is not.
-            meta = source.listing(parse_arxiv_id(arxiv_id))
-            try:
-                paper = source.paper(parse_arxiv_id(meta.arxiv_id))
-            except SourceError as error:
-                if error.kind not in _NO_TEXT:
-                    raise
-                return "\n".join(
-                    [
-                        paper_without_text_line(meta.arxiv_id, error.kind.value),
-                        *_listing_lines(meta),
-                        f"Text: none. {explain(error, 'flat')}",
-                    ]
-                )
-        text = full_text(paper)
-        start = min(start, len(text))
-        stop = _stop(text, start, PAPER_CHAR_LIMIT)
-        lines = [
-            paper_line(
-                meta.arxiv_id, start, stop, len(text), len(paper.sections), paper.parser_version
-            ),
-            *_listing_lines(meta),
-            "Text:",
-            "",
-            text[start:stop],
-        ]
-        if stop < len(text):
-            lines.append("")
-            lines.append(
-                f"[cut at character {stop} of {len(text)}. To continue, call read_paper with start={stop}.]"
-            )
-        return "\n".join(lines)
+        return await _in_a_thread(_whole_paper, source, arxiv_id, start)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
