@@ -21,6 +21,7 @@ import time
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from enum import Enum
+from importlib.metadata import version
 from typing import Any
 
 from mcp import Client, MCPError
@@ -36,6 +37,15 @@ from hepph_paper_miner.agent.prompt import (
 )
 from hepph_paper_miner.agent.trace import ERROR, FAILED, NOT_RUN, NOT_SENT, OK, ToolRecord, Trace
 from hepph_paper_miner.result_text import error_kind
+
+
+# Packages that write a part of what a model reads. The SDK puts its own words in front
+# of an error and makes the schema of every tool from the tool's arguments; pydantic
+# writes the sentence for arguments that break a schema, and names its own version in
+# it. The name of the tool texts does not cover any of that, so the versions go into
+# the record beside it. They are the versions in this process, which is also where
+# the command runs the server.
+_WRITE_FOR_THE_MODEL = ("mcp", "pydantic")
 
 
 class EndReason(str, Enum):
@@ -147,6 +157,7 @@ async def run(
             "prompt_version": PROMPT_VERSION,
             "model": model.settings,
             "limits": asdict(limits),
+            "packages": {name: version(name) for name in _WRITE_FOR_THE_MODEL},
         },
         private={
             "system": SYSTEM_PROMPT,

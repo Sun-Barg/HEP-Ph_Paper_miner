@@ -10,6 +10,7 @@ import hashlib
 import json
 import threading
 import time
+from importlib.metadata import version
 from types import SimpleNamespace
 
 import pytest
@@ -146,6 +147,9 @@ async def test_the_record_says_what_was_run_and_what_each_result_was(client, tra
     assert start["prompt_version"] == PROMPT_VERSION
     assert start["model"] == {"model": "scripted"}
     assert start["limits"] == {"max_turns": 12, "tool_seconds": 700.0, "run_seconds": 900.0}
+    # The SDK and pydantic write a part of what the model reads (the sentence for
+    # arguments that break a schema, say), so the record names the versions in use.
+    assert start["packages"] == {"mcp": version("mcp"), "pydantic": version("pydantic")}
 
     assert [turn["turn"] for turn in turns] == [1, 2, 3, 4]
     assert turns[0]["blocks"] == ["thinking", "tool_use"] and turns[0]["stop_reason"] == "tool_use"
