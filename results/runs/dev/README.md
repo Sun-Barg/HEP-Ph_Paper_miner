@@ -16,6 +16,7 @@ the evaluation.
 | `pilot-1/` | 8 | 2026-11-12 18:08 to 18:13 | `8594338` | `staged-3`, `flat-1` | dev-02 to dev-05 with each layout, once | 6 answered, 2 at the turn limit |
 | `pilot-2/` | 8 | 2026-11-13 01:49 to 01:52 | `8594338` | `staged-3`, `flat-1` | the same as `pilot-1/`, a second time | 6 answered, 2 at the turn limit |
 | `diag-1/` | 12 | 2026-11-13 06:25 to 06:30 | `c96912a` | `staged-5`, `flat-4` | dev-04 and dev-05 with each layout, three times, with `--cache --show-thinking` | 5 answered, 7 at the turn limit |
+| `diag-2/` | 12 | 2026-11-13 08:06 to 08:09 | `62185a7` | `staged-5`, `flat-4` | the same as `diag-1/`, with `--no-answer-format` as well | 12 ended by the model, none with an answer of the expected form |
 
 All of them: model `claude-sonnet-5-5`, effort `high`, prompt `p1`, at most 12 turns.
 
@@ -31,5 +32,11 @@ All of them: model `claude-sonnet-5-5`, effort `high`, prompt `p1`, at most 12 t
   A later run of the same question and layout read from the cache what an earlier one
   had written, as far as the two had asked for the same things, so the cache counts of a
   run depend on what ran in the five minutes before it. The sum does not.
+- In `diag-2/` the request left out the form of the answer (`answer_format` is null in
+  the first line of a record). This was a diagnosis: with the form, seven of the twelve
+  runs of `diag-1/` went on asking for tools until the turn limit; without it, all
+  twelve ended their turn after two to seven responses. What they ended with is plain
+  text, which the loop does not take for an answer, so these records hold none. The
+  text is in the private records only.
 - A file is named after its run: `<UTC time>_<question id>_<layout>_<four random
   characters>.jsonl`.
