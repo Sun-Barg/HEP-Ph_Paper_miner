@@ -66,6 +66,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="have the API return a summary of the model's thinking, for the private "
         "record only (the model reads and pays the same: see the README)",
     )
+    parser.add_argument(
+        "--no-answer-format",
+        action="store_true",
+        help="for a diagnosis, not for an evaluation: do not hold the final text to the "
+        "form of an answer (such a run can end as 'no_answer': see the README)",
+    )
     parser.add_argument("--max-turns", type=int, default=Limits().max_turns)
     parser.add_argument(
         "--repeat",
@@ -130,6 +136,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         effort=arguments.effort,
         cache=arguments.cache,
         show_thinking=arguments.show_thinking,
+        answer_format=not arguments.no_answer_format,
     )
     # The files of the record are made last, when nothing can refuse the run any more:
     # a file without an "end" line reads as a run that died.

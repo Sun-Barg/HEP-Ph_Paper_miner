@@ -97,8 +97,14 @@ def test_one_question_from_the_command_line_to_the_two_files(
     scripted = ScriptedModel(asks(section), says(json.dumps(ANSWER)))
     made = {}
 
-    def model(name, effort, cache, show_thinking):
-        made.update(name=name, effort=effort, cache=cache, show_thinking=show_thinking)
+    def model(name, effort, cache, show_thinking, answer_format):
+        made.update(
+            name=name,
+            effort=effort,
+            cache=cache,
+            show_thinking=show_thinking,
+            answer_format=answer_format,
+        )
         return scripted
 
     monkeypatch.setattr(command, "ClaudeModel", model)
@@ -115,6 +121,7 @@ def test_one_question_from_the_command_line_to_the_two_files(
         "effort": "medium",
         "cache": False,
         "show_thinking": False,
+        "answer_format": True,
     }
     shown = capsys.readouterr().out
     assert "ended     answered" in shown and "answer    Ten." in shown
@@ -153,7 +160,7 @@ def test_with_the_cache_asked_for_the_model_is_told_and_the_counts_are_shown(
     answer = dataclasses.replace(says(json.dumps(ANSWER)), usage=usage)
     made = {}
 
-    def model(name, effort, cache, show_thinking):
+    def model(name, effort, cache, show_thinking, answer_format):
         made.update(cache=cache)
         return ScriptedModel(answer)
 
@@ -173,7 +180,7 @@ def test_with_the_thinking_asked_for_the_model_is_told(monkeypatch, folders):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
     made = {}
 
-    def model(name, effort, cache, show_thinking):
+    def model(name, effort, cache, show_thinking, answer_format):
         made.update(show_thinking=show_thinking)
         return ScriptedModel(says(json.dumps(ANSWER)))
 
@@ -186,12 +193,41 @@ def test_with_the_thinking_asked_for_the_model_is_told(monkeypatch, folders):
     assert made == {"show_thinking": True}
 
 
+def test_without_the_answer_form_the_model_is_told_and_plain_text_is_no_answer(
+    monkeypatch, capsys, tmp_path, folders
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    made = {}
+
+    def model(name, effort, cache, show_thinking, answer_format):
+        made.update(answer_format=answer_format)
+        # What a model writes when nothing holds it to the form.
+        return ScriptedModel(says("The paper gives no such number."))
+
+    monkeypatch.setattr(command, "ClaudeModel", model)
+    monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
+    monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
+
+    # Such a run is a diagnosis. Its text is not taken for an answer, and the command
+    # says so with its exit code like for any other run without one.
+    assert command.main(["--question", "Q?", "--no-answer-format", *folders]) == 1
+
+    assert made == {"answer_format": False}
+    shown = capsys.readouterr().out
+    assert "ended     no_answer (the text was not an answer of the expected form)" in shown
+    (public,) = (tmp_path / "public").iterdir()
+    last = json.loads(public.read_text(encoding="utf-8").splitlines()[-1])
+    assert (last["reason"], last["answer"]) == ("no_answer", None)
+
+
 def test_the_record_names_the_question_file_and_the_repetition(monkeypatch, tmp_path, folders):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
     monkeypatch.setattr(
         command,
         "ClaudeModel",
-        lambda name, effort, cache, show_thinking: ScriptedModel(says(json.dumps(ANSWER))),
+        lambda name, effort, cache, show_thinking, answer_format: ScriptedModel(
+            says(json.dumps(ANSWER))
+        ),
     )
     monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
     monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
@@ -213,7 +249,9 @@ def test_the_record_names_the_question_file_and_the_repetition(monkeypatch, tmp_
 def test_a_run_without_an_answer_ends_with_a_code_that_says_so(monkeypatch, capsys, folders):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
     monkeypatch.setattr(
-        command, "ClaudeModel", lambda name, effort, cache, show_thinking: ScriptedModel(says(""))
+        command,
+        "ClaudeModel",
+        lambda name, effort, cache, show_thinking, answer_format: ScriptedModel(says("")),
     )
     monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
     monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())

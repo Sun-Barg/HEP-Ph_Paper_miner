@@ -118,6 +118,12 @@ class ClaudeModel:
     without its text, and the signature is what the API reads when the block is sent
     back. The text is for the private record only (trace.py): a summary can quote a
     paper. Without `show_thinking` a request holds what it held before.
+
+    Without `answer_format`, a request leaves out the form of the final answer, and a
+    run ends with whatever text the model writes. That is for one comparison only:
+    whether a model that is not held to a form stops asking for tools sooner. Such a
+    run is no part of an evaluation. Its last text counts as an answer only when it
+    happens to have the form (prompt.py), and the record says how the run was made.
     """
 
     def __init__(
@@ -128,6 +134,7 @@ class ClaudeModel:
         effort: str = "high",
         cache: bool = False,
         show_thinking: bool = False,
+        answer_format: bool = True,
         max_retries: int = 2,
         request_seconds: float = 600.0,
         client: anthropic.AsyncAnthropic | None = None,
@@ -137,6 +144,7 @@ class ClaudeModel:
         self._effort = effort
         self._cache = cache
         self._thinking = dict(_THINKING_SHOWN if show_thinking else _THINKING)
+        self._answer_format = answer_format
         self._max_retries = max_retries
         self._request_seconds = request_seconds
         # Without a client given, the key is read from ANTHROPIC_API_KEY. It is never
@@ -152,6 +160,8 @@ class ClaudeModel:
             "max_tokens": self._max_tokens,
             "thinking": dict(self._thinking),
             "effort": self._effort,
+            # The kind of form the final text is held to, or None when it is held to none.
+            "answer_format": "json_schema" if self._answer_format else None,
             "cache_control": dict(_CACHE) if self._cache else None,
             "max_retries": self._max_retries,
             "request_seconds": self._request_seconds,
@@ -165,6 +175,9 @@ class ClaudeModel:
         tools: list[dict[str, Any]],
         answer_schema: dict[str, Any],
     ) -> Reply:
+        output_config: dict[str, Any] = {"effort": self._effort}
+        if self._answer_format:
+            output_config["format"] = {"type": "json_schema", "schema": answer_schema}
         try:
             response = await self._client.messages.create(
                 model=self.name,
@@ -173,10 +186,7 @@ class ClaudeModel:
                 messages=messages,
                 tools=tools,
                 thinking=self._thinking,
-                output_config={
-                    "effort": self._effort,
-                    "format": {"type": "json_schema", "schema": answer_schema},
-                },
+                output_config=output_config,
                 # Left out of the request altogether when the cache is not asked for.
                 **({"cache_control": _CACHE} if self._cache else {}),
             )

@@ -55,6 +55,41 @@ def test_the_thought_stands_with_the_call_it_led_to_and_no_tool_text_is_printed(
     assert "Data text." not in shown  # what the tool returned
 
 
+def test_a_last_text_that_was_not_read_as_the_answer_is_printed(tmp_path, capsys):
+    # A run made without the answer form ends with plain text, and the record has no
+    # answer. The text is the model's own, so it is shown, like a thought.
+    trace = Trace("run-2", tmp_path / "public", tmp_path / "private")
+    trace.start({"question_id": "q1", "toolset_version": "flat-4", "model": {}}, private={})
+    raw = {"content": [{"type": "text", "text": "The paper gives no such number."}]}
+    trace.turn(1, dataclasses.replace(says("The paper gives no such number."), raw=raw), 0.5, [])
+    trace.end("no_answer", "the text was not an answer of the expected form", None, 1, 1.0)
+
+    assert (
+        show_thinking.main([str(trace.public_path), "--private", str(trace.private_path.parent)])
+        == 0
+    )
+    shown = capsys.readouterr().out
+    assert "   text: The paper gives no such number." in shown
+    assert "end: no_answer | 1 turns" in shown
+
+
+def test_the_text_that_was_read_as_the_answer_is_printed_once(tmp_path, capsys):
+    # The answer of a run stands with its end. Its text is not printed a second time.
+    answer = {"answer": "Ten.", "found": True, "evidence": []}
+    trace = Trace("run-3", tmp_path / "public", tmp_path / "private")
+    trace.start({"question_id": "q1", "toolset_version": "flat-4", "model": {}}, private={})
+    raw = {"content": [{"type": "text", "text": '{"answer": "Ten."}'}]}
+    trace.turn(1, dataclasses.replace(says('{"answer": "Ten."}'), raw=raw), 0.5, [])
+    trace.end("answered", "", answer, 1, 1.0)
+
+    assert (
+        show_thinking.main([str(trace.public_path), "--private", str(trace.private_path.parent)])
+        == 0
+    )
+    shown = capsys.readouterr().out
+    assert "   answer: Ten." in shown and "   text:" not in shown
+
+
 def test_a_pattern_is_opened_here_and_the_output_can_go_to_a_file(run, tmp_path, capsys):
     out = tmp_path / "thinking.txt"
     pattern = str(run.public_path.parent / "run-*.jsonl")

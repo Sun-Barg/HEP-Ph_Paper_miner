@@ -107,6 +107,12 @@ of a run:
 uv run python scripts/show_thinking.py "results/runs/20261113T*.jsonl" --out thinking.txt
 ```
 
+With `--no-answer-format` a request leaves out the form of the final answer, so the
+model ends the run with whatever text it writes. This is for a diagnosis and not for an
+evaluation: it shows whether a model that is not held to a form stops asking for tools
+sooner. The text of such a run is read as an answer only when it happens to have the
+form, so the run can end as `no_answer`. The script above prints that text as well.
+
 The first line of a record says what was run: the names of the tool texts, the prompt
 and the parser, the settings of the model, and which code it was (`code`: the commit,
 and whether a file the repository keeps had been changed). For a question from a file

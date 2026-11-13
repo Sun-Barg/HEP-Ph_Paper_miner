@@ -9,9 +9,11 @@ looked for where the command that made the run puts it.
 
 For every turn this prints what the API counted, the summary of each thinking block,
 and each tool call with its arguments and the facts of the first line of its result.
-It prints no text that a tool returned. A summary of thinking is the model's own
-wording and can quote a few words of a paper, so the output is something to read and
-to show, and not something to commit.
+It also prints the text of a response that was not read as the answer of the run: a
+run made with --no-answer-format ends with such a text. It prints no text that a tool
+returned. A summary of thinking and a text are the model's own wording and can quote
+a few words of a paper, so the output is something to read and to show, and not
+something to commit.
 """
 
 from __future__ import annotations
@@ -39,6 +41,12 @@ def thoughts(private_turn: dict[str, Any] | None) -> list[str] | None:
     return [block.get("thinking") or "" for block in blocks if block.get("type") == "thinking"]
 
 
+def texts(private_turn: dict[str, Any] | None) -> list[str]:
+    """The text blocks of one response. Empty without a private record."""
+    blocks = ((private_turn or {}).get("reply") or {}).get("content") or []
+    return [block.get("text") or "" for block in blocks if block.get("type") == "text"]
+
+
 def render(public: list[dict[str, Any]], private: list[dict[str, Any]] | None) -> list[str]:
     """One run as lines of text. `private` is None when its private record is not there."""
     if not public:
@@ -55,6 +63,10 @@ def render(public: list[dict[str, Any]], private: list[dict[str, Any]] | None) -
     if private is None:
         lines.append("   (no private record of this name: the thinking cannot be shown)")
     private_turns = {line["turn"]: line for line in private or [] if line.get("record") == "turn"}
+    # The text that was read as the answer is printed with the end of the run, below.
+    answered_in = next(
+        (line["turns"] for line in public if line["record"] == "end" and line.get("answer")), None
+    )
     for line in public[1:]:
         if line["record"] == "turn":
             usage = line["usage"]
@@ -68,6 +80,9 @@ def render(public: list[dict[str, Any]], private: list[dict[str, Any]] | None) -
             )
             for thought in thoughts(private_turns.get(line["turn"])) or []:
                 lines.append(f"   thought: {thought.strip() or '(no text)'}")
+            if line["turn"] != answered_in:
+                for text in texts(private_turns.get(line["turn"])):
+                    lines.append(f"   text: {text.strip() or '(no text)'}")
             for tool in line["tools"]:
                 facts = json.dumps(tool.get("first_line"), ensure_ascii=False)
                 lines.append(

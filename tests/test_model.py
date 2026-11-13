@@ -170,6 +170,23 @@ async def test_the_text_of_the_thinking_is_asked_for_only_when_a_caller_says_so(
 
 
 @pytest.mark.anyio
+async def test_the_form_of_the_answer_is_left_out_only_when_a_caller_says_so():
+    # With it the request holds the schema (the first test above). Without it the
+    # request names the effort and no form, and the text comes back as the model wrote it.
+    prose = {"type": "text", "text": "The paper gives no such number."}
+    api = Api(ok(message([prose], "end_turn")))
+    model = api.model(answer_format=False)
+
+    reply = await model.reply(SYSTEM_PROMPT, QUESTION, TOOLS, ANSWER_SCHEMA)
+
+    (request,) = api.requests
+    assert request["output_config"] == {"effort": "high"}
+    assert "json_schema" not in json.dumps(request)  # the schema is nowhere else either
+    assert model.settings["answer_format"] is None  # and the record says so
+    assert reply.stop_reason == "end_turn" and reply.text == prose["text"]
+
+
+@pytest.mark.anyio
 async def test_a_response_that_asks_for_tools_is_read():
     api = Api(ok(message([THINKING, TOOL_USE], "tool_use")))
 
@@ -286,6 +303,7 @@ def test_the_settings_for_the_record_name_the_defaults_in_use():
         "max_tokens": 16000,
         "thinking": {"type": "adaptive"},
         "effort": "high",
+        "answer_format": "json_schema",
         "cache_control": None,
         "max_retries": 2,
         "request_seconds": 600.0,
