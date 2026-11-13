@@ -1,5 +1,8 @@
 """The arXiv source end to end, with arXiv played by a scripted transport. No network."""
 
+import json
+from datetime import UTC, datetime
+
 import httpx2
 import pytest
 from conftest import FIXTURES, SAMPLE_LATEX, plain_tar, tar_gz
@@ -44,8 +47,29 @@ def test_search_sends_the_query_and_returns_the_listing(tmp_path):
 
 def test_search_with_nothing_to_search_for_sends_no_request(tmp_path):
     arxiv = FakeArxiv()
-    assert arxiv.make(tmp_path).search(SearchQuery("()")).total == 0
+    found = arxiv.make(tmp_path).search(SearchQuery("()"))
+    assert found.total == 0
     assert arxiv.requests == []
+    assert datetime.fromisoformat(found.fetched_at) <= datetime.now(UTC)  # made here and now
+
+
+def test_a_search_answer_says_when_arxiv_gave_it_also_when_it_is_read_again_later(tmp_path):
+    # A listing with papers is kept and never asked for again. What it says is the
+    # state of arXiv on the day it was fetched, and the answer carries that moment.
+    arxiv = FakeArxiv()
+    before = datetime.now(UTC).replace(microsecond=0)
+    first = arxiv.make(tmp_path).search(SearchQuery("excess"))
+    assert before <= datetime.fromisoformat(first.fetched_at) <= datetime.now(UTC)
+
+    # As a later run would find it in the cache: the time in its record is long past.
+    (record,) = tmp_path.glob("*/*.json")
+    kept = json.loads(record.read_text(encoding="utf-8"))
+    kept["fetched_at"] = "2026-03-04T05:06:07+00:00"
+    record.write_text(json.dumps(kept), encoding="utf-8")
+
+    again = arxiv.make(tmp_path).search(SearchQuery("excess"))
+    assert again.fetched_at == "2026-03-04T05:06:07+00:00"
+    assert len(arxiv.requests) == 1
 
 
 def test_paper_is_looked_up_then_downloaded_then_split(tmp_path):

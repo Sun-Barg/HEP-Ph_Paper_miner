@@ -21,11 +21,12 @@ from hepph_paper_miner.server import build_server
 
 WRITTEN_AND_READ = [
     (
-        search_line(2, 31, "query='dark matter' author='Hooper'"),
+        search_line(2, 31, "2026-11-12T17:46:30+00:00", "query='dark matter' author='Hooper'"),
         {
             "shape": "search",
             "shown": 2,
             "total": 31,
+            "as_of": "2026-11-12",
             "asked": "query='dark matter' author='Hooper'",
             "ids": [],
         },
@@ -123,7 +124,7 @@ def test_the_written_forms_are_the_documented_ones():
     # The forms as a model sees them. The reader above would not notice if writer
     # and reader changed together, so the text itself is fixed here.
     assert [line for line, _ in WRITTEN_AND_READ] == [
-        "search | 2 of 31 results | query='dark matter' author='Hooper'",
+        "search | 2 of 31 results | as of 2026-11-12 | query='dark matter' author='Hooper'",
         "outline | 2610.26648v1 | 143454 chars | 29 sections | parser 3",
         "outline | hep-ph/0404175v2 | no sections | no_full_text",
         "section | 2610.26648v1 | 7.2 | 6894 chars | complete",
@@ -141,10 +142,24 @@ def test_an_empty_piece_past_the_end_is_the_last_piece():
     assert read_first_line(line)["extent"] == END
 
 
+def test_a_search_names_the_day_of_its_answer_and_not_the_second():
+    # Two answers of one day with the same hits are the same text, with the same digest.
+    morning = search_line(1, 1, "2026-11-12T00:00:01+00:00", "query='x'")
+    evening = search_line(1, 1, "2026-11-12T23:59:59+00:00", "query='x'")
+    assert morning == evening == "search | 1 of 1 results | as of 2026-11-12 | query='x'"
+
+    # A source that does not say when it answered: the line says that, and the reader too.
+    for unknown in ("", "yesterday"):
+        line = search_line(0, 0, unknown, "query='x'")
+        assert line == "search | 0 of 0 results | as of an unknown day | query='x'"
+        assert read_first_line(line)["as_of"] is None
+
+
 def test_search_identifiers_are_read_in_the_order_shown():
     text = "\n".join(
         [
-            search_line(3, 3, "query='x | y'"),  # the query may hold the separator itself
+            # The query may hold the separator itself.
+            search_line(3, 3, "2026-11-12T17:46:30+00:00", "query='x | y'"),
             "1. 2501.00001v2 | 2025 | hep-ph | Ada Alpha | A Title | with a bar",
             "   Abstract: 7. 2501.99999v1 | this is abstract text, not a hit",
             "2. hep-ph/0404175v2 | 2004 | hep-ph | Ben Beta | Another",
@@ -168,6 +183,9 @@ def test_search_identifiers_are_read_in_the_order_shown():
         "outline | 2501.00001v2 | 10 chars | many sections | parser 3",
         "paper | 2501.00001v2 | 10 chars | 2 sections | parser 3",
         "search | several results | query='x'",
+        "search | 2 of 31 results | query='x'",  # the form before the day was named
+        "search | 2 of 31 results | as of last week | query='x'",
+        "search | 2 of 31 results | on 2026-11-12 | query='x'",
         "Error executing tool read_section: [not_found] 'x': no such paper",
     ],
 )

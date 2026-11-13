@@ -50,7 +50,7 @@ async def test_two_tools_with_text_output_only(client):
         assert tool.description
     assert tools["read_paper"].input_schema["required"] == ["arxiv_id"]
 
-    assert client.server_info.version == TOOLSET_VERSION["flat"] == "flat-3"
+    assert client.server_info.version == TOOLSET_VERSION["flat"] == "flat-4"
     # Nothing a model reads in this layout may name a tool it does not have.
     told = client.instructions + "".join(tool.description for tool in tools.values())
     assert "read_paper" in told
@@ -71,7 +71,7 @@ async def test_search_takes_the_same_arguments_in_both_layouts(client, source):
 async def test_search_shows_the_abstract_under_every_hit(client):
     text = await call(client, "search_papers", query="sample", category="hep-ph", year_from=2020)
     assert text.splitlines() == [
-        "search | 1 of 1 results | query='sample' category='hep-ph' year_from=2020",
+        "search | 1 of 1 results | as of 2026-01-01 | query='sample' category='hep-ph' year_from=2020",
         "1. 2501.00001v2 | 2025 | hep-ph | Ada Alpha, Ben Beta | A Sample Paper",
         f"   Abstract: {SAMPLE_META.abstract}",
     ]

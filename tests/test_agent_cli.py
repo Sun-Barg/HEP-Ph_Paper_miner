@@ -109,7 +109,7 @@ def test_one_question_from_the_command_line_to_the_two_files(
     assert (first["question_id"], first["toolset"], first["toolset_version"]) == (
         "adhoc",
         "staged",
-        "staged-4",
+        "staged-5",
     )
     assert "Data text." not in public.read_text(encoding="utf-8")
     assert "Data text." in private.read_text(encoding="utf-8")

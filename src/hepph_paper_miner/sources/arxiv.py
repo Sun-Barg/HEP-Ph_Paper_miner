@@ -7,9 +7,10 @@ answers are read by arxiv_search (Atom) and arxiv_latex (TeX source).
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime
 from xml.etree import ElementTree
 
-from hepph_paper_miner.http import Fetcher, FetchError
+from hepph_paper_miner.http import Fetched, Fetcher, FetchError
 from hepph_paper_miner.sources.arxiv_latex import PARSER_VERSION, NotASource, parse_source
 from hepph_paper_miner.sources.arxiv_search import (
     FeedError,
@@ -43,7 +44,8 @@ class ArxivSource:
     def search(self, query: SearchQuery) -> SearchResult:
         params = search_params(query)
         if params is None:
-            return SearchResult((), 0)
+            # Nothing to ask arXiv for, so this answer is made here and now.
+            return SearchResult((), 0, datetime.now(UTC).isoformat(timespec="seconds"))
         try:
             return self._feed(params, about=query.query)
         except FeedError as error:
@@ -59,7 +61,7 @@ class ArxivSource:
         if meta.arxiv_id not in self._papers:
             url = SOURCE_URL.format(arxiv_id=meta.arxiv_id)
             try:
-                data = self._get(url, {}, about=meta.arxiv_id)
+                data = self._get(url, {}, about=meta.arxiv_id).body
             except SourceError as error:
                 if error.kind is ErrorKind.NOT_FOUND:
                     # The paper is listed, so a missing download means there is no source.
@@ -113,10 +115,13 @@ class ArxivSource:
         more request the next time the same thing is asked.
 
         keep=False: ask arXiv even when an answer is in the cache, and do not keep the new one.
+
+        The result says when arXiv gave the answer. For a kept one that is the day it
+        was first asked for, however much later it is read again.
         """
-        body = self._get(API_URL, params, about=about, refresh=not keep)
+        fetched = self._get(API_URL, params, about=about, refresh=not keep)
         try:
-            found = parse_feed(body)
+            found = replace(parse_feed(fetched.body), fetched_at=fetched.fetched_at)
         except FeedError:
             self._fetcher.forget(API_URL, params)
             raise
@@ -128,10 +133,12 @@ class ArxivSource:
             self._fetcher.forget(API_URL, params)
         return found
 
-    def _get(self, url: str, params: dict[str, str], *, about: str, refresh: bool = False) -> bytes:
+    def _get(
+        self, url: str, params: dict[str, str], *, about: str, refresh: bool = False
+    ) -> Fetched:
         """Fetch, and say in the source's terms why it failed."""
         try:
-            return self._fetcher.get(url, params, refresh=refresh).body
+            return self._fetcher.get(url, params, refresh=refresh)
         except FetchError as error:
             if error.reason in _FAILURES:
                 raise SourceError(_FAILURES[error.reason], about) from error

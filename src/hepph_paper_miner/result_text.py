@@ -4,7 +4,7 @@ Every tool returns one piece of text. Its first line has a fixed form, so that a
 program (the run record of the loop, a grader) can tell what the model was given
 without understanding the prose below it:
 
-    search | 2 of 31 results | query='dark matter'
+    search | 2 of 31 results | as of 2026-11-12 | query='dark matter'
     outline | 2610.26648v1 | 143454 chars | 29 sections | parser 3
     outline | 2503.00001v1 | no sections | no_full_text
     section | 2610.26648v1 | 7.2 | 6894 chars | complete
@@ -28,12 +28,23 @@ COMPLETE = "complete"
 MORE_FOLLOWS = "more_follows"  # written as "partial, more follows"
 END = "end"  # written as "partial, end of section" (or "of paper"): the last piece
 
+_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
+_NO_DAY = "an unknown day"  # for a source that does not say when it answered
+
 
 # --- writing -------------------------------------------------------------------------
 
 
-def search_line(shown: int, total: int, asked: str) -> str:
-    return f"search | {shown} of {total} results | {asked}"
+def search_line(shown: int, total: int, fetched_at: str, asked: str) -> str:
+    """`fetched_at` is when the source gave the answer (UTC, ISO 8601). The line names the day.
+
+    An answer that is kept is read again without asking, and what a search finds
+    changes with time. Without the day, two runs with different hits could not be
+    told from two runs that asked on different days. The day and not the second: the
+    same hits on the same day are then the same text, with the same digest.
+    """
+    day = fetched_at[:10] if _DAY.fullmatch(fetched_at[:10]) else _NO_DAY
+    return f"search | {shown} of {total} results | as of {day} | {asked}"
 
 
 def outline_line(arxiv_id: str, chars: int, sections: int, parser_version: str) -> str:
@@ -92,13 +103,17 @@ def read_first_line(text: str) -> dict[str, Any] | None:
     first, _, rest = text.partition("\n")
     try:
         if first.startswith("search | "):
-            shown, asked = first.removeprefix("search | ").split(" | ", 1)
+            shown, as_of, asked = first.removeprefix("search | ").split(" | ", 2)
             counted = _SHOWN.fullmatch(shown)
+            day = as_of.removeprefix("as of ")
+            if not as_of.startswith("as of ") or not (_DAY.fullmatch(day) or day == _NO_DAY):
+                return None
             ids = [hit.group(1) for line in rest.split("\n") if (hit := _HIT.match(line))]
             return {
                 "shape": "search",
                 "shown": int(counted.group(1)),
                 "total": int(counted.group(2)),
+                "as_of": day if day != _NO_DAY else None,
                 "asked": asked,
                 "ids": ids,
             }

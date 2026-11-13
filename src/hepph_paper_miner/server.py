@@ -67,7 +67,7 @@ SERVER_NAME = "hepph-paper-miner"
 # The name also goes up when a tool answers the same call differently although no text
 # has changed, which no test can see: a search that sends other words to arXiv, a
 # marker in the whole text of a paper that stands in another place.
-TOOLSET_VERSION = {"staged": "staged-4", "flat": "flat-3"}
+TOOLSET_VERSION = {"staged": "staged-5", "flat": "flat-4"}
 
 SECTION_CHAR_LIMIT = 20_000  # the most text one read_section call returns
 # The largest paper of the evaluation has 187,527 characters, so every one of them
@@ -336,7 +336,7 @@ def _search(source: PaperSource, toolset: str, query: SearchQuery) -> str:
         )
         if value is not None
     )
-    lines = [search_line(len(found.papers), found.total, asked)]
+    lines = [search_line(len(found.papers), found.total, found.fetched_at, asked)]
     for rank, meta in enumerate(found.papers, start=1):
         lines.append(
             f"{rank}. {meta.arxiv_id} | {meta.year} | {meta.primary_category} | {_authors(meta.authors)} | {meta.title}"

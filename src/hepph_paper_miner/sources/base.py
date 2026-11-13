@@ -194,6 +194,9 @@ class SearchQuery:
 class SearchResult:
     papers: tuple[PaperMeta, ...]
     total: int  # how many papers matched, which can be more than were returned
+    # When the source gave this answer (UTC, ISO 8601), "" when that is not known. An
+    # answer that is kept is not asked for again, and what a search finds changes.
+    fetched_at: str = ""
 
 
 class PaperSource(Protocol):

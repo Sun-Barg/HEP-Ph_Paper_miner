@@ -22,6 +22,10 @@ def paper_from_latex(meta: PaperMeta, latex: str) -> Paper:
     return Paper(meta, parse_source(latex.encode("utf-8")), PARSER_VERSION)
 
 
+# When every search here is said to have been answered. A fixed moment: the text of a
+# search result names the day, and must not change with the day a test is run.
+FETCHED_AT = "2026-01-01T00:00:00+00:00"
+
 # Failures that concern the full text only: the listing of such a paper can still be read.
 _TEXT_ONLY = (ErrorKind.NO_FULL_TEXT, ErrorKind.PARSE_ERROR)
 
@@ -67,7 +71,7 @@ class FixtureSource:
             if not (query.year_from or 0) <= meta.year <= (query.year_to or 9999):
                 continue
             matches.append(meta)
-        return SearchResult(tuple(matches[: query.max_results]), len(matches))
+        return SearchResult(tuple(matches[: query.max_results]), len(matches), FETCHED_AT)
 
     def listing(self, arxiv_id: ArxivId) -> PaperMeta:
         self.calls.append(("listing", str(arxiv_id)))

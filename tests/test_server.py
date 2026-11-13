@@ -46,7 +46,7 @@ async def test_server_reports_its_name_and_the_name_of_its_tool_texts(client):
     # The version a client sees is the name of what the model reads, not of the package:
     # a run record has to say which tool texts were in front of the model.
     assert client.server_info.name == SERVER_NAME
-    assert client.server_info.version == TOOLSET_VERSION["staged"] == "staged-4"
+    assert client.server_info.version == TOOLSET_VERSION["staged"] == "staged-5"
 
 
 def test_a_layout_that_does_not_exist_is_refused():
@@ -104,7 +104,7 @@ async def test_a_caller_that_stops_waiting_is_not_held_by_a_tool_that_hangs():
 async def test_search_lists_identifiers_but_no_abstracts(client):
     text = await call(client, "search_papers", query="sample", category="hep-ph", year_from=2020)
     assert text.splitlines() == [
-        "search | 1 of 1 results | query='sample' category='hep-ph' year_from=2020",
+        "search | 1 of 1 results | as of 2026-01-01 | query='sample' category='hep-ph' year_from=2020",
         "1. 2501.00001v2 | 2025 | hep-ph | Ada Alpha, Ben Beta | A Sample Paper",
     ]
     assert SAMPLE_META.abstract not in text
@@ -113,7 +113,7 @@ async def test_search_lists_identifiers_but_no_abstracts(client):
 @pytest.mark.anyio
 async def test_search_shortens_a_long_author_list_and_respects_max_results(client):
     text = await call(client, "search_papers", query="paper", max_results=1)
-    assert text.splitlines()[0] == "search | 1 of 2 results | query='paper'"
+    assert text.splitlines()[0] == "search | 1 of 2 results | as of 2026-01-01 | query='paper'"
 
     text = await call(client, "search_papers", query="long")
     assert (
@@ -126,7 +126,7 @@ async def test_search_shortens_a_long_author_list_and_respects_max_results(clien
 async def test_search_without_matches_is_a_result_that_says_what_to_change(client):
     text = await call(client, "search_papers", query="nothing-like-this")
     first, advice = text.splitlines()
-    assert first == "search | 0 of 0 results | query='nothing-like-this'"
+    assert first == "search | 0 of 0 results | as of 2026-01-01 | query='nothing-like-this'"
     assert "fewer or different words" in advice
 
 
