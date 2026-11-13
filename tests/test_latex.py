@@ -2,6 +2,7 @@
 
 import gzip
 import pickle
+import random
 import zlib
 
 import pytest
@@ -17,7 +18,7 @@ from hepph_paper_miner.sources.arxiv_latex import (
     strip_comments,
     unpack,
 )
-from hepph_paper_miner.sources.base import ErrorKind, SourceError
+from hepph_paper_miner.sources.base import ErrorKind, Section, SourceError
 
 
 def sections_of(latex: str, extra: dict[str, str] | None = None):
@@ -118,6 +119,106 @@ def test_long_text_before_the_first_heading_becomes_section_zero():
 
     short = "\\maketitle\nA line.\n\\section{Later}\nMore."
     assert [section.section_id for section in sections_of(document(short))] == ["1"]
+
+
+# Text under no heading of its own: every piece of the body has to lie in a section.
+
+
+def test_long_text_after_appendix_and_before_the_next_section_is_a_section_of_its_own():
+    # It used to lie in no section: the one before it ends at \appendix.
+    lead = "Lead-in. " + filler(60)
+    body = (
+        "\\section{One}\nFirst.\n\\section*{Thanks}\nThanks.\n"
+        "\\appendix\n" + lead + "\n\\section{Tables}\nTable text."
+    )
+    assert [(s.section_id, s.level, s.title, s.text) for s in sections_of(document(body))] == [
+        ("1", 1, "One", "First."),
+        ("u1", 1, "Thanks", "Thanks."),
+        ("u2", 1, "(text after \\appendix, without a section heading)", lead),
+        ("A", 1, "Tables", "Table text."),
+    ]
+
+
+def test_commands_after_appendix_are_not_a_section():
+    body = (
+        "\\section{One}\nFirst.\n\\appendix\n\\setcounter{equation}{0}\n"
+        "\\renewcommand{\\theequation}{A.\\arabic{equation}}\n\\section{Tables}\nTable text."
+    )
+    assert [s.section_id for s in sections_of(document(body))] == ["1", "A"]
+
+
+def test_a_paper_without_headings_keeps_what_follows_appendix():
+    (section,) = sections_of(document("\\maketitle\nMain text.\n\\appendix\nMore text."))
+    assert (section.section_id, section.text) == ("1", "Main text.\n\\appendix\nMore text.")
+
+
+def test_subsections_before_the_first_section_lie_in_section_zero():
+    body = (
+        "\\maketitle\nA line.\n\\subsection{Notation}\nSigns.\n"
+        "\\subsection*{Units}\nGeV.\n\\section{One}\nFirst."
+    )
+    sections = sections_of(document(body))
+    assert [(s.section_id, s.level, s.title) for s in sections] == [
+        ("0", 1, "(text before the first section)"),
+        ("0.1", 2, "Notation"),
+        ("0.u1", 2, "Units"),
+        ("1", 1, "One"),
+    ]
+    # Short as it is, section 0 is kept: without it its subsections would lie in no section.
+    assert sections[0].text == (
+        "A line.\n\\subsection{Notation}\nSigns.\n\\subsection*{Units}\nGeV."
+    )
+    assert (sections[1].text, sections[2].text) == ("Signs.", "GeV.")
+
+
+def test_a_paper_with_subsections_and_no_section_is_one_section_that_holds_them():
+    body = "\\subsection{First}\nOne.\n\\subsection{Second}\nTwo."
+    assert [(s.section_id, s.level, s.text) for s in sections_of(document(body))] == [
+        ("0", 1, "\\subsection{First}\nOne.\n\\subsection{Second}\nTwo."),
+        ("0.1", 2, "One."),
+        ("0.2", 2, "Two."),
+    ]
+
+
+def test_subsections_after_appendix_without_a_section_lie_in_a_section_of_their_own():
+    # They used to be numbered on from the section before \appendix, whose text ends there.
+    body = (
+        "\\section{One}\nFirst.\n\\subsection{Part}\nPart.\n\\appendix\n\\subsection{Proof}\nProof."
+    )
+    assert [(s.section_id, s.level, s.text) for s in sections_of(document(body))] == [
+        ("1", 1, "First.\n\\subsection{Part}\nPart."),
+        ("1.1", 2, "Part."),
+        ("u1", 1, "\\subsection{Proof}\nProof."),
+        ("u1.1", 2, "Proof."),
+    ]
+
+
+def test_in_random_papers_every_piece_of_text_lies_in_a_section():
+    # A split that lost text is worse than no split. Every piece of text here names
+    # itself with a word found nowhere else, and each has to turn up in a section.
+    # Right after \appendix the pieces are long: a short one there, under no heading,
+    # is taken for commands.
+    rng = random.Random(2026)
+    commands = [
+        "\\section{S}",
+        "\\section*{S}",
+        "\\subsection{S}",
+        "\\subsection*{S}",
+        "\\appendix",
+    ]
+    for _ in range(300):
+        lines, named = ["PIECE0 " + filler(200)], ["PIECE0"]
+        for number in range(1, rng.randint(2, 10)):
+            command = rng.choice(commands)
+            lines.append(command)
+            if rng.random() < 0.8:
+                long = command == "\\appendix" or rng.random() < 0.5
+                lines.append(f"PIECE{number} " + filler(60 if long else 3))
+                named.append(f"PIECE{number}")
+        sections = sections_of(document("\n".join(lines)))
+        assert check(sections)[0] is True, lines
+        found = " ".join(section.text for section in sections if section.level == 1).split()
+        assert [name for name in named if name not in found] == [], lines
 
 
 def test_title_with_an_unclosed_brace_ends_at_the_line_end():
@@ -461,6 +562,26 @@ def test_check_reports_ok_and_a_message():
     assert ok is True
     assert message.startswith("8 sections, ")
     assert check(()) == (False, "no sections")
+
+
+def test_a_subsection_outside_the_section_before_it_is_not_trusted():
+    # The text of a paper is the text of its sections, which hold their subsections.
+    # A subsection that lies in none would be missing from the paper read as a whole.
+    whole = Section("1", "One", 1, "Lead.\n\\subsection{Part}\nPart text. " + filler(300))
+    part = Section("1.1", "Part", 2, "Part text. " + filler(300))
+    assert check((whole, part))[0] is True
+
+    stray = Section("1.1", "Part", 2, "Text that section 1 does not hold.")
+    assert check((whole, stray)) == (False, "subsection 1.1 is not part of the section before it")
+    assert check((part, whole)) == (False, "subsection 1.1 is not part of the section before it")
+
+
+def test_a_paper_whose_text_stands_under_no_section_heading_is_read_whole():
+    body = "\\subsection{First}\nONE " + filler(200) + "\n\\appendix\nTWO " + filler(200)
+    sections = parse_source(document(body).encode())
+    assert [s.section_id for s in sections] == ["0", "0.1", "u1"]
+    whole = " ".join(s.text for s in sections if s.level == 1)
+    assert "ONE" in whole and "TWO" in whole
 
 
 def test_too_little_text_is_a_parse_error():

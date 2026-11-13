@@ -237,6 +237,59 @@ CASES = [
         SAME,
         needs=("epsf.tex", "epsf.sty"),
     ),
+    # --- text that stands under no heading of its own ---------------------------------------
+    case(
+        "text between appendix and the section after it",
+        {
+            "main.tex": PRE
+            + BEGIN
+            + f"\\section{{One}}\n<A> {FILL}\n\\appendix\n<B> {FILL}\n\\section{{Two}}\n<C>\n"
+            + END,
+        },
+        SAME,
+        SAME,
+    ),
+    case(
+        "no heading at all, and text after appendix",
+        {"main.tex": PRE + BEGIN + f"<A> {FILL}\n\\appendix\n<B> {FILL}\n" + END},
+        SAME,
+        SAME,
+    ),
+    case(
+        "subsections before the first section and after appendix",
+        {
+            "main.tex": PRE
+            + BEGIN
+            + f"\\subsection{{Zero}}\n<A> {FILL}\n\\section{{One}}\n<B>\n"
+            + "\\appendix\n\\subsection{Last}\n<C>\n"
+            + END,
+        },
+        SAME,
+        SAME,
+    ),
+    case(
+        "subsections and no section",
+        {
+            "main.tex": PRE
+            + BEGIN
+            + f"\\subsection{{One}}\n<A> {FILL}\n\\subsection*{{Two}}\n<B>\n"
+            + END,
+        },
+        SAME,
+        SAME,
+    ),
+    case(
+        "a few words under no heading",
+        {
+            "main.tex": PRE
+            + BEGIN
+            + f"<A> a few words\n\\section{{One}}\n<B> {FILL}\n"
+            + "\\appendix\n<C> a few more\n\\section{Two}\n<D>\n"
+            + END,
+        },
+        WRONG,  # short text under no heading is taken for commands and left out
+        WRONG,
+    ),
     # --- text that TeX skips ---------------------------------------------------------------
     case(
         "include with includeonly",

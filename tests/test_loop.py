@@ -172,7 +172,7 @@ async def test_the_record_says_what_was_run_and_what_each_result_was(client, tra
     assert end["turns"] == 4 and end["tool_calls"] == 3
     assert end["tool_result_chars"] == sum(turn["tools"][0]["result_chars"] for turn in turns[:3])
     assert end["input_tokens"] == 400 and end["output_tokens"] == 40
-    assert end["parser_versions"] == ["3"]  # as the outline's first line named it
+    assert end["parser_versions"] == ["4"]  # as the outline's first line named it
 
 
 @pytest.mark.anyio

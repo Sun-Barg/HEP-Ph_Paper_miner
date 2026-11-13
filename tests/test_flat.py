@@ -9,6 +9,7 @@ from conftest import (
     SAMPLE_META,
     call,
     failure,
+    filler,
     only_text,
     sample_source,
     tar_gz,
@@ -20,7 +21,7 @@ from hepph_paper_miner.result_text import END, MORE_FOLLOWS, read_first_line
 from hepph_paper_miner.server import TOOLSET_VERSION, build_server, explain, full_text
 from hepph_paper_miner.sources.arxiv_latex import PARSER_VERSION, parse_source
 from hepph_paper_miner.sources.base import ErrorKind, Paper, PaperMeta, Section, SourceError
-from hepph_paper_miner.sources.fixture import FixtureSource
+from hepph_paper_miner.sources.fixture import FixtureSource, paper_from_latex
 
 MARKER = re.compile(r"=== (\S+) \| (.*) \| (\d+) chars ===")
 
@@ -141,6 +142,32 @@ def test_every_section_of_the_real_paper_gets_its_marker():
     assert len(found) == 29
     whole = "\n\n".join(section.text for section in paper.sections if section.level == 1)
     assert without_markers(text) == whole
+
+
+def test_text_under_no_section_heading_is_part_of_the_whole_paper():
+    # Subsections before the first section, and what follows \appendix without a
+    # section, lie in sections of their own. They used to lie in none, and the whole
+    # paper, which is the text of its sections, came back without them.
+    latex = (
+        "\\documentclass{article}\\begin{document}\n\\maketitle\n"
+        "\\subsection{Notation}\nSIGNS " + filler(100) + "\n"
+        "\\section{One}\nFIRST " + filler(100) + "\n"
+        "\\appendix\nLEAD-IN " + filler(100) + "\n\\subsection{Proof}\nPROOF.\n"
+        "\\end{document}"
+    )
+    meta = PaperMeta("2504.00005v1", "T", ("A",), 2025, "hep-ph", "A.")
+    paper = paper_from_latex(meta, latex)
+    text = full_text(paper)
+
+    assert [section.section_id for section in paper.sections] == ["0", "0.1", "1", "u1", "u1.1"]
+    marked = [
+        MARKER.fullmatch(line).group(1) for line in text.split("\n") if MARKER.fullmatch(line)
+    ]
+    assert marked == ["0", "0.1", "1", "u1", "u1.1"]
+    for piece in ("SIGNS", "FIRST", "LEAD-IN", "PROOF."):
+        assert piece in text
+    whole = "\n\n".join(section.text for section in paper.sections if section.level == 1)
+    assert without_markers(text) == whole and paper.chars == len(whole) - 2 * 2
 
 
 def test_a_subsection_that_cannot_be_found_gets_no_marker_and_no_text_is_lost():

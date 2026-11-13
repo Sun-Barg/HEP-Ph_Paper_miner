@@ -30,6 +30,8 @@ Known limits. tests/test_against_tex.py shows each of them by running TeX itself
         its files: the longest file is taken for the paper.
       - \\includeonly, \\endinput and \\if... are not obeyed, so text that TeX
         skips can end up in a section.
+      - a few words that stand under no heading (before the first \\section, or
+        between \\appendix and the next one) are taken for commands and left out.
 """
 
 from __future__ import annotations
@@ -44,14 +46,16 @@ import zlib
 from hepph_paper_miner.sources.base import ErrorKind, Section, SourceError
 
 # Part of every run record. Change it whenever the same source would split differently.
-PARSER_VERSION = "3"
+PARSER_VERSION = "4"
 
 _MAX_UNPACKED_BYTES = 200_000_000
 _MAX_MEMBER_BYTES = 5_000_000
 _TEXT_SUFFIXES = (".tex", ".ltx", ".latex")
 _MANIFEST = "00README.json"
 _MIN_TOTAL_CHARS = 1000
-_MIN_FRONT_CHARS = 200
+# Text that stands under no heading is a section of its own from this size on. Below
+# it, it is commands (\\tableofcontents, \\keywords, counters set anew) and is left out.
+_MIN_UNHEADED_CHARS = 200
 _MAX_INPUT_DEPTH = 10
 
 
@@ -353,6 +357,12 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
     Identifiers follow the numbers LaTeX would print: "1", "2", "2.1", and after
     \\appendix "A", "B", "B.1". Starred headings have no number in LaTeX; they get
     "u1", "u2" in document order (or "2.u1" inside section 2).
+
+    Every piece of the body lies in a section, also text under no heading of its own.
+    What comes before the first \\section is section "0", and what stands between
+    \\appendix and the next \\section gets the next "u" identifier. Like any section,
+    each of the two holds the subsections that follow it. Short and without a
+    subsection, such text is commands and makes no section (_MIN_UNHEADED_CHARS).
     """
     # Read the other files in first, then cut. TeX begins the document at the first
     # \begin{document} it meets and ends it at the first \end{document} after that,
@@ -381,33 +391,49 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
     headings = [mark for mark in marks if mark[1] > 0]
     first = marks[0][0] if marks else len(body)
 
-    # Text between the title block and the first heading. Papers without an
-    # "Introduction" heading start their text here.
+    # The text begins after the title block. Papers without an "Introduction" heading
+    # start it right there.
     front_end = 0
     for match in _FRONT_END.finditer(body, 0, first):
         front_end = match.end()
-    front = _tidy(body[front_end:first])
 
     if not headings:
-        return (Section("1", "(the paper has no section headings)", 1, front),)
+        # All of it, also what follows an \appendix: with no heading there either, it
+        # belongs to this one section.
+        text = _tidy(body[front_end:])
+        return (Section("1", "(the paper has no section headings)", 1, text),)
 
     sections: list[Section] = []
-    if len(re.sub(r"\s", "", front)) >= _MIN_FRONT_CHARS:
-        sections.append(Section("0", "(text before the first section)", 1, front))
-
     in_appendix = False
     numbered = lettered = unnumbered = 0
     parent, sub_numbered, sub_unnumbered = "0", 0, 0
+
+    # What comes before the first \section or \appendix, subsections included.
+    first_section = next((mark[0] for mark in marks if mark[1] <= 1), len(body))
+    front = _tidy(body[front_end:first_section])
+    if _makes_a_section(front, followed_by=marks[0]):
+        sections.append(Section("0", "(text before the first section)", 1, front))
+
     for index, (position, level, starred, title, text_start) in enumerate(marks):
-        if level == 0:
-            in_appendix = True
-            continue
-        # A section runs to the next section or to \appendix; a subsection to the next heading.
+        # A section runs to the next section or to \appendix, and so does the text
+        # after \appendix. A subsection runs to the next heading.
         stop = len(body)
         for later_position, later_level, *_ in marks[index + 1 :]:
             if level == 2 or later_level <= 1:
                 stop = later_position
                 break
+        text = _tidy(body[text_start:stop])
+
+        if level == 0:
+            in_appendix = True
+            later = marks[index + 1] if index + 1 < len(marks) else None
+            if _makes_a_section(text, followed_by=later):
+                # No heading, so no number: the next of the identifiers that say so.
+                unnumbered += 1
+                parent, sub_numbered, sub_unnumbered = f"u{unnumbered}", 0, 0
+                title = "(text after \\appendix, without a section heading)"
+                sections.append(Section(parent, title, 1, text))
+            continue
 
         if level == 1:
             sub_numbered = sub_unnumbered = 0
@@ -427,8 +453,19 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
         else:
             sub_numbered += 1
             section_id = f"{parent}.{sub_numbered}"
-        sections.append(Section(section_id, title, level, _tidy(body[text_start:stop])))
+        sections.append(Section(section_id, title, level, text))
     return tuple(sections)
+
+
+def _makes_a_section(text: str, followed_by: tuple[int, int, bool, str, int] | None) -> bool:
+    """Whether text under no heading of its own is kept as a section.
+
+    When it is long enough to be text, and whatever its length when a subsection
+    follows it: that subsection has to lie in a section, and this is the one.
+    """
+    if followed_by is not None and followed_by[1] == 2:
+        return True
+    return len(re.sub(r"\s", "", text)) >= _MIN_UNHEADED_CHARS
 
 
 def _find_headings(body: str) -> list[tuple[int, int, bool, str, int]]:
@@ -481,6 +518,15 @@ def check(sections: tuple[Section, ...]) -> tuple[bool, str]:
     identifiers = [section.section_id for section in sections]
     if len(identifiers) != len(set(identifiers)):
         return False, "two sections share an identifier"
+    # The text of a paper is the text of its sections, which hold their subsections
+    # (Paper.chars, and the whole paper as the flat layout returns it). A subsection
+    # outside the section before it would be missing from both.
+    holder: Section | None = None
+    for section in sections:
+        if section.level == 1:
+            holder = section
+        elif holder is None or section.text not in holder.text:
+            return False, f"subsection {section.section_id} is not part of the section before it"
     total = sum(section.chars for section in sections if section.level == 1)
     if total < _MIN_TOTAL_CHARS:
         return False, f"only {total} characters of text were found"
