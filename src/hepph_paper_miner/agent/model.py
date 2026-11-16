@@ -71,9 +71,13 @@ class Model(Protocol):
         system: str,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
-        answer_schema: dict[str, Any],
+        answer_schema: dict[str, Any] | None,
     ) -> Reply:
-        """Ask once. Raises ModelError when there is no reply."""
+        """Ask once. Raises ModelError when there is no reply.
+
+        `answer_schema` is the form the text that ends a turn is to be held to, or
+        None when nothing is to hold it (the loop says which: prompt.py).
+        """
         ...
 
 
@@ -124,6 +128,8 @@ class ClaudeModel:
     whether a model that is not held to a form stops asking for tools sooner. Such a
     run is no part of an evaluation. Its last text counts as an answer only when it
     happens to have the form (prompt.py), and the record says how the run was made.
+    A request also leaves the form out when the loop passes none: a run that hands in
+    its answer in another way than as text held by the API (prompt.py).
     """
 
     def __init__(
@@ -173,10 +179,10 @@ class ClaudeModel:
         system: str,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
-        answer_schema: dict[str, Any],
+        answer_schema: dict[str, Any] | None,
     ) -> Reply:
         output_config: dict[str, Any] = {"effort": self._effort}
-        if self._answer_format:
+        if self._answer_format and answer_schema is not None:
             output_config["format"] = {"type": "json_schema", "schema": answer_schema}
         try:
             response = await self._client.messages.create(

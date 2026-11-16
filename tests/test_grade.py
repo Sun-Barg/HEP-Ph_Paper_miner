@@ -71,7 +71,9 @@ def answer(text: str = "That.", found: bool = True, *cited: tuple[str, str]) -> 
     return json.dumps({"answer": text, "found": found, "evidence": evidence})
 
 
-async def play(tmp_path, toolset: str, *replies, max_turns: int = 12) -> Record:
+async def play(
+    tmp_path, toolset: str, *replies, max_turns: int = 12, channel: str = "format"
+) -> Record:
     """Run the loop on scripted replies and read the record it wrote."""
     name = f"run-{len(list(tmp_path.glob('*.jsonl'))) + 1}"
     labels = {"question_id": "q1", "toolset": toolset, "repeat": 1}
@@ -83,6 +85,7 @@ async def play(tmp_path, toolset: str, *replies, max_turns: int = 12) -> Record:
             model=ScriptedModel(*replies),
             trace=trace,
             limits=Limits(max_turns=max_turns),
+            channel=channel,
         )
     return read_record(trace.public_path)
 
@@ -560,6 +563,44 @@ async def test_the_command_grades_every_finished_record_and_writes_the_grades(tm
 def test_the_command_says_when_it_has_nothing_to_grade(tmp_path, capsys):
     assert grading.main([str(tmp_path / "*.jsonl")], source=sample_source()) == 2
     assert "no record matches" in capsys.readouterr().err
+
+
+@pytest.mark.anyio
+async def test_a_run_is_graded_the_same_whichever_way_its_answer_came_in(tmp_path):
+    # The record of a run keeps its answer in one place and in one form, so the grader
+    # need not know the way. The call that handed in an answer returned no text of a
+    # paper, and is no reading of one.
+    given = json.loads(answer("That.", True, (SAMPLE, "2.1")))
+    by_tool = await play(
+        tmp_path,
+        "staged",
+        asks(section("2")),
+        asks(("submit_answer", given)),
+        channel="tool",
+    )
+    as_text = await play(
+        tmp_path, "staged", asks(section("2")), says(json.dumps(given)), channel="text"
+    )
+    held = await play(tmp_path, "staged", asks(section("2")), says(json.dumps(given)))
+
+    grades = [grade(record, question(), papers()) for record in (by_tool, as_text, held)]
+
+    for result in grades:
+        assert (result.reason, result.turns) == ("answered", 2)
+        assert (result.access.met, result.access.turn, result.access.turns_after) == (True, 1, 1)
+        assert (result.citation.strict, result.citation.extra, result.citation.unread) == (
+            True,
+            0,
+            0,
+        )
+        assert result.answer.rule == RIGHT and result.problems == ()
+    # A run that was to call the tool and ended with text has no answer, and is wrong.
+    without = await play(
+        tmp_path, "staged", asks(section("2")), says(json.dumps(given)), channel="tool"
+    )
+    result = grade(without, question(), papers())
+    assert (result.reason, result.citation, result.answer.rule) == ("no_answer", None, WRONG)
+    assert result.answer.why == ("no answer (no_answer)",)
 
 
 # --- the records of the development runs, kept in this repository ------------------------

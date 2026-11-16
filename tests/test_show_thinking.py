@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from conftest import asks, says
 
-from hepph_paper_miner.agent.trace import OK, ToolRecord, Trace
+from hepph_paper_miner.agent.trace import ANSWER, OK, ToolRecord, Trace
 
 SCRIPT = Path(__file__).parent.parent / "scripts" / "show_thinking.py"
 spec = importlib.util.spec_from_file_location("show_thinking", SCRIPT)
@@ -88,6 +88,35 @@ def test_the_text_that_was_read_as_the_answer_is_printed_once(tmp_path, capsys):
     )
     shown = capsys.readouterr().out
     assert "   answer: Ten." in shown and "   text:" not in shown
+
+
+def test_text_beside_a_call_that_handed_in_the_answer_is_printed(tmp_path, capsys):
+    # Where the answer comes as a call of the answer tool, no text is the answer. What
+    # the model wrote in that response is its own wording, and is shown like any other.
+    answer = {"answer": "Ten.", "found": True, "evidence": []}
+    trace = Trace("run-4", tmp_path / "public", tmp_path / "private")
+    start = {
+        "question_id": "q1",
+        "toolset_version": "flat-4",
+        "model": {},
+        "answer_channel": "tool",
+    }
+    trace.start(start, private={})
+    raw = {"content": [{"type": "text", "text": "That settles it."}]}
+    last = dataclasses.replace(asks(("submit_answer", answer)), raw=raw)
+    trace.turn(1, last, 0.5, [ToolRecord(last.tool_calls[0], ANSWER)])
+    trace.end("answered", "", answer, 1, 1.0)
+
+    assert (
+        show_thinking.main([str(trace.public_path), "--private", str(trace.private_path.parent)])
+        == 0
+    )
+    shown = capsys.readouterr().out
+    assert "| thinking not asked for | answer by tool" in shown
+    assert "   text: That settles it." in shown
+    assert "   asks: submit_answer " in shown and "-> answer" in shown
+    assert "end: answered | 1 turns | 0 chars in 0 results | found True" in shown
+    assert "   answer: Ten." in shown
 
 
 def test_a_pattern_is_opened_here_and_the_output_can_go_to_a_file(run, tmp_path, capsys):

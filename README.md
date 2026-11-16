@@ -113,6 +113,32 @@ evaluation: it shows whether a model that is not held to a form stops asking for
 sooner. The text of such a run is read as an answer only when it happens to have the
 form, so the run can end as `no_answer`. The script above prints that text as well.
 
+With `--answer-channel` a run hands in its answer in another way. There are three, and
+the model reads something else with each, so each has a prompt of its own
+(`prompt_version` in a record, beside `answer_channel`):
+
+| Channel | The answer is | Prompt |
+|---|---|---|
+| `format` (default) | the text that ends the turn, which the API holds to the form of an answer | `p1` |
+| `tool` | the arguments of a call of `submit_answer`, a tool that the loop adds to the tools of the server | `p2-tool`: `p1` and one line that says to call it |
+| `text` | the text that ends the turn, which the prompt asks for as one JSON object | `p2-text`: `p1` and a paragraph with the form |
+
+```
+uv run python -m hepph_paper_miner.agent --question-id dev-01 --answer-channel tool
+uv run python -m hepph_paper_miner.agent --question-id dev-01 --answer-channel text
+```
+
+The two others are there because of what the first one did on the development
+questions (`results/runs/dev/README.md`): held to the form by the API, most runs went
+on asking for tools long after they had been given what the question needs, and without
+the form every run ended by itself. Which of the three an evaluation uses is not
+decided yet. Neither of the two holds the model to anything. With `tool`, a turn that
+ends without the call is `no_answer`, whatever its text says; a call whose arguments are
+not an answer gets an error result, and the run goes on. The model cannot be made to
+call a tool, and the tool is not marked strict, because strict input is made under the
+same constraint as text held to a form. With `text`, a last text that is anything but
+the one JSON object is `no_answer`.
+
 The first line of a record says what was run: the names of the tool texts, the prompt
 and the parser, the settings of the model, and which code it was (`code`: the commit,
 and whether a file the repository keeps had been changed). For a question from a file

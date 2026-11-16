@@ -33,9 +33,14 @@ RUNS_ENV = "HEPPH_PAPER_MINER_RUNS"
 # What became of a tool call.
 OK = "ok"  # the tool ran and returned a result
 ERROR = "error"  # the tool ran and returned an error result
-NOT_SENT = "not_sent"  # the server has no such tool, so the loop answered the call itself
-NOT_RUN = "not_run"  # the run ended before the call was made (the turn limit)
+# The loop answered the call itself, with an error text: the model was given no tool of
+# that name, or the call was for the loop's own tool and its arguments were no answer.
+NOT_SENT = "not_sent"
+NOT_RUN = "not_run"  # the run ended before the call was made (the turn limit, or an answer)
 FAILED = "failed"  # the call got no result at all, and the run ended with it
+# The call handed in the answer of the run (the loop's own tool: prompt.py). Nothing was
+# returned for it, so it adds nothing to the count of results the model read.
+ANSWER = "answer"
 
 
 def default_private_dir() -> Path:

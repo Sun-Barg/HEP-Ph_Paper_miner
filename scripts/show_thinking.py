@@ -10,7 +10,8 @@ looked for where the command that made the run puts it.
 For every turn this prints what the API counted, the summary of each thinking block,
 and each tool call with its arguments and the facts of the first line of its result.
 It also prints the text of a response that was not read as the answer of the run: a
-run made with --no-answer-format ends with such a text. It prints no text that a tool
+run made with --no-answer-format ends with such a text, and so can a run that was to
+call the answer tool or to write JSON (--answer-channel). It prints no text that a tool
 returned. A summary of thinking and a text are the model's own wording and can quote
 a few words of a paper, so the output is something to read and to show, and not
 something to commit.
@@ -59,14 +60,20 @@ def render(public: list[dict[str, Any]], private: list[dict[str, Any]] | None) -
         f"== {run.get('run_id')} | {run.get('question_id')} | {run.get('toolset_version')} "
         f"| repeat {run.get('repeat')} | code {commit} "
         f"| thinking {'shown' if shown else 'not asked for'}"
+        # A record names the way its answer was to come in since there is more than one.
+        + (f" | answer by {run['answer_channel']}" if run.get("answer_channel") else "")
     ]
     if private is None:
         lines.append("   (no private record of this name: the thinking cannot be shown)")
     private_turns = {line["turn"]: line for line in private or [] if line.get("record") == "turn"}
     # The text that was read as the answer is printed with the end of the run, below.
+    # An answer that came as a call of the answer tool was no text: what the model wrote
+    # beside that call is printed like any other text.
     answered_in = next(
         (line["turns"] for line in public if line["record"] == "end" and line.get("answer")), None
     )
+    if run.get("answer_channel") == "tool":
+        answered_in = None
     for line in public[1:]:
         if line["record"] == "turn":
             usage = line["usage"]

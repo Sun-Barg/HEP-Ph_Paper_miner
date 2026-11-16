@@ -2,6 +2,7 @@
 
     python -m hepph_paper_miner.agent --question-id dev-01
     python -m hepph_paper_miner.agent --question-id dev-01 --toolset flat
+    python -m hepph_paper_miner.agent --question-id dev-01 --answer-channel tool
     python -m hepph_paper_miner.agent --question "Which paper ...?"
 
 Needs the API key in the environment variable ANTHROPIC_API_KEY, and is to be run
@@ -28,6 +29,7 @@ from hepph_paper_miner import __version__
 from hepph_paper_miner.agent.loop import EndReason, Limits, Outcome, run
 from hepph_paper_miner.agent.model import ClaudeModel
 from hepph_paper_miner.agent.origin import file_digest
+from hepph_paper_miner.agent.prompt import FORMAT, PROMPT_VERSION
 from hepph_paper_miner.agent.trace import Trace, default_private_dir, new_run_id
 from hepph_paper_miner.eval.questions import QuestionFileError, load_questions
 from hepph_paper_miner.http import Fetcher, default_cache_dir
@@ -71,6 +73,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="for a diagnosis, not for an evaluation: do not hold the final text to the "
         "form of an answer (such a run can end as 'no_answer': see the README)",
+    )
+    parser.add_argument(
+        "--answer-channel",
+        choices=list(PROMPT_VERSION),
+        default=FORMAT,
+        help="how the run hands in its answer: as text that the API holds to the form of "
+        "an answer (format), as a call of a tool of the loop (tool), or as JSON that the "
+        "prompt asks for (text). Each has a prompt of its own: see the README",
     )
     parser.add_argument("--max-turns", type=int, default=Limits().max_turns)
     parser.add_argument(
@@ -131,12 +141,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.repeat is not None and arguments.repeat < 1:
         print(f"--repeat {arguments.repeat}: repetitions are counted from 1", file=sys.stderr)
         return 2
+    channel = arguments.answer_channel
+    if arguments.no_answer_format and channel != FORMAT:
+        print(
+            f"--no-answer-format goes with --answer-channel {FORMAT} only: "
+            f"a run with --answer-channel {channel} sends no form of the answer anyway",
+            file=sys.stderr,
+        )
+        return 2
     model = ClaudeModel(
         arguments.model,
         effort=arguments.effort,
         cache=arguments.cache,
         show_thinking=arguments.show_thinking,
-        answer_format=not arguments.no_answer_format,
+        # Set here as well as in the loop, so that the settings of the model in the
+        # record say what the requests held.
+        answer_format=channel == FORMAT and not arguments.no_answer_format,
     )
     # The files of the record are made last, when nothing can refuse the run any more:
     # a file without an "end" line reads as a run that died.
@@ -152,7 +172,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         },
     )
     print(f"run       {trace.run_id}")
-    outcome = anyio.run(_ask, question, arguments.toolset, model, trace, limits)
+    outcome = anyio.run(_ask, question, arguments.toolset, model, trace, limits, channel)
 
     print(f"ended     {outcome.reason.value}" + (f" ({outcome.detail})" if outcome.detail else ""))
     print(f"turns     {outcome.turns}")
@@ -176,11 +196,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 async def _ask(
-    question: str, toolset: str, model: ClaudeModel, trace: Trace, limits: Limits
+    question: str, toolset: str, model: ClaudeModel, trace: Trace, limits: Limits, channel: str
 ) -> Outcome:
     fetcher = Fetcher(default_cache_dir(), user_agent=f"{SERVER_NAME}/{__version__}")
     async with Client(build_server(ArxivSource(fetcher), toolset)) as client:
-        return await run(question, client=client, model=model, trace=trace, limits=limits)
+        return await run(
+            question, client=client, model=model, trace=trace, limits=limits, channel=channel
+        )
 
 
 if __name__ == "__main__":

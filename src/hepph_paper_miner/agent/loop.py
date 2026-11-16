@@ -6,9 +6,9 @@ three things the runner does not give:
     why a run ended     Every run ends with one of the reasons below, and the caller
                         gets it as a value. The runner stops without saying why, and
                         a run cut off by its iteration limit looks like any other.
-    what counts as      Only a response that ends its turn with text of the expected
-    the answer          form is an answer. The runner returns the last message,
-                        whatever it is.
+    what counts as      Only what comes in the way chosen for the run, and has the
+    the answer          expected form, is an answer (prompt.py names the ways). The
+                        runner returns the last message, whatever it is.
     a record            Every turn is written down as it happens (trace.py).
 
 What it leaves to others: retries of API requests are the SDK's (model.py), and the
@@ -31,12 +31,26 @@ from hepph_paper_miner.agent.model import Model, ModelError, Reply, ToolCall
 from hepph_paper_miner.agent.origin import code_version
 from hepph_paper_miner.agent.prompt import (
     ANSWER_SCHEMA,
+    ANSWER_TOOL,
+    FORMAT,
+    INVALID_ANSWER_TEXT,
     PROMPT_VERSION,
-    SYSTEM_PROMPT,
+    TOOL,
+    as_answer,
     read_answer,
+    system_prompt,
     unknown_tool_text,
 )
-from hepph_paper_miner.agent.trace import ERROR, FAILED, NOT_RUN, NOT_SENT, OK, ToolRecord, Trace
+from hepph_paper_miner.agent.trace import (
+    ANSWER,
+    ERROR,
+    FAILED,
+    NOT_RUN,
+    NOT_SENT,
+    OK,
+    ToolRecord,
+    Trace,
+)
 from hepph_paper_miner.result_text import error_kind
 
 
@@ -52,8 +66,8 @@ _WRITE_FOR_THE_MODEL = ("mcp", "pydantic")
 class EndReason(str, Enum):
     """Why a run ended. There is no run without one."""
 
-    ANSWERED = "answered"  # the model ended its turn with an answer of the expected form
-    NO_ANSWER = "no_answer"  # it ended its turn with no text, or with text that is not an answer
+    ANSWERED = "answered"  # the model handed in an answer of the expected form
+    NO_ANSWER = "no_answer"  # it ended its turn without one (what was missing is in the detail)
     TURN_LIMIT = "turn_limit"  # the last allowed response still asked for tools
     MAX_TOKENS = "max_tokens"  # a response was cut off at the output limit
     REFUSAL = "refusal"  # the API declined to answer
@@ -126,14 +140,21 @@ async def run(
     trace: Trace,
     limits: Limits | None = None,
     clock: Callable[[], float] = time.monotonic,
+    channel: str = FORMAT,
 ) -> Outcome:
     """Answer one question with the tools of the connected server.
 
     A turn is one response of the model. With max_turns = N the model is asked at
     most N times, and tools are run at most N - 1 times: if the Nth response still
     asks for tools, they are not run, because nobody would read their results.
+
+    `channel` is the way the answer is handed in (prompt.py). It decides which
+    system prompt the model reads, whether it is given the loop's own tool, and
+    what is taken for the answer.
     """
     limits = limits or Limits()
+    if channel not in PROMPT_VERSION:
+        raise ValueError(f"no such way to hand in an answer: {channel!r}")
     listed = (await client.list_tools()).tools
     # The server's own names, descriptions and schemas, passed on unchanged: the
     # model is to see what any other MCP host would show it.
@@ -145,7 +166,19 @@ async def run(
         }
         for tool in listed
     ]
+    if channel == TOOL:
+        if any(tool["name"] == ANSWER_TOOL["name"] for tool in tools):
+            # Two tools of one name: the call that is to end the run could not be
+            # told from a call for the server.
+            raise ValueError(f"the server has a tool named {ANSWER_TOOL['name']!r} of its own")
+        # After the tools of the server, so that the model is shown those exactly as
+        # in a run without it.
+        tools.append(ANSWER_TOOL)
     declared = [tool["name"] for tool in tools]
+    system = system_prompt(channel)
+    # The API is given the form to hold a text to in one of the ways only. In the
+    # others no form goes into a request, whatever the model is set to send.
+    held_to = ANSWER_SCHEMA if channel == FORMAT else None
     server = client.server_info
     trace.start(
         {
@@ -155,7 +188,9 @@ async def run(
             # imported: the loop knows the server through the protocol only.
             "toolset_version": server.version if server else None,
             "tools": declared,
-            "prompt_version": PROMPT_VERSION,
+            "prompt_version": PROMPT_VERSION[channel],
+            # How the answer was to be handed in (prompt.py).
+            "answer_channel": channel,
             "model": model.settings,
             "limits": asdict(limits),
             "packages": {name: version(name) for name in _WRITE_FOR_THE_MODEL},
@@ -164,7 +199,7 @@ async def run(
             "code": code_version(),
         },
         private={
-            "system": SYSTEM_PROMPT,
+            "system": system,
             "tool_definitions": tools,
             "answer_schema": ANSWER_SCHEMA,
         },
@@ -183,7 +218,7 @@ async def run(
             return end(EndReason.TIME_LIMIT, f"over {limits.run_seconds:.0f} s after {turn} turns")
         asked_at = clock()
         try:
-            reply = await model.reply(SYSTEM_PROMPT, messages, tools, ANSWER_SCHEMA)
+            reply = await model.reply(system, messages, tools, held_to)
         except ModelError as error:
             return end(EndReason.API_ERROR, str(error))
         turn += 1
@@ -191,10 +226,29 @@ async def run(
 
         if reply.stop_reason != "tool_use":
             trace.turn(turn, reply, seconds, [])
-            return end(*_final(reply))
+            return end(*_final(reply, channel))
         if not reply.tool_calls:
             trace.turn(turn, reply, seconds, [])
             return end(EndReason.UNEXPECTED_STOP, "stop_reason 'tool_use' without a tool call")
+        if channel == TOOL:
+            # Looked at before the turn limit: the limit is there to stop tools from
+            # being run for nobody, and an answer that is handed in needs none run.
+            handed_in = _handed_in(reply.tool_calls)
+            if handed_in is not None:
+                call, answer = handed_in
+                # The other calls of this response are not run. The model asked for
+                # them and gave its answer in one breath, so it did not wait to read
+                # what they return.
+                trace.turn(
+                    turn,
+                    reply,
+                    seconds,
+                    [
+                        ToolRecord(each, ANSWER if each is call else NOT_RUN)
+                        for each in reply.tool_calls
+                    ],
+                )
+                return end(EndReason.ANSWERED, "", answer)
         if turn == limits.max_turns:
             trace.turn(
                 turn, reply, seconds, [ToolRecord(call, NOT_RUN) for call in reply.tool_calls]
@@ -205,6 +259,13 @@ async def run(
         # connection to arXiv, and a record in a fixed order is easier to read.
         records: list[ToolRecord] = []
         for call in reply.tool_calls:
+            if channel == TOOL and call.name == ANSWER_TOOL["name"]:
+                # Its arguments are no answer, or the run would have ended above. The
+                # model is told so, and can hand in an answer again.
+                records.append(
+                    ToolRecord(call, NOT_SENT, INVALID_ANSWER_TEXT, 0.0, "invalid_answer")
+                )
+                continue
             try:
                 records.append(await _call_tool(client, call, declared, limits.tool_seconds, clock))
             except _ToolFailure as failure:
@@ -219,9 +280,24 @@ async def run(
         messages.append({"role": "user", "content": [_tool_result(record) for record in records]})
 
 
-def _final(reply: Reply) -> tuple[EndReason, str, dict[str, Any] | None]:
+def _handed_in(calls: tuple[ToolCall, ...]) -> tuple[ToolCall, dict[str, Any]] | None:
+    """The first call of the loop's own tool whose arguments are an answer, with that answer."""
+    for call in calls:
+        if call.name == ANSWER_TOOL["name"]:
+            answer = as_answer(call.arguments)
+            if answer is not None:
+                return call, answer
+    return None
+
+
+def _final(reply: Reply, channel: str) -> tuple[EndReason, str, dict[str, Any] | None]:
     """Reason, detail and answer for a response that did not ask for tools."""
     stop = reply.stop_reason
+    if stop == "end_turn" and channel == TOOL:
+        # Text is no answer in this way, whatever it says. One rule for every run, and
+        # the records show how often a model ends a run like this.
+        detail = f"the turn ended without a call of {ANSWER_TOOL['name']}"
+        return EndReason.NO_ANSWER, detail, None
     if stop == "end_turn":
         answer = read_answer(reply.text)
         if answer is not None:
@@ -252,7 +328,7 @@ async def _call_tool(
     something other than one piece of text, raises _ToolFailure.
     """
     if call.name not in declared:
-        # Answered here. A name the server never offered is not passed on to it.
+        # Answered here. A name the model was never given is not passed on to the server.
         return ToolRecord(
             call, NOT_SENT, unknown_tool_text(call.name, declared), 0.0, "unknown_tool"
         )

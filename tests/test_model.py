@@ -187,6 +187,19 @@ async def test_the_form_of_the_answer_is_left_out_only_when_a_caller_says_so():
 
 
 @pytest.mark.anyio
+async def test_no_form_goes_into_a_request_when_the_loop_passes_none():
+    # A run that hands in its answer in another way gives the model no form to send
+    # (agent/prompt.py). The request then holds none, also from a model that would send one.
+    api = Api(ok(message([THINKING, TOOL_USE], "tool_use")))
+
+    await api.model().reply(SYSTEM_PROMPT, QUESTION, TOOLS, None)
+
+    (request,) = api.requests
+    assert request["output_config"] == {"effort": "high"}
+    assert "json_schema" not in json.dumps(request)
+
+
+@pytest.mark.anyio
 async def test_a_response_that_asks_for_tools_is_read():
     api = Api(ok(message([THINKING, TOOL_USE], "tool_use")))
 

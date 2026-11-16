@@ -10,6 +10,7 @@ from conftest import asks, says
 
 from hepph_paper_miner.agent.model import ToolCall
 from hepph_paper_miner.agent.trace import (
+    ANSWER,
     FAILED,
     NOT_RUN,
     NOT_SENT,
@@ -107,9 +108,11 @@ def test_the_public_facts_of_a_tool_call_leave_its_text_out():
     assert "Data text." not in json.dumps(facts)
     assert facts["result_chars"] == len(TEXT) and facts["seconds"] == 1.235
     assert facts["first_line"]["section_id"] == "2.1"
-    # A call that got no text has no size and no hash to show.
-    for status in (NOT_RUN, FAILED):
-        assert "result_chars" not in ToolRecord(CALL, status).public()
+    # A call that got no text has no size and no hash to show. That goes for the call
+    # that handed in the answer as well: nothing was returned for it.
+    for status in (NOT_RUN, FAILED, ANSWER):
+        kept = ToolRecord(CALL, status)
+        assert "result_chars" not in kept.public() and not kept.is_error
     # An error text has a size, but no first line of a known form to read.
     told = ToolRecord(CALL, NOT_SENT, "Unknown tool: 'x'.", 0.0, "unknown_tool")
     assert told.is_error and told.public()["first_line"] is None
@@ -118,12 +121,14 @@ def test_the_public_facts_of_a_tool_call_leave_its_text_out():
 def test_totals_count_every_text_the_model_was_given(tmp_path):
     trace = Trace("run-1", tmp_path, None)
     trace.start({}, private={})
-    both = asks(("read_section", {}), ("read_section", {}))
+    three = asks(("read_section", {}), ("read_section", {}), ("submit_answer", {}))
     records = [
-        ToolRecord(both.tool_calls[0], OK, TEXT, 0.1),
-        ToolRecord(both.tool_calls[1], NOT_RUN),
+        ToolRecord(three.tool_calls[0], OK, TEXT, 0.1),
+        ToolRecord(three.tool_calls[1], NOT_RUN),
+        # The call that handed in the answer was given no text either, so it adds nothing.
+        ToolRecord(three.tool_calls[2], ANSWER),
     ]
-    trace.turn(1, both, 0.2, records)
+    trace.turn(1, three, 0.2, records)
     trace.end("turn_limit", "", None, turns=1, seconds=0.3)
     end = json.loads(trace.public_path.read_text(encoding="utf-8").splitlines()[-1])
     assert (end["tool_calls"], end["tool_result_chars"]) == (1, len(TEXT))

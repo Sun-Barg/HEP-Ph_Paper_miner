@@ -41,7 +41,9 @@ works here follows the rules below.
   description, an argument description or the form of a result changes. The model reads all
   three, so a change to any of them is a different experiment.
 - `PROMPT_VERSION` in `src/hepph_paper_miner/agent/prompt.py`: raise it whenever the system
-  prompt, the answer schema or a message the loop writes for the model changes.
+  prompt, the answer schema, the loop's own tool or a message the loop writes for the model
+  changes. It has one name for each way a run hands in its answer: raise the name of every
+  way whose texts change.
 - `tests/test_toolset_pin.py` and `tests/test_prompt.py` fail when one of these texts changes
   under an unchanged version. Raise the version first, then pin the digest the failure prints.
 

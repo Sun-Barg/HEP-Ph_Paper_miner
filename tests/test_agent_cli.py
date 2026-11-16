@@ -257,3 +257,85 @@ def test_a_run_without_an_answer_ends_with_a_code_that_says_so(monkeypatch, caps
     monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
     assert command.main(["--question-id", "dev-05", "--toolset", "flat", *folders]) == 1
     assert "ended     no_answer (the response had no text)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("channel", "last", "prompt"),
+    [
+        ("tool", asks(("submit_answer", ANSWER)), "p2-tool"),
+        ("text", says(json.dumps(ANSWER)), "p2-text"),
+    ],
+)
+def test_another_way_to_hand_in_the_answer_reaches_the_loop_and_the_record(
+    monkeypatch, capsys, tmp_path, folders, channel, last, prompt
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    section = ("read_section", {"arxiv_id": "2501.00001v2", "section_id": "2.1"})
+    scripted = ScriptedModel(asks(section), last)
+    made = {}
+
+    def model(name, effort, cache, show_thinking, answer_format):
+        made.update(answer_format=answer_format)
+        return scripted
+
+    monkeypatch.setattr(command, "ClaudeModel", model)
+    monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
+    monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
+
+    assert (
+        command.main(["--question", "How much data?", "--answer-channel", channel, *folders]) == 0
+    )
+
+    # The model is set to send no form, so that its settings in the record say what the
+    # requests held. The loop passes it none either.
+    assert made == {"answer_format": False}
+    assert [asked["schema"] for asked in scripted.asked] == [None, None]
+    shown = capsys.readouterr().out
+    assert "ended     answered" in shown and "answer    Ten." in shown
+    assert "read      74 characters in 1 tool results" in shown
+    (public,) = (tmp_path / "public").iterdir()
+    first, *_, end = (json.loads(line) for line in public.read_text(encoding="utf-8").splitlines())
+    assert (first["answer_channel"], first["prompt_version"]) == (channel, prompt)
+    assert (end["reason"], end["answer"]) == ("answered", ANSWER)
+
+
+def test_without_the_option_the_answer_is_text_that_the_api_holds_to_the_form(
+    monkeypatch, tmp_path, folders
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    scripted = ScriptedModel(says(json.dumps(ANSWER)))
+    monkeypatch.setattr(
+        command,
+        "ClaudeModel",
+        lambda name, effort, cache, show_thinking, answer_format: scripted,
+    )
+    monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
+    monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
+
+    assert command.main(["--question", "Q?", *folders]) == 0
+
+    assert scripted.asked[0]["schema"] is not None
+    (public,) = (tmp_path / "public").iterdir()
+    first = json.loads(public.read_text(encoding="utf-8").splitlines()[0])
+    assert (first["answer_channel"], first["prompt_version"]) == ("format", "p1")
+
+
+@pytest.mark.parametrize("channel", ["tool", "text"])
+def test_leaving_out_the_form_goes_with_the_one_way_that_sends_it(
+    monkeypatch, capsys, tmp_path, folders, channel
+):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    asked = ["--question", "Q?", "--no-answer-format", "--answer-channel", channel, *folders]
+    assert command.main(asked) == 2
+    assert (
+        f"--no-answer-format goes with --answer-channel format only: a run with "
+        f"--answer-channel {channel} sends no form of the answer anyway"
+    ) in capsys.readouterr().err
+    assert not any(tmp_path.iterdir())
+
+
+def test_a_way_to_hand_in_the_answer_that_does_not_exist_is_refused(monkeypatch, capsys, folders):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    with pytest.raises(SystemExit):
+        command.main(["--question", "Q?", "--answer-channel", "letter", *folders])
+    assert "invalid choice: 'letter'" in capsys.readouterr().err

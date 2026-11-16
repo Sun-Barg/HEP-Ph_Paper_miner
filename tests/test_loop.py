@@ -23,8 +23,13 @@ from hepph_paper_miner.agent.model import ModelError, Reply
 from hepph_paper_miner.agent.origin import code_version
 from hepph_paper_miner.agent.prompt import (
     ANSWER_SCHEMA,
-    PROMPT_VERSION,
+    ANSWER_TOOL,
+    FORMAT,
+    INVALID_ANSWER_TEXT,
     SYSTEM_PROMPT,
+    TEXT,
+    TOOL,
+    system_prompt,
     unknown_tool_text,
 )
 from hepph_paper_miner.agent.trace import Trace
@@ -145,7 +150,8 @@ async def test_the_record_says_what_was_run_and_what_each_result_was(client, tra
     assert start["record"] == "run" and start["run_id"] == "run-1" and start["question_id"] == "q1"
     assert start["toolset_version"] == "staged-5"  # as the server reported it over MCP
     assert start["tools"] == ["search_papers", "get_outline", "read_section"]
-    assert start["prompt_version"] == PROMPT_VERSION
+    # The name of the loop's own texts, and the way the answer was to be handed in.
+    assert (start["prompt_version"], start["answer_channel"]) == ("p1", "format")
     assert start["model"] == {"model": "scripted"}
     assert start["limits"] == {"max_turns": 12, "tool_seconds": 700.0, "run_seconds": 900.0}
     # The SDK and pydantic write a part of what the model reads (the sentence for
@@ -555,3 +561,238 @@ async def test_a_run_that_dies_leaves_what_it_had_done_and_no_end_line(client, t
 
     # No "end" line: that is how an unfinished run is told from a finished one.
     assert [line["record"] for line in records(trace.public_path)] == ["run", "turn"]
+
+
+# --- the two other ways to hand in an answer: a tool of the loop, and text asked for as JSON ---
+
+SUBMIT = (ANSWER_TOOL["name"], ANSWER)
+
+
+@pytest.mark.anyio
+async def test_a_call_of_the_answer_tool_is_the_answer_and_ends_the_run(client, source, trace):
+    model = ScriptedModel(asks(SECTION), asks(SUBMIT))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=TOOL)
+
+    assert (outcome.reason, outcome.answer, outcome.turns) == (EndReason.ANSWERED, ANSWER, 2)
+    assert len(model.asked) == 2  # nothing was asked after the answer
+    # What the model is given in this way: the prompt with its one more line, the tools
+    # of the server as the server describes them with the loop's own after them, and no
+    # form for the API to hold a text to.
+    first = model.asked[0]
+    assert first["system"] == system_prompt(TOOL) and first["schema"] is None
+    listed = (await client.list_tools()).tools
+    assert first["tools"] == [
+        *(
+            {"name": tool.name, "description": tool.description, "input_schema": tool.input_schema}
+            for tool in listed
+        ),
+        ANSWER_TOOL,
+    ]
+
+    start, _, second, end = records(trace.public_path)
+    assert (start["prompt_version"], start["answer_channel"]) == ("p2-tool", "tool")
+    assert start["tools"] == ["search_papers", "get_outline", "read_section", "submit_answer"]
+    (handed_in,) = second["tools"]
+    assert (handed_in["name"], handed_in["status"]) == ("submit_answer", "answer")
+    assert handed_in["arguments"] == ANSWER and "result_chars" not in handed_in
+    assert (end["reason"], end["answer"]) == ("answered", ANSWER)
+    # The model read one result, the section. Nothing was returned for the answer.
+    assert end["tool_calls"] == 1 and end["tool_result_chars"] == 74
+    private = records(trace.private_path)[0]
+    assert private["system"] == system_prompt(TOOL)
+    assert private["tool_definitions"][-1] == ANSWER_TOOL
+
+
+@pytest.mark.anyio
+async def test_calls_that_come_with_the_answer_are_not_run(client, source, trace):
+    model = ScriptedModel(asks(OUTLINE, SUBMIT, SECTION))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=TOOL)
+
+    assert (outcome.reason, outcome.answer, outcome.turns) == (EndReason.ANSWERED, ANSWER, 1)
+    assert source.calls == []  # neither the call before the answer nor the one after it
+    _, turn, end = records(trace.public_path)
+    assert [tool["status"] for tool in turn["tools"]] == ["not_run", "answer", "not_run"]
+    assert end["tool_calls"] == 0
+
+
+@pytest.mark.anyio
+async def test_arguments_that_are_no_answer_are_sent_back_and_the_run_goes_on(
+    client, source, trace
+):
+    incomplete = (ANSWER_TOOL["name"], {"answer": "The data section says so.", "found": True})
+    model = ScriptedModel(asks(incomplete, SECTION), asks(SUBMIT))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=TOOL)
+
+    assert (outcome.reason, outcome.answer, outcome.turns) == (EndReason.ANSWERED, ANSWER, 2)
+    told, read = model.asked[1]["messages"][-1]["content"]
+    assert told == {
+        "type": "tool_result",
+        "tool_use_id": "call-submit_answer-0",
+        "content": INVALID_ANSWER_TEXT,
+        "is_error": True,
+    }
+    # The call beside it was a call like any other, and was run.
+    assert read["content"].startswith("section | 2501.00001v2 | 2.1 | ")
+    refused, _ = records(trace.public_path)[1]["tools"]
+    assert (refused["status"], refused["error_kind"]) == ("not_sent", "invalid_answer")
+    # The model read the sentence, so it counts like every other text it was given.
+    assert refused["result_chars"] == len(INVALID_ANSWER_TEXT)
+    assert records(trace.public_path)[-1]["tool_calls"] == 2
+    assert INVALID_ANSWER_TEXT == (
+        "The answer was not accepted. Its arguments have to be: answer (text, not empty), "
+        "found (true or false) and evidence (a list, each item with arxiv_id and section_id "
+        "as text), and nothing else. Call submit_answer again."
+    )
+
+
+@pytest.mark.anyio
+async def test_of_several_answers_in_one_response_the_first_that_is_one_counts(client, trace):
+    empty = (ANSWER_TOOL["name"], {**ANSWER, "answer": ""})
+    later = (ANSWER_TOOL["name"], {**ANSWER, "answer": "Something else."})
+
+    outcome = await run(
+        "Q?",
+        client=client,
+        model=ScriptedModel(asks(empty, SUBMIT, later)),
+        trace=trace,
+        channel=TOOL,
+    )
+
+    assert (outcome.reason, outcome.answer) == (EndReason.ANSWERED, ANSWER)
+    statuses = [tool["status"] for tool in records(trace.public_path)[1]["tools"]]
+    assert statuses == ["not_run", "answer", "not_run"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("text", ["It is ten.", json.dumps(ANSWER), ""])
+async def test_text_is_no_answer_where_the_answer_is_to_come_through_the_tool(client, trace, text):
+    # Also not text that has the very form of an answer: the way is part of what is run.
+    outcome = await run(
+        "Q?", client=client, model=ScriptedModel(says(text)), trace=trace, channel=TOOL
+    )
+    assert (outcome.reason, outcome.answer) == (EndReason.NO_ANSWER, None)
+    assert outcome.detail == "the turn ended without a call of submit_answer"
+
+
+@pytest.mark.anyio
+async def test_an_answer_in_the_last_allowed_response_is_an_answer(client, source, trace):
+    model = ScriptedModel(asks(SECTION), asks(OUTLINE, SUBMIT))
+
+    outcome = await run(
+        "Q?", client=client, model=model, trace=trace, limits=Limits(max_turns=2), channel=TOOL
+    )
+
+    # The limit keeps tools from being run for nobody. An answer needs none run.
+    assert (outcome.reason, outcome.turns, outcome.answer) == (EndReason.ANSWERED, 2, ANSWER)
+    assert [what[0] for what in source.calls] == ["paper"]  # the section of the first response
+
+
+@pytest.mark.anyio
+async def test_the_turn_limit_ends_a_run_whose_last_response_hands_in_no_answer(client, trace):
+    no_answer = (ANSWER_TOOL["name"], {"answer": "The data section says so."})
+    model = ScriptedModel(asks(SECTION), asks(no_answer), asks(SUBMIT))
+
+    outcome = await run(
+        "Q?", client=client, model=model, trace=trace, limits=Limits(max_turns=2), channel=TOOL
+    )
+
+    assert (outcome.reason, outcome.turns, outcome.answer) == (EndReason.TURN_LIMIT, 2, None)
+    assert len(model.asked) == 2  # it was not told what was wrong: nobody was to read that
+    last = records(trace.public_path)[2]["tools"][0]
+    assert last["status"] == "not_run" and "result_chars" not in last
+
+
+@pytest.mark.anyio
+async def test_the_tools_named_to_the_model_include_the_loops_own(client, trace):
+    model = ScriptedModel(asks(("read_paper", {"arxiv_id": "2501.00001v2"})), asks(SUBMIT))
+
+    await run("Q?", client=client, model=model, trace=trace, channel=TOOL)
+
+    assert model.asked[1]["messages"][-1]["content"][0]["content"] == (
+        "Unknown tool: 'read_paper'. "
+        "The tools are: search_papers, get_outline, read_section, submit_answer."
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("channel", [FORMAT, TEXT])
+async def test_where_the_model_was_not_given_the_tool_a_call_of_it_is_no_answer(
+    client, trace, channel
+):
+    model = ScriptedModel(asks(SUBMIT), says(json.dumps(ANSWER)))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=channel)
+
+    # The call is one of an unknown tool. The run goes on, and ends with the text.
+    assert (outcome.reason, outcome.turns) == (EndReason.ANSWERED, 2)
+    start, first, _, _ = records(trace.public_path)
+    assert "submit_answer" not in start["tools"]
+    assert (first["tools"][0]["status"], first["tools"][0]["error_kind"]) == (
+        "not_sent",
+        "unknown_tool",
+    )
+
+
+@pytest.mark.anyio
+async def test_asked_for_as_text_the_answer_is_the_text_that_ends_the_turn(client, trace):
+    model = ScriptedModel(asks(SECTION), says(json.dumps(ANSWER)))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=TEXT)
+
+    assert (outcome.reason, outcome.answer, outcome.turns) == (EndReason.ANSWERED, ANSWER, 2)
+    # The prompt asks for the form here, so nothing else does: no form for the API to
+    # hold the text to, and no tool beside those of the server.
+    first = model.asked[0]
+    assert first["system"] == system_prompt(TEXT) and first["schema"] is None
+    assert [tool["name"] for tool in first["tools"]] == [
+        "search_papers",
+        "get_outline",
+        "read_section",
+    ]
+    start = records(trace.public_path)[0]
+    assert (start["prompt_version"], start["answer_channel"]) == ("p2-text", "text")
+    assert records(trace.private_path)[0]["system"] == system_prompt(TEXT)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Here is the answer:\n" + json.dumps(ANSWER),
+        "```json\n" + json.dumps(ANSWER) + "\n```",
+        json.dumps(ANSWER) + "\n\nI did not read the appendix.",
+        "The data section says so.",
+    ],
+)
+async def test_text_that_is_not_the_object_alone_is_no_answer(client, trace, text):
+    # Nothing holds the model to the form in this way, and nothing is read into what it
+    # wrote instead. How often that costs an answer is what the records are to show.
+    outcome = await run(
+        "Q?", client=client, model=ScriptedModel(says(text)), trace=trace, channel=TEXT
+    )
+    assert (outcome.reason, outcome.answer) == (EndReason.NO_ANSWER, None)
+    assert outcome.detail == "the text was not an answer of the expected form"
+
+
+@pytest.mark.anyio
+async def test_a_server_with_a_tool_of_the_same_name_is_not_given_the_loops_own(trace):
+    class Clashing(StandInClient):
+        async def list_tools(self):
+            tool = SimpleNamespace(
+                name=ANSWER_TOOL["name"], description="Another.", input_schema={"type": "object"}
+            )
+            return SimpleNamespace(tools=[tool])
+
+    with pytest.raises(ValueError, match="a tool named 'submit_answer' of its own"):
+        await run("Q?", client=Clashing(), model=ScriptedModel(), trace=trace, channel=TOOL)
+    # Nothing was written: the run never began.
+    assert trace.public_path.read_text(encoding="utf-8") == ""
+
+
+@pytest.mark.anyio
+async def test_a_way_to_hand_in_an_answer_that_does_not_exist_is_refused(client, trace):
+    with pytest.raises(ValueError, match="no such way to hand in an answer: 'letter'"):
+        await run("Q?", client=client, model=ScriptedModel(), trace=trace, channel="letter")
