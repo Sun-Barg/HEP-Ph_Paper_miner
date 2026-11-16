@@ -222,3 +222,98 @@ def test_lines_that_are_not_objects_and_repeated_ids_are_refused(tmp_path):
         load_questions(write(tmp_path, "[1, 2]"))
     with pytest.raises(QuestionFileError, match="line 2: the id 'q1' is used twice"):
         load_questions(write(tmp_path, LINE, LINE))
+
+
+# --- the answer key: what a rule is to check ---------------------------------------------
+
+NUMBER = {"label": "the share", "value": 0.791}
+
+
+def test_an_answer_key_of_the_right_form_loads(tmp_path):
+    key = {
+        "numbers": [
+            {**NUMBER, "min_sig_figs": 2},
+            {"label": "the mass", "value": 69.2, "unit": "GeV"},
+            {"label": "the count", "value": 49},
+            # More digits than the file can write for the value: an answer then has to
+            # write the zero at its end, "0.7910". Odd, and allowed.
+            {**NUMBER, "min_sig_figs": 4},
+        ],
+        "wrong_numbers": [{"label": "another paper's value", "value": 2.194e-26, "unit": "cm^3/s"}],
+        "phrases": [{"label": "the factor", "any_of": ["J-factor", "J factor"]}],
+        "by_hand": ["says that the two differ"],
+    }
+    (question,) = load_questions(write(tmp_path, {**LINE, "answer_key": key}))
+    assert question.answer_key == key
+    # Every part may be left out, and a part may be empty.
+    load_questions(write(tmp_path, {**LINE, "answer_key": {"numbers": [], "by_hand": []}}))
+
+
+@pytest.mark.parametrize(
+    ("key", "message"),
+    [
+        # A part under a name no grader looks for: every answer would pass it.
+        ({"number": [NUMBER]}, "unknown part(s) of answer_key: number"),
+        ({"numbers": [NUMBER], "tolerance": 0.01}, "unknown part(s) of answer_key: tolerance"),
+        ({"numbers": NUMBER}, "numbers of answer_key has to be a list"),
+        ({"by_hand": "says so"}, "by_hand of answer_key has to be a list"),
+        ({"by_hand": ["says so", ""]}, "by_hand of answer_key has to hold text, and not empty"),
+        ({"by_hand": [{"label": "x"}]}, "by_hand of answer_key has to hold text, and not empty"),
+        ({"numbers": [0.791]}, "an item of numbers needs label and value"),
+        ({"numbers": [{"label": "x"}]}, "an item of numbers needs label and value"),
+        ({"numbers": [{"value": 0.791}]}, "an item of numbers needs label and value"),
+        ({"numbers": [{**NUMBER, "label": " "}]}, "has a label that is not text, or is empty"),
+        ({"numbers": [{**NUMBER, "value": "0.791"}]}, "(the share): value has to be a number"),
+        ({"numbers": [{**NUMBER, "value": True}]}, "(the share): value has to be a number"),
+        ({"numbers": [{**NUMBER, "value": None}]}, "(the share): value has to be a number"),
+        ({"numbers": [{**NUMBER, "value": float("inf")}]}, "(the share): value has to be a number"),
+        ({"numbers": [{**NUMBER, "value": float("nan")}]}, "(the share): value has to be a number"),
+        ({"numbers": [{**NUMBER, "unit": ""}]}, "(the share): unit has to be text"),
+        (
+            {"numbers": [{**NUMBER, "tolerance": 0.01}]},
+            "an item of numbers has unknown field(s): tolerance",
+        ),
+        (
+            {"numbers": [{**NUMBER, "min_sig_figs": 0}]},
+            "(the share): min_sig_figs has to be a whole number, 1 or more",
+        ),
+        (
+            {"numbers": [{**NUMBER, "min_sig_figs": 2.0}]},
+            "(the share): min_sig_figs has to be a whole number, 1 or more",
+        ),
+        (
+            {"numbers": [{**NUMBER, "min_sig_figs": True}]},
+            "(the share): min_sig_figs has to be a whole number, 1 or more",
+        ),
+        # How few digits still count is a question for a number an answer has to hold.
+        (
+            {"wrong_numbers": [{**NUMBER, "min_sig_figs": 2}]},
+            "an item of wrong_numbers has unknown field(s): min_sig_figs",
+        ),
+        ({"wrong_numbers": [{"label": "x", "value": "72.1"}]}, "(x): value has to be a number"),
+        ({"phrases": [{"label": "x", "anyof": ["J-factor"]}]}, "an item of phrases needs label"),
+        ({"phrases": [{"label": "x", "any_of": "J-factor"}]}, "(x): any_of has to be a list"),
+        ({"phrases": [{"label": "x", "any_of": []}]}, "(x): any_of has to be a list of wordings"),
+        ({"phrases": [{"label": "x", "any_of": ["J-factor", " "]}]}, "none empty"),
+        (
+            {"phrases": [{"label": "x", "any_of": ["J-factor"], "all_of": ["s"]}]},
+            "an item of phrases has unknown field(s): all_of",
+        ),
+    ],
+)
+def test_an_answer_key_that_a_grader_could_not_use_is_refused(tmp_path, key, message):
+    with pytest.raises(QuestionFileError) as refused:
+        load_questions(write(tmp_path, {**LINE, "answer_key": key}))
+    assert str(refused.value).startswith("questions.jsonl line 1: ")
+    assert message in str(refused.value)
+
+
+def test_the_keys_of_the_development_questions_have_every_part_a_grader_reads():
+    # What the grader takes out of a key (eval/grade.py), on the keys there are.
+    for question in load_questions(DEV):
+        key = question.answer_key
+        assert set(key) <= {"numbers", "phrases", "wrong_numbers", "by_hand"}
+        for item in [*key.get("numbers", []), *key.get("wrong_numbers", [])]:
+            assert isinstance(item["label"], str) and isinstance(item["value"], int | float)
+        for item in key.get("phrases", []):
+            assert item["label"] and item["any_of"]

@@ -148,6 +148,32 @@ Every turn names the model that answered (`response_model`).
 The questions are in `eval_data/questions_dev.jsonl`. These five are for development:
 tool texts and the prompt may be tuned on them, so they are not part of the evaluation.
 
+## Checking a question file
+
+A question names the sections its answer stands in, and for each a short piece of the
+section's text that marks the place (the anchor). Before a file of questions is used:
+
+```
+uv run python -m hepph_paper_miner.eval.check eval_data/questions_dev.jsonl
+```
+
+reads the file (a line of the wrong form refuses the whole file, with the line named;
+that includes an answer key a grader could not use), reads the papers through the folder
+of downloads, and says for every piece of evidence where it stands:
+
+```
+dev-04 | long_section | an answer is expected
+   2610.26648v1 6.3 | chars 20342-20354 of 25531 | given by call 2 of 2
+```
+
+The last part is the number of calls of `read_section` it takes, from the start of the
+section, until the place has been given whole: a section of more than 20,000 characters
+comes in pieces. A section that does not exist, or an anchor that does not stand in its
+section, is listed as a problem, and the command then ends with code 1. It closes with
+counts over the file (how many questions expect "not in the papers", name no paper,
+need a second call, and so on), to hold against the mix that was planned. It prints
+places and sizes, and no text of a paper.
+
 ## Grading a run
 
 `src/hepph_paper_miner/eval/grade.py` grades a finished run from its public record, the

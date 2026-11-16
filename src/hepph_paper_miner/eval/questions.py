@@ -17,7 +17,12 @@ The fields of one line:
                          there, that marks the place of the fact. It may be left out.
     expect_found         false when the right answer is "the papers do not say"
     reference_answer     the answer a grader compares with
-    answer_key           what a rule can check (numbers, phrases); a grader's business
+    answer_key           what a rule can check, each part a list that may be left out:
+                         "numbers" the answer has to hold ({"label", "value"}, and if
+                         wanted "unit" and "min_sig_figs": how few digits still count),
+                         "phrases" ({"label", "any_of": wordings, one of which has to be
+                         there}), "wrong_numbers" that send an answer to a person
+                         ({"label", "value"}), and "by_hand": what only a person can judge
     accept_note          what counts as correct, in the question writer's words
     abstract_sufficient  true when the abstract alone answers the question
     notes                anything else worth keeping, by topic
@@ -29,6 +34,7 @@ paper, so they cannot go stale when the way a long section is cut changes.
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -51,6 +57,13 @@ _REQUIRED = (
 )
 _TEXTS = ("id", "question", "type", "reference_answer", "accept_note")
 _EVIDENCE_FIELDS = ("arxiv_id", "section_id", "anchor")
+# The parts of an answer key, and the fields an item of each may have. The first two
+# fields of an item have to be there.
+_KEY_PARTS = {
+    "numbers": ("label", "value", "unit", "min_sig_figs"),
+    "wrong_numbers": ("label", "value", "unit"),
+    "phrases": ("label", "any_of"),
+}
 # An id goes into the name of a run and of its files, where "_" stands between the parts.
 _ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9.-]*")
 
@@ -137,6 +150,7 @@ def _question(data: dict[str, Any], where: str) -> Question:
             raise QuestionFileError(f"{where}: {name} has to be true or false")
     if not isinstance(data["answer_key"], dict):
         raise QuestionFileError(f"{where}: answer_key has to be an object")
+    _check_answer_key(data["answer_key"], where)
     notes = data.get("notes", {})
     if not isinstance(notes, dict) or not all(isinstance(value, str) for value in notes.values()):
         raise QuestionFileError(f"{where}: notes has to be an object with text values")
@@ -203,6 +217,62 @@ def _evidence(item: Any, where: str) -> Evidence:
 
 def _is_text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def _check_answer_key(key: dict[str, Any], where: str) -> None:
+    """Refuse an answer key that a grader could not use, or would use for something else.
+
+    A part under a misspelt name would never be looked at, and every answer would pass
+    it. A value of the wrong kind would stop the grader at the first run it grades, long
+    after the runs were paid for.
+    """
+    unknown = sorted(set(key) - set(_KEY_PARTS) - {"by_hand"})
+    if unknown:
+        raise QuestionFileError(f"{where}: unknown part(s) of answer_key: {', '.join(unknown)}")
+    for part in (*_KEY_PARTS, "by_hand"):
+        if not isinstance(key.get(part, []), list):
+            raise QuestionFileError(f"{where}: {part} of answer_key has to be a list")
+    if not all(_is_text(item) for item in key.get("by_hand", [])):
+        raise QuestionFileError(f"{where}: by_hand of answer_key has to hold text, and not empty")
+
+    for part, fields in _KEY_PARTS.items():
+        for item in key.get(part, []):
+            what = f"{where}: an item of {part}"
+            if not isinstance(item, dict) or not set(fields[:2]) <= set(item):
+                raise QuestionFileError(f"{what} needs {fields[0]} and {fields[1]}")
+            unknown = sorted(set(item) - set(fields))
+            if unknown:
+                raise QuestionFileError(f"{what} has unknown field(s): {', '.join(unknown)}")
+            if not _is_text(item["label"]):
+                raise QuestionFileError(f"{what} has a label that is not text, or is empty")
+            if part == "phrases":
+                wordings = item["any_of"]
+                if (
+                    not isinstance(wordings, list)
+                    or not wordings
+                    or not all(map(_is_text, wordings))
+                ):
+                    raise QuestionFileError(
+                        f"{what} ({item['label']}): any_of has to be a list of wordings, none empty"
+                    )
+                continue
+            value = item["value"]
+            # True and False are numbers to Python, and 1e999 is one to a JSON reader.
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, int | float)
+                or not math.isfinite(value)
+            ):
+                raise QuestionFileError(f"{what} ({item['label']}): value has to be a number")
+            if "unit" in item and not _is_text(item["unit"]):
+                raise QuestionFileError(f"{what} ({item['label']}): unit has to be text")
+            least = item.get("min_sig_figs")
+            if least is not None and (
+                isinstance(least, bool) or not isinstance(least, int) or least < 1
+            ):
+                raise QuestionFileError(
+                    f"{what} ({item['label']}): min_sig_figs has to be a whole number, 1 or more"
+                )
 
 
 def problems_with_evidence(question: Question, papers: Mapping[str, Paper]) -> list[str]:

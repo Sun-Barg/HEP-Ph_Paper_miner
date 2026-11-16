@@ -238,6 +238,21 @@ def _stop(text: str, start: int, limit: int) -> int:
     return hard
 
 
+def piece_ends(text: str, limit: int = SECTION_CHAR_LIMIT) -> list[int]:
+    """Where the pieces of a text end when it is read from its start, call after call.
+
+    For a program that has to say how many calls it takes until a place in a long
+    section has been given (eval/check.py). The cuts are the ones the tools make.
+    """
+    ends, start = [], 0
+    while True:
+        stop = _stop(text, start, limit)
+        ends.append(stop)
+        if stop >= len(text):
+            return ends
+        start = stop
+
+
 def section_marker(section: Section) -> str:
     """The line that stands in front of a section in the whole text of a paper.
 
