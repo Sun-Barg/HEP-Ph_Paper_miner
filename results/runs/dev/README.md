@@ -17,8 +17,11 @@ the evaluation.
 | `pilot-2/` | 8 | 2026-11-13 01:49 to 01:52 | `8594338` | `staged-3`, `flat-1` | the same as `pilot-1/`, a second time | 6 answered, 2 at the turn limit |
 | `diag-1/` | 12 | 2026-11-13 06:25 to 06:30 | `c96912a` | `staged-5`, `flat-4` | dev-04 and dev-05 with each layout, three times, with `--cache --show-thinking` | 5 answered, 7 at the turn limit |
 | `diag-2/` | 12 | 2026-11-13 08:06 to 08:09 | `62185a7` | `staged-5`, `flat-4` | the same as `diag-1/`, with `--no-answer-format` as well | 12 ended by the model, none with an answer of the expected form |
+| `diag-3-tool/` | 30 | 2026-11-16 08:12 to 08:27 | `9d8024c` | `staged-5`, `flat-4` | dev-01 to dev-05 with each layout, three times, with `--answer-channel tool --cache --show-thinking` | 30 answered |
+| `diag-3-text/` | 30 | 2026-11-16 08:13 to 08:27 | `9d8024c` | `staged-5`, `flat-4` | the same as `diag-3-tool/`, with `--answer-channel text` instead | 26 answered, 3 at the turn limit, 1 ended by the model without an answer of the expected form |
 
-All of them: model `claude-sonnet-5-5`, effort `high`, prompt `p1`, at most 12 turns.
+All of them: model `claude-sonnet-5-5`, effort `high`, at most 12 turns. The prompt is `p1`
+in the first five folders, `p2-tool` in `diag-3-tool/` and `p2-text` in `diag-3-text/`.
 
 - The records of the first three folders do not name their code: a record has done that
   since `c96912a` (`code` in its first line). They name the tool texts `staged-3` and
@@ -42,5 +45,22 @@ All of them: model `claude-sonnet-5-5`, effort `high`, prompt `p1`, at most 12 t
   strings. None of the twelve is an answer of the form the loop reads, as a whole or in
   that last part, so these records hold no answer. The texts are in the private records
   only.
+- `diag-3-tool/` and `diag-3-text/` are one set of sixty runs, the third diagnosis: the
+  two other ways of handing in an answer (`--answer-channel`, "Asking one question" in
+  the README of the repository), each on the five questions with both layouts, three
+  times. For every question, layout and repetition the two ran one after the other, with
+  the cache and the summaries of thinking on, as in `diag-1/`. With `tool` the answer is
+  the arguments of a call of `submit_answer`, a tool that the loop adds to those of the
+  server. With `text` the prompt asks for one JSON object as the last text, and the
+  request holds no form of the answer, as in `diag-2/`.
+- With `tool`, all thirty runs handed in an answer, after two to six responses. Three
+  calls of `read_section` gave the section under a name the tool does not have (`section`
+  in place of `section_id`, in the three runs of dev-01 with the staged layout): each
+  came back as an error, and the next call was right.
+- With `text`, twenty-six runs ended with an answer that the loop could read, after two
+  to eleven responses. Three went on asking for tools until the turn limit. One closed
+  with the object inside a code fence, which is not an answer of the form the loop reads
+  (the text is in the private record only). Four runs called a tool that does not exist,
+  with no arguments: `json`, `json_dump` (twice) and `[object Object]`.
 - A file is named after its run: `<UTC time>_<question id>_<layout>_<four random
   characters>.jsonl`.
