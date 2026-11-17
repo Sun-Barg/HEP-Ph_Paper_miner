@@ -12,7 +12,8 @@ sections.
 - [x] Project skeleton; tests run without network
 - [x] arXiv search, LaTeX section parsing, and the reading tools in two layouts
 - [x] Tool-calling loop and run records
-- [ ] Evaluation set, graders, results
+- [x] Evaluation set, graders, and the pre-registration of the evaluation
+- [ ] Runs of the evaluation, grading by hand, results
 
 ## The two tool layouts
 
@@ -239,7 +240,10 @@ grade.
 uv run python -m hepph_paper_miner.eval.run --questions eval_data/questions_eval.jsonl --out results/runs/eval
 ```
 
-runs every question of the file with both layouts, three times. Each run is the command
+runs every question of the file with both layouts, three times. What is measured, and
+how each hypothesis is read, was fixed before the first run in
+`eval_data/PREREGISTRATION.md`, with the SHA-256 of the question file to pass as
+`--questions-sha256`. Each run is the command
 of one question in a process of its own, started as a run of the evaluation is started
 (`--cache --show-thinking`, the layout and the repetition), and its record is held
 against the conditions as soon as it is written. The repetition is the outer loop, and
