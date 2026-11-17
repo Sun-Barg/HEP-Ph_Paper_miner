@@ -214,9 +214,11 @@ places and sizes, and no text of a paper.
 
 It also looks for every number of an answer key in the evidence, read the way the
 grader reads an answer, so that an answer copying the number from there would pass the
-rule. When all places are needed, one of them has to write it; when any one is enough,
-each has to, since each is meant to answer alone. A number that is not written is
-listed with a `?` (the paper here is one the tests make up):
+rule. TeX spacing and math mode are read as spaces, and a number right after a command
+as the number it prints (`$\sim100$` is 100). When all places are needed, one of them
+has to write it; when any one is enough, each has to, since each is meant to answer
+alone. A number that is not written is listed with a `?` (the paper here is one the
+tests make up):
 
 ```
    ? key 29 (regions) is not written in 2504.00004v1 1

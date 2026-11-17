@@ -89,6 +89,10 @@ def look_at(question: Question, papers: Mapping[str, Paper]) -> Looked:
 # TeX spacing and the signs of math mode can stand inside one number, as in
 # "2.5\,\times\,10^{-26}". Read as spaces, they let the grader's rule read it whole.
 _TEX_SPACING = re.compile(r"\\[,;:! ]|~|\$")
+# A control word ends where its letters end, so "$\sim100$" is "~100": the digits after
+# it are a number of their own. The rule reads no number that a letter stands right in
+# front of (the "2" of "h2"), so a space is put there.
+_CONTROL_WORD_BEFORE_DIGIT = re.compile(r"(\\[A-Za-z]+)(?=\d)")
 
 
 def unwritten(question: Question, papers: Mapping[str, Paper]) -> tuple[str, ...]:
@@ -109,6 +113,7 @@ def unwritten(question: Question, papers: Mapping[str, Paper]) -> tuple[str, ...
         if item.section_id not in sections:
             return ()  # a place that is not there is a problem of its own (problems_with_evidence)
         text = _TEX_SPACING.sub(" ", sections[item.section_id])
+        text = _CONTROL_WORD_BEFORE_DIGIT.sub(r"\1 ", text)
         places[f"{item.arxiv_id} {item.section_id}"] = numbers_in(text)
     groups = [list(places)] if question.need == "all" else [[name] for name in places]
     lines = []

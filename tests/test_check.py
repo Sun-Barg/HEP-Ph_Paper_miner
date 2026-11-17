@@ -330,6 +330,19 @@ def test_key_numbers_that_the_evidence_writes_are_not_listed(tmp_path):
     assert unwritten(question, numbers_paper(text)) == ()
 
 
+def test_a_number_right_after_a_control_word_is_written(tmp_path):
+    # "$\sim100$" prints as "~100" (1511.08787v2, section 8). The digits are a number of
+    # their own, and "\times10" still joins the power of ten to the number before it.
+    question = keyed(
+        tmp_path,
+        ["1"],
+        {"label": "mass", "value": 100, "unit": "GeV"},
+        {"label": "cross section", "value": 2.5e-26},
+    )
+    text = r"below $\sim100$ GeV, at $2.5\times10^{-26}$ cm$^3$/s"
+    assert unwritten(question, numbers_paper(text)) == ()
+
+
 def test_a_key_number_that_the_evidence_does_not_write_is_listed(tmp_path):
     # A count that an answer has to work out is listed too: a person says whether it is meant.
     question = keyed(tmp_path, ["1"], {"label": "regions", "value": 29})
