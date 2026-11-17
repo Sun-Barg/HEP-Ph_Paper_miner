@@ -5,4 +5,6 @@ check.py        checking a question file against the papers: where its evidence 
 grade.py        grading one run from its public record: search, access, citation, answer
 conditions.py   what every run of the evaluation is made with, and holding a record against it
 run.py          running the evaluation: every question, both layouts, in a fixed order
+sheet.py        the sheet on which a person grades the answers, blind to the layout
+report.py       the report of the evaluation: the layouts compared, question by question
 """

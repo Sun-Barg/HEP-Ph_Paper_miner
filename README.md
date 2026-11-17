@@ -288,6 +288,49 @@ It prints one line for each run and says four things:
   otherwise. This is not the verdict: a person grades every answer, and the rule is kept
   beside that grade to see how far the two agree.
 
+## Grading the answers by hand
+
+```
+uv run python -m hepph_paper_miner.eval.sheet --questions eval_data/questions_eval.jsonl --runs results/runs/eval --sheet grading.csv --key runs_private/grading-key.csv
+```
+
+writes, once every cell of the evaluation is done, the sheet on which a person grades
+every answer. It has a row for each run that counts and handed in an answer; a run
+without an answer is wrong whatever it would have said, and is not on it. The rows of a
+question stand together, in an order drawn at random, numbered down the sheet, and the
+first row of a question shows the question, its reference answer and what is accepted.
+The sheet does not show the layout, the repetition or the run, the sections an answer
+cites, or what the rule said. Write `right` or `wrong` under `grade` (there is no partial
+credit), why under `why_wrong`, anything else under `note`, and save it as "CSV UTF-8".
+Which run a number stands for is in the key, which goes in `runs_private/` (never
+committed) and stays closed until every row is graded.
+
+## The report
+
+```
+uv run python -m hepph_paper_miner.eval.report --questions eval_data/questions_eval.jsonl --runs results/runs/eval --sheet grading.csv --key runs_private/grading-key.csv --out results/report.md
+```
+
+grades every run that counts with `grade.py`, takes the verdicts from the sheet, and
+writes tables in Markdown:
+
+- By layout: the search, access and citation of the runs, the answers right by hand,
+  the characters of tool results, the input tokens (written to the cache and read from
+  it included), the paper text a run was given with each character counted once, calls,
+  turns, calls that gave nothing new, and the cost worked out from the usage.
+- H1, question by question: the median characters of the staged runs against those of
+  the flat runs, and a one-sided sign test of the questions in which staged is lower.
+- H2, question by question: a layout answers a question right when more than half of
+  its runs are right, two of three.
+- Why runs were wrong, from their records: no answer and why, or an answer after the
+  passage was given, after only its paper was, or without a paper of the question.
+- What the rule of `grade.py` said against the grade by hand, and the runs that do not
+  count.
+
+Without `--sheet` it writes everything but the verdicts. It refuses a sheet whose key
+does not name exactly the runs that count with an answer, and names every record that
+differs from the conditions.
+
 ## Paper text and the cache
 
 Downloads from arXiv are kept in `~/.cache/hepph-paper-miner` (set
