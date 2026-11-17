@@ -225,6 +225,39 @@ listed with a `?` (the paper here is one the tests make up):
 That is not counted as a problem: an answer may be meant to work the number out, as a
 count of regions. A person says whether it is meant, or a mistake in the key.
 
+## Running the evaluation
+
+```
+uv run python -m hepph_paper_miner.eval.run --questions eval_data/questions_eval.jsonl --out results/runs/eval
+```
+
+runs every question of the file with both layouts, three times. Each run is the command
+of one question in a process of its own, started as a run of the evaluation is started
+(`--cache --show-thinking`, the layout and the repetition), and its record is held
+against the conditions as soon as it is written. The repetition is the outer loop, and
+within it the questions come in the order of the file; which layout of a question runs
+first alternates from question to question and from repetition to repetition.
+
+A run is spoilt when arXiv or the API failed under it: a tool call that ended in
+`timeout` or `upstream_busy`, or a run that ended in `api_error`, `tool_transport_error`,
+`tool_timeout` or `time_limit`, or one that never wrote its last line. Its record is kept,
+and the cell is run again with the same repetition number after the pass, at most twice.
+A cell spoilt three times is given up and counted. Started again, the command skips what
+is done, so it can be stopped and resumed; a run stopped by hand has no last line and
+counts as spoilt (move its record out of the folder if it should not).
+
+It stops at once when the API refuses the key, the credit or the spending limit of the
+workspace, after three runs in a row that the API failed, and when a record names
+anything but the conditions. It does not start when files the repository keeps have
+been changed, when the folder holds runs of another question file, or runs made by
+another commit (`--allow-other-code` adds to them anyway), or, with `--questions-sha256`,
+when the file is not the one named. `--plan` says what is done and what would run, and
+runs nothing; `--only` and `--repeats` run a part, as for a rehearsal:
+
+```
+uv run python -m hepph_paper_miner.eval.run --questions eval_data/questions_dev.jsonl --out results/runs/rehearsal --only dev-01 --repeats 1
+```
+
 ## Grading a run
 
 `src/hepph_paper_miner/eval/grade.py` grades a finished run from its public record, the
