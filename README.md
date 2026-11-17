@@ -227,6 +227,12 @@ tests make up):
 That is not counted as a problem: an answer may be meant to work the number out, as a
 count of regions. A person says whether it is meant, or a mistake in the key.
 
+For a paper that a question does not name, so that a search has to find it, the check
+asks arXiv which version it lists now. A search lists that version and a run reads it,
+while the run is graded against the version the question names, so another one is shown
+with a `~`. That is not counted as a problem either: the owner says which version to
+grade.
+
 ## Running the evaluation
 
 ```

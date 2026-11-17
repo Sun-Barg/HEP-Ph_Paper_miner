@@ -75,14 +75,23 @@ def look_at(question: Question, papers: Mapping[str, Paper]) -> Looked:
             f"| given by call {calls} of {len(ends)}{note}"
         )
     problems = problems_with_evidence(question, papers)
-    # Named with or without its version, or with "arXiv:" in front: the digits are there.
-    to_find = tuple(
-        key for key in question.gold_papers if parse_arxiv_id(key).base not in question.question
-    )
     complete = len(lines) == len(question.evidence)
     calls = most if complete else None
     return Looked(
-        question, tuple(lines), tuple(problems), to_find, calls, unwritten(question, papers)
+        question,
+        tuple(lines),
+        tuple(problems),
+        to_find(question),
+        calls,
+        unwritten(question, papers),
+    )
+
+
+def to_find(question: Question) -> tuple[str, ...]:
+    """The papers of a question that it does not name, so that a search has to find them."""
+    # Named with or without its version, or with "arXiv:" in front: the digits are there.
+    return tuple(
+        key for key in question.gold_papers if parse_arxiv_id(key).base not in question.question
     )
 
 
@@ -200,6 +209,18 @@ def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -
         except SourceError as error:
             print(f"cannot read {key}: {error}", file=sys.stderr)
 
+    # A search lists the latest version of a paper, and a run reads the version it is
+    # given; the run is graded against the version the question names.
+    listed: dict[str, str] = {}
+    listing = getattr(source, "listing", None)
+    for key in dict.fromkeys(key for question in questions for key in to_find(question)):
+        if listing is None:
+            break
+        try:
+            listed[key] = listing(parse_arxiv_id(parse_arxiv_id(key).base)).arxiv_id
+        except SourceError as error:
+            print(f"cannot ask for the latest version of {key}: {error}", file=sys.stderr)
+
     all_looked = [look_at(question, papers) for question in questions]
     for looked in all_looked:
         print(head_of(looked))
@@ -209,6 +230,9 @@ def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -
             print(f"   ! {problem}")
         for number in looked.unwritten:
             print(f"   ? {number}")
+        for key in looked.to_find:
+            if listed.get(key, key) != key:
+                print(f"   ~ a search lists {listed[key]}, and runs are graded against {key}")
     print()
     for line in summary(all_looked):
         print(line)
@@ -216,7 +240,13 @@ def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -
     verdict = f"{wrong} question(s) with a problem" if wrong else "no problem found"
     # A number to look at is no problem: it can be one an answer is meant to work out.
     to_look_at = sum(len(looked.unwritten) for looked in all_looked)
-    print(verdict + (f"; {to_look_at} key number(s) to look at (?)" if to_look_at else ""))
+    # Another version is no problem of the file either: the owner says which one to grade.
+    other = sum(1 for x in all_looked for key in x.to_find if listed.get(key, key) != key)
+    print(
+        verdict
+        + (f"; {to_look_at} key number(s) to look at (?)" if to_look_at else "")
+        + (f"; {other} paper(s) that a search lists in another version (~)" if other else "")
+    )
     return 1 if wrong else 0
 
 

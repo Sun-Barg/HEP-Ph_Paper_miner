@@ -5,6 +5,7 @@ the paper kept in this repository. No network.
 """
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,7 @@ from hepph_paper_miner.eval.questions import load_questions
 from hepph_paper_miner.result_text import read_first_line
 from hepph_paper_miner.server import SECTION_CHAR_LIMIT, build_server, piece_ends
 from hepph_paper_miner.sources.arxiv_latex import PARSER_VERSION, parse_source
-from hepph_paper_miner.sources.base import Paper, PaperMeta, Section
+from hepph_paper_miner.sources.base import ErrorKind, Paper, PaperMeta, Section, SourceError
 from hepph_paper_miner.sources.fixture import FixtureSource
 
 SAMPLE = "2501.00001v2"  # sections 1, 2 (2.1, 2.u1, 2.2), u1, A (A.1)
@@ -397,3 +398,41 @@ def test_the_command_lists_numbers_to_look_at_without_calling_them_a_problem(tmp
     out = capsys.readouterr().out.splitlines()
     assert "   ? key 29 (regions) is not written in 2504.00004v1 1" in out
     assert out[-1] == "no problem found; 1 key number(s) to look at (?)"
+
+
+class Replaced(FixtureSource):
+    """arXiv after the authors replaced a paper: its listing names a later version."""
+
+    def __init__(self, papers, later: dict[str, str]) -> None:
+        super().__init__(papers)
+        self.later = later
+
+    def listing(self, arxiv_id):
+        if arxiv_id.version is None and str(arxiv_id) in self.later:
+            if self.later[str(arxiv_id)] == "busy":
+                raise SourceError(ErrorKind.UPSTREAM_BUSY, str(arxiv_id))
+            meta = super().listing(arxiv_id)
+            return replace(meta, arxiv_id=self.later[str(arxiv_id)])
+        return super().listing(arxiv_id)
+
+
+def test_a_paper_that_a_search_lists_in_another_version_is_named(tmp_path, capsys):
+    unnamed = line("q1", (NUMBERS, "1", None), question="What does the paper on numbers say?")
+    named = line("q2", (NUMBERS, "1", None))  # it names 2504.00004v1 in its question
+    file = written(tmp_path, unnamed, named)
+    papers = list(numbers_paper("One.").values())
+    assert check.main([str(file)], source=Replaced(papers, {"2504.00004": "2504.00004v3"})) == 0
+    out = capsys.readouterr().out.splitlines()
+    shown = "   ~ a search lists 2504.00004v3, and runs are graded against 2504.00004v1"
+    assert out.count(shown) == 1 and out.index(shown) < out.index(named_head(out))
+    assert out[-1] == "no problem found; 1 paper(s) that a search lists in another version (~)"
+    assert check.main([str(file)], source=Replaced(papers, {})) == 0
+    assert "~" not in capsys.readouterr().out
+    assert check.main([str(file)], source=Replaced(papers, {"2504.00004": "busy"})) == 0
+    said = capsys.readouterr()
+    assert "cannot ask for the latest version of 2504.00004v1" in said.err
+    assert "~" not in said.out
+
+
+def named_head(out: list[str]) -> str:
+    return next(text for text in out if text.startswith("q2 |"))

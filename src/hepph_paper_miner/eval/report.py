@@ -40,6 +40,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from hepph_paper_miner.eval.check import to_find
 from hepph_paper_miner.eval.conditions import differences
 from hepph_paper_miner.eval.grade import Grade, Places, Record, _add, _covers, _reads, grade
 from hepph_paper_miner.eval.questions import Question, QuestionFileError, load_questions
@@ -115,13 +116,6 @@ def sign_test(lower: int, higher: int) -> float:
     """One-sided p of a sign test: the chance of `lower` or more of n when either is even."""
     n = lower + higher
     return sum(math.comb(n, k) for k in range(lower, n + 1)) / 2**n
-
-
-def to_find(question: Question) -> tuple[str, ...]:
-    """The papers of a question that it does not name, so that a search has to find them."""
-    return tuple(
-        key for key in question.gold_papers if parse_arxiv_id(key).base not in question.question
-    )
 
 
 @dataclass(frozen=True)
