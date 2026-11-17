@@ -140,6 +140,20 @@ def attempts_in(folder: Path) -> dict[Cell, list[Attempt]]:
     return found
 
 
+def counted(attempts: Mapping[Cell, list[Attempt]]) -> dict[Cell, Attempt]:
+    """The run that counts for each cell: the first one that arXiv and the API did not spoil.
+
+    The same rule makes a cell done (State.done), so the runs the runner stops at are the
+    runs the sheet and the report read.
+    """
+    found = {}
+    for cell, tried in attempts.items():
+        first = next((attempt for attempt in tried if attempt.spoilt is None), None)
+        if first is not None:
+            found[cell] = first
+    return found
+
+
 def refusal(end: Mapping[str, Any] | None) -> str | None:
     """Why the API will refuse every run from now on, when the last line says so."""
     if not end or end.get("reason") != "api_error":
@@ -361,6 +375,7 @@ def main(argv: Sequence[str] | None = None, launch: Launch | None = None) -> int
         print(f"cannot read the questions: {error}", file=sys.stderr)
         return 2
     ids = [question.id for question in questions]
+    wanted = None
     if arguments.only:
         wanted = [name.strip() for name in arguments.only.split(",") if name.strip()]
         unknown = [name for name in wanted if name not in ids]
@@ -369,7 +384,6 @@ def main(argv: Sequence[str] | None = None, launch: Launch | None = None) -> int
                 f"no question {', '.join(unknown)} in {arguments.questions.name}", file=sys.stderr
             )
             return 2
-        ids = [name for name in ids if name in wanted]
     if arguments.repeats < 1:
         print("--repeats: at least 1", file=sys.stderr)
         return 2
@@ -380,7 +394,11 @@ def main(argv: Sequence[str] | None = None, launch: Launch | None = None) -> int
         )
         return 2
 
+    # A part is taken from the plan of the whole file: its cells keep the order, and the
+    # layout that comes first, that the whole evaluation gives them.
     cells = plan(ids, arguments.repeats)
+    if wanted is not None:
+        cells = [cell for cell in cells if cell.question_id in wanted]
     print(f"questions {arguments.questions} | sha256 {digest}")
     try:
         attempts = attempts_in(arguments.out)

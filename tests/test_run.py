@@ -349,6 +349,29 @@ def test_the_command_says_what_is_done_without_running_anything(world, monkeypat
     assert shown[-1].startswith("12 cell(s): 2 done, 10 to run")
 
 
+def test_a_part_keeps_the_order_that_the_whole_file_gives_its_cells(world, monkeypatch, capsys):
+    folder, launch, _ = world
+    questions = file_of(folder, "ok-a", "ok-b")
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    out = ["--questions", str(questions), "--out", str(folder / "public"), "--plan"]
+    assert run.main([*out, "--only", "ok-b", "--repeats", "2"], launch=launch) == 0
+    listed = [line.split(" | ")[0] for line in capsys.readouterr().out.splitlines()[1:-1]]
+    # ok-b is the second question of the file, so the flat layout runs first in repetition 1.
+    assert listed == ["ok-b flat 1", "ok-b staged 1", "ok-b staged 2", "ok-b flat 2"]
+
+
+def test_the_run_that_counts_for_a_cell_is_its_first_unspoilt_one(tmp_path):
+    def kept(name: str, end: dict | None) -> Attempt:
+        return Attempt(
+            tmp_path / name, {"question_id": "q", "toolset": "flat", "repeat": 1}, (), end
+        )
+
+    spoilt, first, second = kept("1", None), kept("2", {"reason": "answered"}), kept("3", {})
+    other = Cell("q", "staged", 1)
+    found = run.counted({Cell("q", "flat", 1): [spoilt, first, second], other: [spoilt]})
+    assert found == {Cell("q", "flat", 1): first}
+
+
 def test_the_command_ends_with_counts_and_a_code(world, capsys):
     folder, launch, _ = world
     questions = file_of(folder, "ok", "stuck")
