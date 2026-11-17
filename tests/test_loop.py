@@ -107,7 +107,9 @@ async def test_a_question_is_answered_through_search_outline_and_section(client,
         says(json.dumps(ANSWER)),
     )
 
-    outcome = await run("What does the data say?", client=client, model=model, trace=trace)
+    outcome = await run(
+        "What does the data say?", client=client, model=model, trace=trace, channel=FORMAT
+    )
 
     assert (outcome.reason, outcome.answer, outcome.turns) == (EndReason.ANSWERED, ANSWER, 4)
     assert len(model.asked) == 4
@@ -144,7 +146,7 @@ async def test_the_record_says_what_was_run_and_what_each_result_was(client, tra
         asks(SECTION),
         says(json.dumps(ANSWER)),
     )
-    await run("What does the data say?", client=client, model=model, trace=trace)
+    await run("What does the data say?", client=client, model=model, trace=trace, channel=FORMAT)
 
     start, *turns, end = records(trace.public_path)
     assert start["record"] == "run" and start["run_id"] == "run-1" and start["question_id"] == "q1"
@@ -209,7 +211,7 @@ async def test_the_public_record_holds_no_text_that_a_tool_returned(tmp_path):
         says(json.dumps(ANSWER)),
     )
     async with Client(build_server(FixtureSource([paper]))) as client:
-        outcome = await run("Q?", client=client, model=model, trace=trace)
+        outcome = await run("Q?", client=client, model=model, trace=trace, channel=FORMAT)
     assert outcome.reason is EndReason.ANSWERED
 
     public = trace.public_path.read_text(encoding="utf-8")
@@ -235,7 +237,7 @@ async def test_an_error_result_goes_to_the_model_as_it_is_and_the_run_goes_on(cl
     wrong = ("read_section", {"arxiv_id": "2501.00001v2", "section_id": "9"})
     model = ScriptedModel(asks(wrong), asks(SECTION), says(json.dumps(ANSWER)))
 
-    outcome = await run("Q?", client=client, model=model, trace=trace)
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=FORMAT)
 
     assert outcome.reason is EndReason.ANSWERED
     told = model.asked[1]["messages"][-1]["content"][0]
@@ -258,7 +260,7 @@ async def test_arguments_that_break_the_schema_are_told_apart_from_failures_of_t
     broken = ("read_section", {"arxiv_id": "2501.00001v2", "section_id": "1", "start": -1})
     model = ScriptedModel(asks(broken), says(json.dumps(ANSWER)))
 
-    await run("Q?", client=client, model=model, trace=trace)
+    await run("Q?", client=client, model=model, trace=trace, channel=FORMAT)
 
     assert records(trace.public_path)[1]["tools"][0]["error_kind"] == "invalid_arguments"
     assert source.calls == []
@@ -272,7 +274,7 @@ async def test_a_tool_the_server_never_offered_is_answered_without_asking_the_se
         asks(("read_paper", {"arxiv_id": "2501.00001v2"})), says(json.dumps(ANSWER))
     )
 
-    outcome = await run("Q?", client=client, model=model, trace=trace)
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=FORMAT)
 
     assert outcome.reason is EndReason.ANSWERED
     assert source.calls == []
@@ -298,7 +300,7 @@ async def test_several_calls_in_one_response_run_in_order_and_go_back_in_one_mes
     both = asks(OUTLINE, ("get_outline", {"arxiv_id": "2502.00002v1"}), SECTION)
     model = ScriptedModel(both, says(json.dumps(ANSWER)))
 
-    await run("Q?", client=client, model=model, trace=trace)
+    await run("Q?", client=client, model=model, trace=trace, channel=FORMAT)
 
     assert [what for what in source.calls if what[0] == "paper"] == [
         ("paper", "2501.00001v2"),
@@ -329,7 +331,12 @@ async def test_a_tool_call_without_any_result_ends_the_run(trace, error, reason)
     model = ScriptedModel(asks(("echo", {})), says(json.dumps(ANSWER)))
 
     outcome = await run(
-        "Q?", client=stand_in, model=model, trace=trace, limits=Limits(tool_seconds=55.0)
+        "Q?",
+        client=stand_in,
+        model=model,
+        trace=trace,
+        limits=Limits(tool_seconds=55.0),
+        channel=FORMAT,
     )
 
     assert outcome.reason is reason and "echo" in outcome.detail
@@ -356,7 +363,12 @@ async def test_a_tool_of_the_real_server_that_hangs_is_ended_by_the_time_limit(t
     try:
         async with Client(build_server(Hanging([]))) as connected:
             outcome = await run(
-                "Q?", client=connected, model=model, trace=trace, limits=Limits(tool_seconds=0.2)
+                "Q?",
+                client=connected,
+                model=model,
+                trace=trace,
+                limits=Limits(tool_seconds=0.2),
+                channel=FORMAT,
             )
         waited = time.monotonic() - began
     finally:
@@ -382,7 +394,9 @@ async def test_a_tool_of_the_real_server_that_hangs_is_ended_by_the_time_limit(t
 async def test_a_result_that_is_not_one_piece_of_text_ends_the_run(trace, blocks):
     model = ScriptedModel(asks(("echo", {})), says(json.dumps(ANSWER)))
 
-    outcome = await run("Q?", client=StandInClient(result_of(*blocks)), model=model, trace=trace)
+    outcome = await run(
+        "Q?", client=StandInClient(result_of(*blocks)), model=model, trace=trace, channel=FORMAT
+    )
 
     assert outcome.reason is EndReason.TOOL_TRANSPORT_ERROR
     assert "not one text block" in outcome.detail
@@ -394,7 +408,7 @@ async def test_an_error_text_of_no_known_form_is_still_passed_on(trace):
     odd = result_of(text_block("it broke"), is_error=True)
     model = ScriptedModel(asks(("echo", {})), says(json.dumps(ANSWER)))
 
-    outcome = await run("Q?", client=StandInClient(odd), model=model, trace=trace)
+    outcome = await run("Q?", client=StandInClient(odd), model=model, trace=trace, channel=FORMAT)
 
     assert outcome.reason is EndReason.ANSWERED
     assert model.asked[1]["messages"][-1]["content"][0]["content"] == "it broke"
@@ -408,7 +422,9 @@ async def test_an_error_text_of_no_known_form_is_still_passed_on(trace):
 async def test_the_last_allowed_response_does_not_get_its_tools_run(client, source, trace):
     model = ScriptedModel(asks(OUTLINE), asks(SECTION, OUTLINE), says(json.dumps(ANSWER)))
 
-    outcome = await run("Q?", client=client, model=model, trace=trace, limits=Limits(max_turns=2))
+    outcome = await run(
+        "Q?", client=client, model=model, trace=trace, limits=Limits(max_turns=2), channel=FORMAT
+    )
 
     assert (outcome.reason, outcome.turns, outcome.answer) == (EndReason.TURN_LIMIT, 2, None)
     assert len(model.asked) == 2
@@ -423,7 +439,9 @@ async def test_the_last_allowed_response_does_not_get_its_tools_run(client, sour
 @pytest.mark.anyio
 async def test_a_single_turn_is_enough_for_a_model_that_answers_at_once(client, trace):
     model = ScriptedModel(says(json.dumps(ANSWER)))
-    outcome = await run("Q?", client=client, model=model, trace=trace, limits=Limits(max_turns=1))
+    outcome = await run(
+        "Q?", client=client, model=model, trace=trace, limits=Limits(max_turns=1), channel=FORMAT
+    )
     assert (outcome.reason, outcome.turns) == (EndReason.ANSWERED, 1)
 
 
@@ -450,6 +468,7 @@ async def test_the_time_limit_is_looked_at_between_turns_only(client, source, tr
         trace=trace,
         limits=Limits(run_seconds=100.0),
         clock=lambda: now[0],
+        channel=FORMAT,
     )
 
     # The second response arrives at 120 s. Its tool still runs: the limit is only
@@ -489,7 +508,9 @@ async def test_the_time_limit_is_looked_at_between_turns_only(client, source, tr
     ],
 )
 async def test_an_end_of_turn_without_a_usable_answer_is_no_answer(client, trace, text, detail):
-    outcome = await run("Q?", client=client, model=ScriptedModel(says(text)), trace=trace)
+    outcome = await run(
+        "Q?", client=client, model=ScriptedModel(says(text)), trace=trace, channel=FORMAT
+    )
     assert (outcome.reason, outcome.detail, outcome.answer) == (EndReason.NO_ANSWER, detail, None)
     assert records(trace.public_path)[-1]["answer"] is None
 
@@ -498,7 +519,11 @@ async def test_an_end_of_turn_without_a_usable_answer_is_no_answer(client, trace
 async def test_an_answer_may_say_that_the_papers_do_not_hold_it(client, trace):
     nothing = {"answer": "The paper reports no such value.", "found": False, "evidence": []}
     outcome = await run(
-        "Q?", client=client, model=ScriptedModel(says(json.dumps(nothing))), trace=trace
+        "Q?",
+        client=client,
+        model=ScriptedModel(says(json.dumps(nothing))),
+        trace=trace,
+        channel=FORMAT,
     )
     assert (outcome.reason, outcome.answer) == (EndReason.ANSWERED, nothing)
 
@@ -520,7 +545,7 @@ async def test_every_other_stop_reason_ends_the_run_under_its_own_name(client, t
     # The text is a perfectly good answer. A response that was cut off or refused is
     # still not one: only a turn the model ended itself counts.
     model = ScriptedModel(says(json.dumps(ANSWER), stop=stop))
-    outcome = await run("Q?", client=client, model=model, trace=trace)
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=FORMAT)
     assert (outcome.reason, outcome.answer) == (reason, None)
     assert records(trace.public_path)[-1]["reason"] == reason.value
 
@@ -529,7 +554,7 @@ async def test_every_other_stop_reason_ends_the_run_under_its_own_name(client, t
 async def test_a_refusal_keeps_what_the_api_said_about_it(client, trace):
     details = {"type": "refusal", "category": "cyber", "explanation": "Declined."}
     model = ScriptedModel(says("", stop="refusal", stop_details=details))
-    outcome = await run("Q?", client=client, model=model, trace=trace)
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=FORMAT)
     assert (outcome.reason, outcome.detail) == (EndReason.REFUSAL, "cyber | Declined.")
     assert records(trace.public_path)[1]["stop_details"] == details
 
@@ -537,7 +562,9 @@ async def test_a_refusal_keeps_what_the_api_said_about_it(client, trace):
 @pytest.mark.anyio
 async def test_a_tool_use_stop_without_a_tool_call_is_unexpected(client, trace):
     hollow = Reply("tool_use", "", (), ("thinking",), {}, content=object())
-    outcome = await run("Q?", client=client, model=ScriptedModel(hollow), trace=trace)
+    outcome = await run(
+        "Q?", client=client, model=ScriptedModel(hollow), trace=trace, channel=FORMAT
+    )
     assert outcome.reason is EndReason.UNEXPECTED_STOP
 
 
@@ -545,7 +572,7 @@ async def test_a_tool_use_stop_without_a_tool_call_is_unexpected(client, trace):
 async def test_a_failure_of_the_api_ends_the_run_and_is_named(client, trace):
     model = ScriptedModel(asks(OUTLINE), ModelError("RateLimitError", "429 slow down", 429))
 
-    outcome = await run("Q?", client=client, model=model, trace=trace)
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=FORMAT)
 
     assert (outcome.reason, outcome.turns) == (EndReason.API_ERROR, 1)
     assert outcome.detail == "RateLimitError: 429 slow down"
@@ -557,13 +584,13 @@ async def test_a_run_that_dies_leaves_what_it_had_done_and_no_end_line(client, t
     model = ScriptedModel(asks(OUTLINE), RuntimeError("a bug, not an expected failure"))
 
     with pytest.raises(RuntimeError):
-        await run("Q?", client=client, model=model, trace=trace)
+        await run("Q?", client=client, model=model, trace=trace, channel=FORMAT)
 
     # No "end" line: that is how an unfinished run is told from a finished one.
     assert [line["record"] for line in records(trace.public_path)] == ["run", "turn"]
 
 
-# --- the two other ways to hand in an answer: a tool of the loop, and text asked for as JSON ---
+# --- the ways to hand in an answer: a tool of the loop, and text asked for as JSON ---------
 
 SUBMIT = (ANSWER_TOOL["name"], ANSWER)
 
@@ -796,3 +823,12 @@ async def test_a_server_with_a_tool_of_the_same_name_is_not_given_the_loops_own(
 async def test_a_way_to_hand_in_an_answer_that_does_not_exist_is_refused(client, trace):
     with pytest.raises(ValueError, match="no such way to hand in an answer: 'letter'"):
         await run("Q?", client=client, model=ScriptedModel(), trace=trace, channel="letter")
+
+
+@pytest.mark.anyio
+async def test_a_run_has_to_be_told_how_its_answer_is_handed_in(client, trace):
+    # There is no way that a run uses when nobody names one: the way decides what the
+    # model reads, so a run in a way that nobody chose would be a run of another experiment.
+    with pytest.raises(TypeError, match="channel"):
+        await run("Q?", client=client, model=ScriptedModel(), trace=trace)
+    assert trace.public_path.read_text(encoding="utf-8") == ""

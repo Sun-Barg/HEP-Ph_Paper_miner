@@ -107,46 +107,84 @@ of a run:
 uv run python scripts/show_thinking.py "results/runs/20261113T*.jsonl" --out thinking.txt
 ```
 
-With `--no-answer-format` a request leaves out the form of the final answer, so the
-model ends the run with whatever text it writes. This is for a diagnosis and not for an
-evaluation: it shows whether a model that is not held to a form stops asking for tools
-sooner. The text of such a run is read as an answer only when it happens to have the
-form, so the run can end as `no_answer`. The script above prints that text as well.
-
-With `--answer-channel` a run hands in its answer in another way. There are three, and
-the model reads something else with each, so each has a prompt of its own
-(`prompt_version` in a record, beside `answer_channel`):
+A run hands in its answer in one of three ways (`--answer-channel`). The model reads
+something else with each, so each has a prompt of its own (`prompt_version` in a
+record, beside `answer_channel`):
 
 | Channel | The answer is | Prompt |
 |---|---|---|
-| `format` (default) | the text that ends the turn, which the API holds to the form of an answer | `p1` |
-| `tool` | the arguments of a call of `submit_answer`, a tool that the loop adds to the tools of the server | `p2-tool`: `p1` and one line that says to call it |
+| `tool` (default) | the arguments of a call of `submit_answer`, a tool that the loop adds to the tools of the server | `p2-tool`: `p1` and one line that says to call it |
+| `format` | the text that ends the turn, which the API holds to the form of an answer | `p1` |
 | `text` | the text that ends the turn, which the prompt asks for as one JSON object | `p2-text`: `p1` and a paragraph with the form |
 
 ```
-uv run python -m hepph_paper_miner.agent --question-id dev-01 --answer-channel tool
+uv run python -m hepph_paper_miner.agent --question-id dev-01 --answer-channel format
 uv run python -m hepph_paper_miner.agent --question-id dev-01 --answer-channel text
 ```
 
-The two others are there because of what the first one did on the development
-questions (`results/runs/dev/README.md`): held to the form by the API, most runs went
-on asking for tools long after they had been given what the question needs, and without
-the form every run ended by itself. Which of the three an evaluation uses is not
-decided yet. Neither of the two holds the model to anything. With `tool`, a turn that
-ends without the call is `no_answer`, whatever its text says; a call whose arguments are
-not an answer gets an error result, and the run goes on. The model cannot be made to
-call a tool, and the tool is not marked strict, because strict input is made under the
-same constraint as text held to a form. With `text`, a last text that is anything but
-the one JSON object is `no_answer`.
+`format` was the first of them, and the two others came from what it did on the
+development questions (`results/runs/dev/README.md`): held to the form by the API, most
+runs went on asking for tools long after they had been given what the question needs,
+and without the form every run ended by itself. The two others were then run side by
+side, on the five questions with both layouts, three times each: with `tool` all thirty
+runs handed in an answer, with `text` twenty-six of the thirty. The evaluation uses
+`tool` (next section), so that is what the command does unless it is told otherwise.
+`format` and `text` are kept, for the records that were made with them and to run those
+conditions again.
 
-The first line of a record says what was run: the names of the tool texts, the prompt
-and the parser, the settings of the model, and which code it was (`code`: the commit,
-and whether a file the repository keeps had been changed). For a question from a file
-it names the file and its SHA-256 (`questions`), and with `--repeat` the repetition.
-Every turn names the model that answered (`response_model`).
+Neither `tool` nor `text` holds the model to anything. With `tool`, a turn that ends
+without the call is `no_answer`, whatever its text says; a call whose arguments are not
+an answer gets an error result, and the run goes on. The model cannot be made to call a
+tool, and the tool is not marked strict, because strict input is made under the same
+constraint as text held to a form. With `text`, a last text that is anything but the
+one JSON object is `no_answer`.
+
+With `--no-answer-format`, which goes with `--answer-channel format` only, a request
+leaves out the form of the final answer, so the model ends the run with whatever text
+it writes. This is for a diagnosis and not for an evaluation: it shows whether a model
+that is not held to a form stops asking for tools sooner. The text of such a run is
+read as an answer only when it happens to have the form, so the run can end as
+`no_answer`. `scripts/show_thinking.py` prints that text as well.
+
+The first line of a record says what was run: the names of the tool texts and of the
+prompt, the settings of the model, and which code it was (`code`: the commit, and
+whether a file the repository keeps had been changed). For a question from a file it
+names the file and its SHA-256 (`questions`), and with `--repeat` the repetition. Every
+turn names the model that answered (`response_model`), and the last line names the
+parser, as the results of the run named it (`parser_versions`).
 
 The questions are in `eval_data/questions_dev.jsonl`. These five are for development:
-tool texts and the prompt may be tuned on them, so they are not part of the evaluation.
+tool texts and the prompt were tuned on them, so they are not part of the evaluation.
+
+## The conditions of the evaluation
+
+The evaluation compares the two layouts. Everything else is the same in every run of
+it, and is written down in `src/hepph_paper_miner/eval/conditions.py`:
+
+| What | Fixed at |
+|---|---|
+| Tool texts | `staged-5` and `flat-4` |
+| Parser | `4` |
+| Answer | handed in with `tool`; prompt `p2-tool` |
+| Model | `claude-sonnet-5-5`, adaptive thinking, effort `high`, at most 16,000 output tokens in a response |
+| Limits of a run | 12 responses; 700 s for one tool call; 900 s for the run, looked at between responses |
+| Requests to the API | 600 s for one request, which the SDK tries again up to twice; the API's cache on |
+
+These are the defaults of the command, with one exception: the cache is off unless
+asked for, so a run of the evaluation is started with `--cache`.
+
+They were fixed while this repository held the five development questions and no
+question of the evaluation. Tool texts and the prompt were tuned on those five, and are
+not tuned on the questions they are then measured with. The thirty runs of
+`results/runs/dev/diag-3-tool/` were made under these conditions (and with
+`--show-thinking`, which the conditions leave open: the model reads the same with it).
+
+Tests keep the conditions in place. A text that a model reads cannot change under its
+name (`tests/test_toolset_pin.py`, `tests/test_prompt.py`). A name, or a default of the
+command, the loop or the model, cannot move away from the conditions
+(`tests/test_conditions.py`). And `differences` in the module holds the first line of a
+record against them, which is how those thirty records are checked, and how the records
+of the evaluation can be.
 
 ## Checking a question file
 

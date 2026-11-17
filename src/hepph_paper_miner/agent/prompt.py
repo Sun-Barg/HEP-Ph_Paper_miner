@@ -20,7 +20,8 @@ each of them, so each has its own name for its texts:
 There are three because of what the runs on the development questions showed
 (results/runs/dev/README.md): held to the form by the API, runs went on asking for
 tools long after they had been given what the question needs. The two other ways are
-there to see with which of them a run ends when it could.
+there to see with which of them a run ends when it could. With `tool` all thirty runs
+handed in an answer, and that is the way the evaluation uses (eval/conditions.py).
 
 The same texts are used with both tool layouts, so they name no tool of the server.
 They also name no paper and no fact from a paper: an example in a prompt is a hint.

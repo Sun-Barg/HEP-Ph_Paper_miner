@@ -2,7 +2,7 @@
 
     python -m hepph_paper_miner.agent --question-id dev-01
     python -m hepph_paper_miner.agent --question-id dev-01 --toolset flat
-    python -m hepph_paper_miner.agent --question-id dev-01 --answer-channel tool
+    python -m hepph_paper_miner.agent --question-id dev-01 --answer-channel format
     python -m hepph_paper_miner.agent --question "Which paper ...?"
 
 Needs the API key in the environment variable ANTHROPIC_API_KEY, and is to be run
@@ -29,7 +29,7 @@ from hepph_paper_miner import __version__
 from hepph_paper_miner.agent.loop import EndReason, Limits, Outcome, run
 from hepph_paper_miner.agent.model import ClaudeModel
 from hepph_paper_miner.agent.origin import file_digest
-from hepph_paper_miner.agent.prompt import FORMAT, PROMPT_VERSION
+from hepph_paper_miner.agent.prompt import FORMAT, PROMPT_VERSION, TOOL
 from hepph_paper_miner.agent.trace import Trace, default_private_dir, new_run_id
 from hepph_paper_miner.eval.questions import QuestionFileError, load_questions
 from hepph_paper_miner.http import Fetcher, default_cache_dir
@@ -71,16 +71,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--no-answer-format",
         action="store_true",
-        help="for a diagnosis, not for an evaluation: do not hold the final text to the "
-        "form of an answer (such a run can end as 'no_answer': see the README)",
+        help="for a diagnosis, not for an evaluation, and with --answer-channel format "
+        "only: do not hold the final text to the form of an answer (such a run can end as "
+        "'no_answer': see the README)",
     )
     parser.add_argument(
         "--answer-channel",
         choices=list(PROMPT_VERSION),
-        default=FORMAT,
-        help="how the run hands in its answer: as text that the API holds to the form of "
-        "an answer (format), as a call of a tool of the loop (tool), or as JSON that the "
-        "prompt asks for (text). Each has a prompt of its own: see the README",
+        # The way the evaluation uses (eval/conditions.py). The two others are kept for
+        # the records that were made with them, and to run those conditions again.
+        default=TOOL,
+        help="how the run hands in its answer: as a call of a tool of the loop (tool, the "
+        "default), as text that the API holds to the form of an answer (format), or as "
+        "JSON that the prompt asks for (text). Each has a prompt of its own: see the README",
     )
     parser.add_argument("--max-turns", type=int, default=Limits().max_turns)
     parser.add_argument(

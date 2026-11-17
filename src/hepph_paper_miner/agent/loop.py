@@ -92,7 +92,11 @@ _STOPS = {
 
 @dataclass(frozen=True)
 class Limits:
-    """How far a run may go. First values, to be set from what pilot runs show.
+    """How far a run may go. The defaults are the limits of the evaluation (eval/conditions.py).
+
+    max_turns is not shown to the model, so it changes a run only where it ends one.
+    It was kept at its first value: handing in the answer through the loop's tool, the
+    thirty runs of results/runs/dev/diag-3-tool/ ended after two to six responses.
 
     tool_seconds is a backstop, not a budget. The arXiv source gives up by itself
     and says so ("[timeout]", "[upstream_busy]"); in the worst case, three requests
@@ -138,9 +142,9 @@ async def run(
     client: Client,
     model: Model,
     trace: Trace,
+    channel: str,
     limits: Limits | None = None,
     clock: Callable[[], float] = time.monotonic,
-    channel: str = FORMAT,
 ) -> Outcome:
     """Answer one question with the tools of the connected server.
 
@@ -150,7 +154,8 @@ async def run(
 
     `channel` is the way the answer is handed in (prompt.py). It decides which
     system prompt the model reads, whether it is given the loop's own tool, and
-    what is taken for the answer.
+    what is taken for the answer. It has no default: whoever starts a run says which
+    way it uses, so that no run is made in a way that nobody chose.
     """
     limits = limits or Limits()
     if channel not in PROMPT_VERSION:

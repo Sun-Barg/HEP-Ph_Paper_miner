@@ -62,5 +62,12 @@ in the first five folders, `p2-tool` in `diag-3-tool/` and `p2-text` in `diag-3-
   with the object inside a code fence, which is not an answer of the form the loop reads
   (the text is in the private record only). Four runs called a tool that does not exist,
   with no arguments: `json`, `json_dump` (twice) and `[object Object]`.
+- `diag-3-tool/` is the set from which the conditions of the evaluation were then fixed
+  (`src/hepph_paper_miner/eval/conditions.py`; "The conditions of the evaluation" in the
+  README of the repository). Its thirty records name those conditions, and no record of
+  another folder does: `tests/test_conditions.py` checks both.
+- When these runs were made, the command handed in an answer with `format` unless it was
+  told otherwise. It now does so with `tool`. To run again what a folder before
+  `diag-3-tool/` ran, add `--answer-channel format` to the options in the table.
 - A file is named after its run: `<UTC time>_<question id>_<layout>_<four random
   characters>.jsonl`.

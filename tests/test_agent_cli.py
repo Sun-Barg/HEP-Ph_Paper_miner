@@ -14,12 +14,15 @@ from conftest import ScriptedModel, asks, sample_source, says
 
 from hepph_paper_miner.agent import __main__ as command
 from hepph_paper_miner.agent.origin import code_version
+from hepph_paper_miner.agent.prompt import ANSWER_SCHEMA
 
 ANSWER = {
     "answer": "Ten.",
     "found": True,
     "evidence": [{"arxiv_id": "2501.00001v2", "section_id": "2.1"}],
 }
+# How a run hands in that answer when the command is told nothing else.
+SUBMIT = ("submit_answer", ANSWER)
 
 
 @pytest.fixture
@@ -94,7 +97,7 @@ def test_one_question_from_the_command_line_to_the_two_files(
 ):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
     section = ("read_section", {"arxiv_id": "2501.00001v2", "section_id": "2.1"})
-    scripted = ScriptedModel(asks(section), says(json.dumps(ANSWER)))
+    scripted = ScriptedModel(asks(section), asks(SUBMIT))
     made = {}
 
     def model(name, effort, cache, show_thinking, answer_format):
@@ -121,7 +124,7 @@ def test_one_question_from_the_command_line_to_the_two_files(
         "effort": "medium",
         "cache": False,
         "show_thinking": False,
-        "answer_format": True,
+        "answer_format": False,
     }
     shown = capsys.readouterr().out
     assert "ended     answered" in shown and "answer    Ten." in shown
@@ -157,7 +160,7 @@ def test_with_the_cache_asked_for_the_model_is_told_and_the_counts_are_shown(
         "cache_creation_input_tokens": 900,
         "cache_read_input_tokens": 300,
     }
-    answer = dataclasses.replace(says(json.dumps(ANSWER)), usage=usage)
+    answer = dataclasses.replace(asks(SUBMIT), usage=usage)
     made = {}
 
     def model(name, effort, cache, show_thinking, answer_format):
@@ -182,7 +185,7 @@ def test_with_the_thinking_asked_for_the_model_is_told(monkeypatch, folders):
 
     def model(name, effort, cache, show_thinking, answer_format):
         made.update(show_thinking=show_thinking)
-        return ScriptedModel(says(json.dumps(ANSWER)))
+        return ScriptedModel(asks(SUBMIT))
 
     monkeypatch.setattr(command, "ClaudeModel", model)
     monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
@@ -210,7 +213,8 @@ def test_without_the_answer_form_the_model_is_told_and_plain_text_is_no_answer(
 
     # Such a run is a diagnosis. Its text is not taken for an answer, and the command
     # says so with its exit code like for any other run without one.
-    assert command.main(["--question", "Q?", "--no-answer-format", *folders]) == 1
+    asked = ["--question", "Q?", "--answer-channel", "format", "--no-answer-format", *folders]
+    assert command.main(asked) == 1
 
     assert made == {"answer_format": False}
     shown = capsys.readouterr().out
@@ -225,9 +229,7 @@ def test_the_record_names_the_question_file_and_the_repetition(monkeypatch, tmp_
     monkeypatch.setattr(
         command,
         "ClaudeModel",
-        lambda name, effort, cache, show_thinking, answer_format: ScriptedModel(
-            says(json.dumps(ANSWER))
-        ),
+        lambda name, effort, cache, show_thinking, answer_format: ScriptedModel(asks(SUBMIT)),
     )
     monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
     monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
@@ -256,18 +258,20 @@ def test_a_run_without_an_answer_ends_with_a_code_that_says_so(monkeypatch, caps
     monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
     monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
     assert command.main(["--question-id", "dev-05", "--toolset", "flat", *folders]) == 1
-    assert "ended     no_answer (the response had no text)" in capsys.readouterr().out
+    shown = capsys.readouterr().out
+    assert "ended     no_answer (the turn ended without a call of submit_answer)" in shown
 
 
 @pytest.mark.parametrize(
-    ("channel", "last", "prompt"),
+    ("channel", "last", "prompt", "held"),
     [
-        ("tool", asks(("submit_answer", ANSWER)), "p2-tool"),
-        ("text", says(json.dumps(ANSWER)), "p2-text"),
+        ("tool", asks(SUBMIT), "p2-tool", None),
+        ("format", says(json.dumps(ANSWER)), "p1", ANSWER_SCHEMA),
+        ("text", says(json.dumps(ANSWER)), "p2-text", None),
     ],
 )
-def test_another_way_to_hand_in_the_answer_reaches_the_loop_and_the_record(
-    monkeypatch, capsys, tmp_path, folders, channel, last, prompt
+def test_each_way_to_hand_in_the_answer_reaches_the_loop_and_the_record(
+    monkeypatch, capsys, tmp_path, folders, channel, last, prompt, held
 ):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
     section = ("read_section", {"arxiv_id": "2501.00001v2", "section_id": "2.1"})
@@ -286,10 +290,11 @@ def test_another_way_to_hand_in_the_answer_reaches_the_loop_and_the_record(
         command.main(["--question", "How much data?", "--answer-channel", channel, *folders]) == 0
     )
 
-    # The model is set to send no form, so that its settings in the record say what the
-    # requests held. The loop passes it none either.
-    assert made == {"answer_format": False}
-    assert [asked["schema"] for asked in scripted.asked] == [None, None]
+    # A form goes into the requests in one of the ways only. In the two others the
+    # model is set to send none, so that its settings in the record say what the
+    # requests held, and the loop passes it none either.
+    assert made == {"answer_format": held is not None}
+    assert [asked["schema"] for asked in scripted.asked] == [held, held]
     shown = capsys.readouterr().out
     assert "ended     answered" in shown and "answer    Ten." in shown
     assert "read      74 characters in 1 tool results" in shown
@@ -299,11 +304,10 @@ def test_another_way_to_hand_in_the_answer_reaches_the_loop_and_the_record(
     assert (end["reason"], end["answer"]) == ("answered", ANSWER)
 
 
-def test_without_the_option_the_answer_is_text_that_the_api_holds_to_the_form(
-    monkeypatch, tmp_path, folders
-):
+def test_without_the_option_the_answer_is_a_call_of_the_loops_tool(monkeypatch, tmp_path, folders):
+    # The way the evaluation uses is what the command does when it is told nothing else.
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
-    scripted = ScriptedModel(says(json.dumps(ANSWER)))
+    scripted = ScriptedModel(asks(SUBMIT))
     monkeypatch.setattr(
         command,
         "ClaudeModel",
@@ -314,18 +318,26 @@ def test_without_the_option_the_answer_is_text_that_the_api_holds_to_the_form(
 
     assert command.main(["--question", "Q?", *folders]) == 0
 
-    assert scripted.asked[0]["schema"] is not None
+    assert scripted.asked[0]["schema"] is None
+    assert scripted.asked[0]["tools"][-1]["name"] == "submit_answer"
     (public,) = (tmp_path / "public").iterdir()
     first = json.loads(public.read_text(encoding="utf-8").splitlines()[0])
-    assert (first["answer_channel"], first["prompt_version"]) == ("format", "p1")
+    assert (first["answer_channel"], first["prompt_version"]) == ("tool", "p2-tool")
 
 
-@pytest.mark.parametrize("channel", ["tool", "text"])
+@pytest.mark.parametrize(
+    ("options", "channel"),
+    [
+        ([], "tool"),  # what the command does when it is not told a way
+        (["--answer-channel", "tool"], "tool"),
+        (["--answer-channel", "text"], "text"),
+    ],
+)
 def test_leaving_out_the_form_goes_with_the_one_way_that_sends_it(
-    monkeypatch, capsys, tmp_path, folders, channel
+    monkeypatch, capsys, tmp_path, folders, options, channel
 ):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
-    asked = ["--question", "Q?", "--no-answer-format", "--answer-channel", channel, *folders]
+    asked = ["--question", "Q?", "--no-answer-format", *options, *folders]
     assert command.main(asked) == 2
     assert (
         f"--no-answer-format goes with --answer-channel format only: a run with "
