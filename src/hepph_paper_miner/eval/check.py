@@ -6,8 +6,9 @@ Reading the file already refuses a line of the wrong form (questions.py). This g
 on to the papers: every piece of evidence has to name a section the parser made, and
 its anchor has to stand in that section. For each piece it says where the place is and
 how many calls of read_section it takes, from the start of the section, until the
-place has been given whole. It ends with counts over the file, to hold against the mix
-of questions that was planned.
+place has been given whole. It lists the numbers of an answer key that the evidence
+does not write (see `unwritten`), and ends with counts over the file, to hold against
+the mix of questions that was planned.
 
 The papers are read through the folder of downloads, and arXiv is asked for one that is
 not in it. Nothing of a paper is printed: places, sizes and counts only.
@@ -16,12 +17,14 @@ not in it. Nothing of a paper is printed: places, sizes and counts only.
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from hepph_paper_miner.eval.grade import agrees, numbers_in
 from hepph_paper_miner.eval.questions import (
     Question,
     QuestionFileError,
@@ -41,6 +44,7 @@ class Looked:
     problems: tuple[str, ...]
     to_find: tuple[str, ...]  # papers that the question does not name by identifier
     calls: int | None  # the most calls any of its places takes; None when a place is missing
+    unwritten: tuple[str, ...] = ()  # numbers of the answer key that the evidence does not write
 
 
 def look_at(question: Question, papers: Mapping[str, Paper]) -> Looked:
@@ -76,7 +80,48 @@ def look_at(question: Question, papers: Mapping[str, Paper]) -> Looked:
         key for key in question.gold_papers if parse_arxiv_id(key).base not in question.question
     )
     complete = len(lines) == len(question.evidence)
-    return Looked(question, tuple(lines), tuple(problems), to_find, most if complete else None)
+    calls = most if complete else None
+    return Looked(
+        question, tuple(lines), tuple(problems), to_find, calls, unwritten(question, papers)
+    )
+
+
+# TeX spacing and the signs of math mode can stand inside one number, as in
+# "2.5\,\times\,10^{-26}". Read as spaces, they let the grader's rule read it whole.
+_TEX_SPACING = re.compile(r"\\[,;:! ]|~|\$")
+
+
+def unwritten(question: Question, papers: Mapping[str, Paper]) -> tuple[str, ...]:
+    """The numbers of the answer key that the evidence does not write, one line each.
+
+    An answer that copies a number from its evidence has to pass the grader's rule, so a
+    number of the key should stand in the evidence in a form the rule accepts: in one of
+    its places when all of them are needed, and in each of them when any one is enough,
+    because then each place alone is meant to answer. A number that an answer has to work
+    out, such as a count, is written nowhere and is listed too: whether that is meant is
+    for a person to say. Phrases and wrong numbers are not looked for. Phrases are written
+    for answers rather than for TeX, and a wrong number may stand anywhere.
+    """
+    places = {}
+    for item in question.evidence:
+        paper = papers.get(item.arxiv_id)
+        sections = {section.section_id: section.text for section in paper.sections} if paper else {}
+        if item.section_id not in sections:
+            return ()  # a place that is not there is a problem of its own (problems_with_evidence)
+        text = _TEX_SPACING.sub(" ", sections[item.section_id])
+        places[f"{item.arxiv_id} {item.section_id}"] = numbers_in(text)
+    groups = [list(places)] if question.need == "all" else [[name] for name in places]
+    lines = []
+    for item in question.answer_key.get("numbers", ()):
+        for group in groups:
+            if not any(
+                agrees(number, item["value"], item.get("min_sig_figs"))
+                for name in group
+                for number in places[name]
+            ):
+                where = " or ".join(group) if len(group) > 1 else group[0]
+                lines.append(f"key {item['value']:g} ({item['label']}) is not written in {where}")
+    return tuple(lines)
 
 
 def head_of(looked: Looked) -> str:
@@ -157,11 +202,16 @@ def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -
             print(line)
         for problem in looked.problems:
             print(f"   ! {problem}")
+        for number in looked.unwritten:
+            print(f"   ? {number}")
     print()
     for line in summary(all_looked):
         print(line)
     wrong = sum(1 for looked in all_looked if looked.problems)
-    print(f"{wrong} question(s) with a problem" if wrong else "no problem found")
+    verdict = f"{wrong} question(s) with a problem" if wrong else "no problem found"
+    # A number to look at is no problem: it can be one an answer is meant to work out.
+    to_look_at = sum(len(looked.unwritten) for looked in all_looked)
+    print(verdict + (f"; {to_look_at} key number(s) to look at (?)" if to_look_at else ""))
     return 1 if wrong else 0
 
 

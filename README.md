@@ -212,6 +212,19 @@ counts over the file (how many questions expect "not in the papers", name no pap
 need a second call, and so on), to hold against the mix that was planned. It prints
 places and sizes, and no text of a paper.
 
+It also looks for every number of an answer key in the evidence, read the way the
+grader reads an answer, so that an answer copying the number from there would pass the
+rule. When all places are needed, one of them has to write it; when any one is enough,
+each has to, since each is meant to answer alone. A number that is not written is
+listed with a `?` (the paper here is one the tests make up):
+
+```
+   ? key 29 (regions) is not written in 2504.00004v1 1
+```
+
+That is not counted as a problem: an answer may be meant to work the number out, as a
+count of regions. A person says whether it is meant, or a mistake in the key.
+
 ## Grading a run
 
 `src/hepph_paper_miner/eval/grade.py` grades a finished run from its public record, the

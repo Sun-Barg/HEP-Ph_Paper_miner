@@ -12,12 +12,12 @@ from conftest import OWN_PAPER, call, sample_source, tar_gz
 from mcp import Client
 
 from hepph_paper_miner.eval import check
-from hepph_paper_miner.eval.check import look_at, summary
+from hepph_paper_miner.eval.check import look_at, summary, unwritten
 from hepph_paper_miner.eval.questions import load_questions
 from hepph_paper_miner.result_text import read_first_line
 from hepph_paper_miner.server import SECTION_CHAR_LIMIT, build_server, piece_ends
 from hepph_paper_miner.sources.arxiv_latex import PARSER_VERSION, parse_source
-from hepph_paper_miner.sources.base import Paper, PaperMeta
+from hepph_paper_miner.sources.base import Paper, PaperMeta, Section
 from hepph_paper_miner.sources.fixture import FixtureSource
 
 SAMPLE = "2501.00001v2"  # sections 1, 2 (2.1, 2.u1, 2.2), u1, A (A.1)
@@ -292,3 +292,95 @@ def test_the_summary_leaves_out_of_the_count_a_question_whose_place_is_missing(t
     (question,) = load_questions(file)
     lines = summary([look_at(question, papers())])
     assert "   with a place that the first call of read_section does not give: 0" in lines
+
+
+# --- numbers of the answer key that the evidence does not write --------------------------
+
+NUMBERS = "2504.00004v1"
+
+
+def numbers_paper(first: str, second: str = "Nothing here.") -> dict[str, Paper]:
+    meta = PaperMeta(NUMBERS, "Numbers", ("A",), 2025, "hep-ph", "Abstract.")
+    sections = (Section("1", "One", 1, first), Section("2", "Two", 1, second))
+    return {NUMBERS: Paper(meta, sections, PARSER_VERSION)}
+
+
+def keyed(tmp_path, places, *numbers: dict, need: str = "all"):
+    items = [{"arxiv_id": NUMBERS, "section_id": section} for section in places]
+    changes = {
+        "answer_key": {"numbers": list(numbers)},
+        "gold_evidence": {"need": need, "items": items},
+    }
+    (question,) = load_questions(
+        written(tmp_path, line("q1", (NUMBERS, places[0], None), **changes))
+    )
+    return question
+
+
+def test_key_numbers_that_the_evidence_writes_are_not_listed(tmp_path):
+    # As TeX writes them: spacing inside the number, math mode, a power of ten in braces.
+    text = r"It is $2.5\,\times\,10^{-26}$ cm$^3$/s, with $\chi^2 = 27.92$ for 40\% of it."
+    question = keyed(
+        tmp_path,
+        ["1"],
+        {"label": "cross section", "value": 2.5e-26},
+        {"label": "chi^2", "value": 27.92},
+        {"label": "share", "value": 40, "unit": "%"},
+    )
+    assert unwritten(question, numbers_paper(text)) == ()
+
+
+def test_a_key_number_that_the_evidence_does_not_write_is_listed(tmp_path):
+    # A count that an answer has to work out is listed too: a person says whether it is meant.
+    question = keyed(tmp_path, ["1"], {"label": "regions", "value": 29})
+    assert unwritten(question, numbers_paper("From $k=-14$ to $k=14$.")) == (
+        "key 29 (regions) is not written in 2504.00004v1 1",
+    )
+
+
+def test_fewer_digits_in_the_evidence_count_as_far_as_the_key_allows(tmp_path):
+    allowed = keyed(tmp_path, ["1"], {"label": "end", "value": 51.931, "min_sig_figs": 2})
+    exact = keyed(tmp_path, ["1"], {"label": "end", "value": 51.931})
+    assert unwritten(allowed, numbers_paper("up to 51.93 GeV")) == ()
+    assert unwritten(exact, numbers_paper("up to 51.93 GeV")) == (
+        "key 51.931 (end) is not written in 2504.00004v1 1",
+    )
+
+
+def test_when_all_places_are_needed_one_of_them_has_to_write_the_number(tmp_path):
+    question = keyed(tmp_path, ["1", "2"], {"label": "n", "value": 7.5})
+    assert unwritten(question, numbers_paper("No number.", "It is 7.5.")) == ()
+    assert unwritten(question, numbers_paper("No number.", "Still none.")) == (
+        "key 7.5 (n) is not written in 2504.00004v1 1 or 2504.00004v1 2",
+    )
+
+
+def test_when_any_place_is_enough_each_of_them_has_to_write_the_number(tmp_path):
+    # Each place alone is meant to answer the question.
+    question = keyed(tmp_path, ["1", "2"], {"label": "n", "value": 7.5}, need="any")
+    assert unwritten(question, numbers_paper("It is 7.5.", "No number.")) == (
+        "key 7.5 (n) is not written in 2504.00004v1 2",
+    )
+    assert unwritten(question, numbers_paper("It is 7.5.", "Also 7.5.")) == ()
+
+
+def test_a_place_that_is_not_there_is_left_to_the_problems(tmp_path):
+    question = keyed(tmp_path, ["9"], {"label": "n", "value": 7.5})
+    result = look_at(question, numbers_paper("It is 7.5."))
+    assert result.unwritten == () and result.problems
+
+
+def test_the_command_lists_numbers_to_look_at_without_calling_them_a_problem(tmp_path, capsys):
+    file = written(
+        tmp_path,
+        line(
+            "q1",
+            (NUMBERS, "1", None),
+            answer_key={"numbers": [{"label": "regions", "value": 29}]},
+        ),
+    )
+    source = FixtureSource(list(numbers_paper("From $k=-14$ to $k=14$.").values()))
+    assert check.main([str(file)], source=source) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert "   ? key 29 (regions) is not written in 2504.00004v1 1" in out
+    assert out[-1] == "no problem found; 1 key number(s) to look at (?)"
