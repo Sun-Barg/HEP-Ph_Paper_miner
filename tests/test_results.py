@@ -17,13 +17,20 @@ No network and no LLM. Some lines of the report need the text of the papers: whe
 passage was given to a run, and how much paper text a run read. Of the thirteen papers
 only the maintainer's own is kept here (tests/fixtures, CC0), so those lines are held up
 for the questions about that paper and left out for the others.
+
+The last tests hold what results/README.md says of the runs that went wrong, as far as
+the report does not say it already: where the passage of eval-15 stands, what its runs
+read and what they cost, how the run of eval-13 without an answer ended, which calls
+came back as an error, and which runs took more responses than any development run.
 """
 
 import csv
 from collections import Counter
+from collections.abc import Iterable
 from datetime import datetime
 from itertools import groupby
 from pathlib import Path
+from statistics import median
 
 import pytest
 from conftest import OWN_PAPER, tar_gz
@@ -31,7 +38,9 @@ from conftest import OWN_PAPER, tar_gz
 from hepph_paper_miner.agent.origin import file_digest
 from hepph_paper_miner.eval import report
 from hepph_paper_miner.eval.conditions import differences
+from hepph_paper_miner.eval.grade import Record, grade, parent_of
 from hepph_paper_miner.eval.questions import Question, load_questions
+from hepph_paper_miner.eval.report import cost_of
 from hepph_paper_miner.eval.run import Attempt, attempts_in, plan
 from hepph_paper_miner.eval.sheet import Row, read_grades, read_key, write_key, write_sheet
 from hepph_paper_miner.sources.arxiv_latex import PARSER_VERSION, parse_source
@@ -80,6 +89,49 @@ def own_paper() -> Paper:
 def read_csv(path: Path) -> list[dict[str, str]]:
     with path.open(encoding="utf-8-sig", newline="") as stream:
         return list(csv.DictReader(stream))
+
+
+def runs_of(records: list[Attempt], question_id: str, toolset: str) -> dict[int, Attempt]:
+    """The runs of one question with one layout, by repetition."""
+    cell = (question_id, toolset)
+    return {a.cell.repeat: a for a in records if (a.cell.question_id, a.cell.toolset) == cell}
+
+
+def results_of(attempt: Attempt) -> list[tuple[str, dict]]:
+    """The calls of a run that came back with a result, in the order they were made."""
+    return [
+        (call["name"], call["arguments"])
+        for turn in attempt.turns
+        for call in turn["tools"]
+        if call["status"] == "ok"
+    ]
+
+
+def sections_read(attempt: Attempt) -> list[str]:
+    """The sections a staged run was given: one for each read that came back."""
+    return [
+        arguments["section_id"] for name, arguments in results_of(attempt) if name == "read_section"
+    ]
+
+
+def ended(attempt: Attempt) -> tuple[str, int]:
+    """Why a run ended, and with which response."""
+    return attempt.end["reason"], attempt.end["turns"]
+
+
+def read_from_cache(attempt: Attempt) -> int:
+    return attempt.end["cache_read_input_tokens"]
+
+
+def input_tokens(attempt: Attempt) -> int:
+    """All the input of a run, as the report counts it: new, written to the cache, read from it."""
+    end = attempt.end
+    return end["input_tokens"] + end["cache_creation_input_tokens"] + read_from_cache(attempt)
+
+
+def cost(attempts: Iterable[Attempt]) -> float:
+    """What runs cost in dollars, worked out as the report works it out, to the cent."""
+    return round(sum(cost_of(a.turns, a.run["model"]["model"]) for a in attempts), 2)
 
 
 # --- the records --------------------------------------------------------------------------
@@ -206,3 +258,125 @@ def test_the_report_is_what_the_command_writes_from_these_files(tmp_path, monkey
     eval_15 = "| eval-15 | not_in_paper | 1 / 3 | 3 / 3 | 109,279 | 147,086 | 1 / 3 | 3 / 3 |"
     assert eval_15 in written
     assert "| answered wrong, its paper was given but not the passage | 1 | 0 |" in written
+
+
+# --- what results/README.md says of the runs that went wrong -----------------------------
+
+
+def test_the_passage_of_eval_15_is_text_of_section_4_that_no_subsection_holds(questions):
+    (evidence,) = next(question for question in questions if question.id == "eval-15").evidence
+    sections = {section.section_id: section for section in own_paper().sections}
+    # Section 4 begins with 1,072 characters of its own, before the heading of 4.1.
+    assert (evidence.section_id, sections["4.1"].heading_at) == ("4", 1072)
+    assert sections["4"].text.index(evidence.anchor) + len(evidence.anchor) <= 1072
+    assert not any(evidence.anchor in sections[name].text for name in ("4.1", "4.2", "4.3"))
+    # Every section of this paper that has subsections begins with such text: this is
+    # where the heading of its first subsection stands.
+    first_heading: dict[str, int] = {}
+    for section in sections.values():
+        if section.level == 2:
+            first_heading.setdefault(parent_of(section.section_id), section.heading_at)
+    assert first_heading == {"2": 292, "3": 1804, "4": 1072, "6": 926, "7": 792}
+
+
+def test_one_staged_run_of_eval_15_read_section_4_itself_and_was_given_the_passage(
+    questions, records
+):
+    question = next(question for question in questions if question.id == "eval-15")
+    papers = {OWN: own_paper()}
+
+    def passage_given(attempt: Attempt) -> bool | None:
+        record = Record(attempt.run, attempt.turns, attempt.end)
+        return grade(record, question, papers).access.met
+
+    staged = runs_of(records, "eval-15", "staged")
+    read = {repeat: sections_read(attempt) for repeat, attempt in staged.items()}
+    # All three read the three subsections of section 4 and went on to other sections.
+    # Only the first then read the section itself: its thirteenth read.
+    assert all({"4.1", "4.2", "4.3"} <= set(sections) for sections in read.values())
+    assert {n: "4" in sections for n, sections in read.items()} == {1: True, 2: False, 3: False}
+    assert read[1].index("4") + 1 == 13
+    assert {n: passage_given(a) for n, a in staged.items()} == {1: True, 2: False, 3: False}
+    steps = [("answered", 10), ("answered", 12), ("turn_limit", 12)]
+    assert [ended(staged[n]) for n in (1, 2, 3)] == steps
+    # A flat run reads the whole paper in one call, and answers with its second response.
+    flat = runs_of(records, "eval-15", "flat")
+    assert {n: passage_given(a) for n, a in flat.items()} == {1: True, 2: True, 3: True}
+    assert {ended(attempt) for attempt in flat.values()} == {("answered", 2)}
+    # The staged runs were given fewer characters and took 3.7 times the input tokens.
+    # More than two thirds of those were read from the cache, which costs little: the
+    # three runs cost the same in both layouts.
+    tokens = [median(map(input_tokens, runs.values())) for runs in (staged, flat)]
+    assert tokens == [251330, 67581] and round(tokens[0] / tokens[1], 1) == 3.7
+    assert all(read_from_cache(a) > 2 / 3 * input_tokens(a) for a in staged.values())
+    assert (cost(staged.values()), cost(flat.values())) == (0.51, 0.51)
+
+
+def test_the_run_of_eval_13_without_an_answer_read_what_the_others_read_and_ended_with_text(
+    records,
+):
+    staged = runs_of(records, "eval-13", "staged")
+    assert results_of(staged[3]) == results_of(staged[1]) == results_of(staged[2])
+    # Its third response is text and no call: the loop reads no answer out of a text.
+    last = staged[3].turns[-1]
+    assert (last["stop_reason"], last["blocks"]) == ("end_turn", ["thinking", "text"])
+    assert last["tools"] == [] and ended(staged[3]) == ("no_answer", 3)
+
+
+def test_the_ten_calls_that_ended_in_an_error_were_asked_for_what_is_not_there(records):
+    errors = [
+        (str(attempt.cell), call["name"], call["error_kind"], call["arguments"])
+        for attempt in records
+        for turn in attempt.turns
+        for call in turn["tools"]
+        if call["status"] == "error"
+    ]
+    assert Counter(kind for _, _, kind, _ in errors) == {"invalid_arguments": 5, "not_found": 5}
+    # "section" where the tool has "section_id": in every staged run of eval-08, and in
+    # two of eval-15.
+    refused = [
+        (run, name, sorted(given)) for run, name, kind, given in errors if kind != "not_found"
+    ]
+    runs = ("eval-08 staged 1", "eval-08 staged 2", "eval-15 staged 2")
+    runs += ("eval-08 staged 3", "eval-15 staged 3")
+    assert refused == [(run, "read_section", ["arxiv_id", "section"]) for run in runs]
+    # A second or third version of the paper of eval-17, where every search of its runs
+    # that listed the paper listed the first.
+    missing = Counter(
+        (run, given["arxiv_id"]) for run, _, kind, given in errors if kind == "not_found"
+    )
+    assert missing == {
+        ("eval-17 staged 1", "2101.11027v2"): 1,
+        ("eval-17 flat 1", "2101.11027v3"): 1,
+        ("eval-17 flat 1", "2101.11027v2"): 1,
+        ("eval-17 flat 2", "2101.11027v2"): 1,
+        ("eval-17 flat 3", "2101.11027v2"): 1,
+    }
+    listed = {
+        paper
+        for attempt in records
+        for turn in attempt.turns
+        for call in turn["tools"]
+        if attempt.cell.question_id == "eval-17"
+        for paper in (call.get("first_line") or {}).get("ids", ())
+        if paper.startswith("2101.11027")
+    }
+    assert listed == {"2101.11027v1"}
+
+
+def test_only_runs_of_eval_15_and_eval_17_took_more_than_six_responses(records):
+    # Six is the most a run took on the development questions (test_conditions.py), and
+    # the limit of twelve was kept from there. Here it ended one run.
+    longer = {
+        str(attempt.cell): attempt.end["turns"] for attempt in records if attempt.end["turns"] > 6
+    }
+    assert longer == {
+        "eval-15 staged 1": 10,
+        "eval-15 staged 2": 12,
+        "eval-15 staged 3": 12,
+        "eval-17 staged 1": 11,
+        "eval-17 staged 2": 8,
+        "eval-17 staged 3": 9,
+        "eval-17 flat 2": 8,
+    }
+    assert [str(a.cell) for a in records if a.end["reason"] == "turn_limit"] == ["eval-15 staged 3"]

@@ -13,7 +13,7 @@ sections.
 - [x] arXiv search, LaTeX section parsing, and the reading tools in two layouts
 - [x] Tool-calling loop and run records
 - [x] Evaluation set, graders, and the pre-registration of the evaluation
-- [ ] Runs of the evaluation, grading by hand, results
+- [x] Runs of the evaluation, grading by hand, results
 
 ## The two tool layouts
 
@@ -27,6 +27,104 @@ A server offers one of them, chosen when it is started.
 Every result is one piece of text. Its first line has a fixed form that a program can
 read (`section | 2501.00001v2 | 3.2 | chars 0-19980 of 25531 | partial, more follows`);
 `src/hepph_paper_miner/result_text.py` writes and reads these lines.
+
+## Results of the evaluation
+
+Twenty questions in English about thirteen papers, each asked three times with each
+layout: 120 runs, made on 2026-11-17 with `claude-sonnet-5-5` under the conditions
+described below, by the commit that pre-registered the evaluation (`70c7384`). arXiv and
+the API spoilt no run, so every cell was run once. The maintainer graded the 118 answers
+by hand, on a sheet that does not show the layout. What is measured, and how each
+hypothesis is read, was fixed before the first run in `eval_data/PREREGISTRATION.md`.
+The records, the graded sheet, its key and the whole report (`report.md`) are in
+`results/`, with a README of their own.
+
+| | staged | flat |
+|---|---|---|
+| Runs that handed in an answer | 58 / 60 | 60 / 60 |
+| A search listed the paper (the five questions that do not name it) | 15 / 15 | 15 / 15 |
+| The passage the answer rests on was given to the model | 58 / 60 | 60 / 60 |
+| The answer cites the sections of the question (of the runs with an answer) | 57 / 58 | 60 / 60 |
+| Right, graded by hand (a run without an answer is wrong) | 57 / 60 | 60 / 60 |
+| Questions right in at least two of their three runs | 19 / 20 | 20 / 20 |
+| Tool result characters in a run, median (range) | 20,399 (6,412 to 113,344) | 147,086 (29,560 to 347,325) |
+| Input tokens in a run, median (range) | 19,459 (10,801 to 278,432) | 67,665 (21,539 to 285,781) |
+| Responses in a run, median (range) | 4 (3 to 12) | 2 (2 to 8) |
+| Runs with a tool call that ended in an error | 6 | 3 |
+| Cost of the 60 runs, worked out from the usage at list prices | $2.78 | $10.90 |
+
+Input tokens are everything a run sent to the model, summed over its responses: new,
+written to the API's cache, and read from it.
+
+- **H1, staged gives the model less tool result text: in 20 questions of 20.** The
+  median of the three staged runs is lower than the median of the three flat runs in
+  every question, at 0.03 (eval-06) to 0.80 (eval-04) of it. One-sided sign test over
+  the questions: p = 9.5e-07, reported as it comes (no threshold was fixed in
+  advance). Input tokens are lower in 18 questions and higher in 2 (p = 0.0002), one of
+  them eval-15: a staged run takes more responses, and each response is asked for with
+  the whole conversation so far.
+- **H2, staged does not answer clearly worse: the layouts agree in 19 questions of
+  20.** A layout has a question right when at least two of its three runs are right.
+  Both right: 19. Staged only: 0. Flat only: 1 (eval-15). Neither: 0. This does not
+  show that the two answer equally well. Twenty questions cannot show it, and all three
+  wrong runs are staged.
+- **H3 (exploratory), staged makes more tool calls, and its wrong runs gather in "its
+  paper was given but not the passage".** It made more calls (median 3 against 1). Of
+  its three wrong runs one is of that kind. The two others handed in no answer, and in
+  one of those the passage had not been given either.
+
+### The three wrong runs
+
+All three are staged, and two of them are of one question. `results/README.md` goes
+through them, with the tool calls that ended in an error and the limit of responses.
+
+- **eval-15, second and third run: the passage was never read.** The passage stands in
+  the text that a section has before its first subsection. Only a read of the section
+  itself returns that text, and no tool text says that there is any. All three staged
+  runs read the three subsections and went on to other sections. One then read the
+  section itself and answered right. One never did, answered that it could not find
+  the statement of the paper that the question repeats, and was graded wrong. One was
+  ended by the limit of twelve responses. The staged runs of this question took 3.7
+  times the input tokens of the flat runs, and cost the same.
+- **eval-13, third run: an answer written as text**, without the call that hands it
+  in. By the rule fixed before the runs that is no answer, and no answer is wrong.
+  Outside that rule the maintainer read the text, knowing which run it was, and graded
+  it right: what failed in this run is how the answer was handed in.
+
+### How strong each claim is
+
+| Claim | Strength | What it does not cover |
+|---|---|---|
+| Staged gives the model less tool result text | measured in every one of the 20 questions | one model, one effort and one prompt; thirteen papers with LaTeX source on arXiv; questions in English that name their paper or can find it with a search |
+| Staged takes fewer input tokens | measured in 18 of the 20 questions | the two others, and what a miss costs: in eval-15 staged took 3.7 times the tokens of flat |
+| Staged answers as well as flat | not shown | the layouts agree in 19 of 20 questions, and every wrong run is staged. Twenty questions cannot show that two layouts answer equally well, and these were kept only when a reader of the full text answered them as the reference does |
+| Which difference between the layouts matters | not measured | abstracts in search results and the unit of reading change together |
+| Why staged failed in eval-15 | one observation | text that only a read of the whole section returns: one question about one paper. No run tried a changed outline |
+| Staged is cheaper | only for these 120 runs | $2.78 against $10.90, worked out from the usage at list prices with the API's cache on, and not read from the Console. In eval-15 the two layouts cost the same |
+
+This is not "staged is as good as flat and cheaper". The table above is the whole of
+what can be claimed.
+
+### What the grading leaves open
+
+- **One verdict was changed after the sheet was graded, and the one question in which
+  the layouts differ rests on it.** Row 86 of the sheet (eval-15, the second staged
+  run) was first graded right: the answer gives no number and says that the paper
+  reports none. A Claude session that works on this repository then held the finished
+  sheet against the notes of the questions, and pointed out that the note of eval-15
+  asks for more: a right answer says that the paper states these limits were derived,
+  and this answer says it found no such statement. The maintainer graded the row wrong,
+  not yet knowing its layout. The session had read the records of all runs, and could
+  tell. With the first verdict staged has eval-15 right in two of three runs, and both
+  layouts have all 20 questions right. The criterion is written in that row of the
+  sheet. The note in the question file was left as it is, because the file is fixed by
+  its digest. The change is listed under Deviations in the pre-registration.
+- The grader also revised the questions, and the wording of an answer can hint at its
+  layout. The sheet hides the layout, the repetition, the cited sections and what the
+  rule said, and nothing more. The runner prints how each run ends, so it was known
+  before the grading that the row missing for eval-13 and for eval-15 was a staged one.
+- The rule of `eval.grade` sent all 118 answers to a person (`by_hand`), so the report
+  says nothing here about how far the rule and the grade by hand agree.
 
 ## Development
 

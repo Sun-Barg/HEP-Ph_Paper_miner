@@ -154,4 +154,19 @@ reads the records, the sheet and the key.
 
 ## 10. Deviations
 
-None yet.
+- **2026-11-18, grading (Section 8).** After the maintainer had graded all 118 rows,
+  and before the report was made, a Claude session that works on the repository held
+  the graded sheet against the `accept_note` of each question. It had read the public
+  records of all runs, so it was not blind to the layouts. It pointed out one row: 86
+  (eval-15), graded right, whose answer says that it found no statement that limits
+  with fixed J-factors were derived, where the note asks for an answer that says they
+  were derived and that no result of them is reported. The maintainer changed the
+  verdict to wrong, not knowing the layout of the row; it is the second staged run of
+  eval-15. With the first verdict the paired table of H2 reads 20, 0, 0, 0 (both right,
+  staged only, flat only, neither), and with the second 19, 0, 1, 0. Section 8 names one
+  grader and no second look at the grades, so the change is listed here. The
+  `accept_note` in the question file is as it was.
+- **2026-11-18, outside the counts.** The staged run of eval-13 that ended its turn
+  with text, without a call of `submit_answer`, is wrong by Section 7. The maintainer
+  read that text, knowing which run it was, and graded it right by the `accept_note`.
+  No count of the report uses this.
