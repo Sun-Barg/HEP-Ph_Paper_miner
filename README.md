@@ -312,13 +312,18 @@ first row of a question shows the question, its reference answer and what is acc
 The sheet does not show the layout, the repetition or the run, the sections an answer
 cites, or what the rule said. Write `right` or `wrong` under `grade` (there is no partial
 credit), why under `why_wrong`, anything else under `note`, and save it as "CSV UTF-8".
-Which run a number stands for is in the key, which goes in `runs_private/` (never
-committed) and stays closed until every row is graded.
+Which run a number stands for is in the key, which goes in `runs_private/` (a folder
+that is never committed) and stays closed until every row is graded.
+
+When the last row is graded, the sheet and the key are committed together, as
+`results/grading.csv` and `results/grading-key.csv`. The verdicts are a part of the
+results, and without the two files the report could not be made again from this
+repository.
 
 ## The report
 
 ```
-uv run python -m hepph_paper_miner.eval.report --questions eval_data/questions_eval.jsonl --runs results/runs/eval --sheet grading.csv --key runs_private/grading-key.csv --out results/report.md
+uv run python -m hepph_paper_miner.eval.report --questions eval_data/questions_eval.jsonl --runs results/runs/eval --sheet results/grading.csv --key results/grading-key.csv --out results/report.md
 ```
 
 grades every run that counts with `grade.py`, takes the verdicts from the sheet, and
@@ -340,6 +345,20 @@ writes tables in Markdown:
 Without `--sheet` it writes everything but the verdicts. It refuses a sheet whose key
 does not name exactly the runs that count with an answer, and names every record that
 differs from the conditions.
+
+`tests/test_results.py` holds the four things in `results/` against each other: the
+records of the evaluation, the graded sheet, its key, and `results/report.md`. The
+records have to be the 120 cells of the plan, each run once and in its order, made
+under the conditions by the commit of the pre-registration. The key has to name every
+run with an answer once, and the sheet has to be the one written for those runs, with
+only the three columns of the grader filled in. And the report has to be what this
+command writes from the three. That last check runs without the network. It covers
+every line that needs no paper text, and the lines that do need it for the five
+questions that are only about the paper kept in `tests/fixtures/`. The rest stands in
+the report as it was made on the maintainer's computer, and making it again needs the
+twelve other papers from arXiv: whether a passage of one of them was given to a run,
+and the four rows that are counted over the text of every paper (passages given, new
+paper text, repeat reads, responses from the passage to the answer).
 
 ## Paper text and the cache
 
