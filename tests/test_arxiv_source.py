@@ -14,6 +14,8 @@ from hepph_paper_miner.sources.base import ErrorKind, SearchQuery, SourceError, 
 FEED = (FIXTURES / "api_search.xml").read_bytes()
 EMPTY = (FIXTURES / "api_empty.xml").read_bytes()
 ERROR = (FIXTURES / "api_error.xml").read_bytes()
+# The same error feed as arXiv writes it now: the id of its entry begins with https://.
+ERROR_NOW = ERROR.replace(b"http://arxiv.org/api/errors", b"https://arxiv.org/api/errors")
 DOWNLOAD = tar_gz({"paper.tex": SAMPLE_LATEX.encode()})
 
 
@@ -241,6 +243,7 @@ def test_an_answer_that_cannot_be_read_at_all_is_upstream_busy(tmp_path, where, 
     ("api", "kind"),
     [
         ((200, ERROR), ErrorKind.BAD_QUERY),  # the API's error feed
+        ((200, ERROR_NOW), ErrorKind.BAD_QUERY),  # the same, as arXiv writes it now
         ((400, b""), ErrorKind.BAD_QUERY),
         ((403, b""), ErrorKind.UPSTREAM_BUSY),  # arXiv refuses this client
         ((200, b"<html>Rate exceeded.</html>"), ErrorKind.UPSTREAM_BUSY),  # not a feed

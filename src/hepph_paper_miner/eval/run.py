@@ -317,8 +317,9 @@ class Runner:
 def _in_a_process(argv: list[str]) -> int:
     """Run the command of one question in a process of its own.
 
-    What it printed is passed on only when it refused to start: the runner says how each
-    run ended, and the record holds the rest.
+    What it printed is passed on only when it refused to start, and its traceback when an
+    error that nobody caught ended it: the runner says how each run ended, and the record
+    holds the rest.
     """
     try:
         done = subprocess.run(
@@ -335,6 +336,11 @@ def _in_a_process(argv: list[str]) -> int:
         sys.stderr.write(
             done.stdout.decode("utf-8", "replace") + done.stderr.decode("utf-8", "replace")
         )
+    elif b"Traceback (most recent call last):" in done.stderr:
+        # Python ends with code 1 then, as the command does for a run without an answer,
+        # and the record has no last line: the traceback is the only word on why. What
+        # the command printed before is left out, because it can hold the answer.
+        sys.stderr.write(done.stderr.decode("utf-8", "replace"))
     return done.returncode
 
 

@@ -481,3 +481,18 @@ def test_the_default_launch_starts_the_command_in_a_process_of_its_own(capsys):
     assert run._in_a_process(["--no-such-option"]) == 2
     # What the command said is passed on.
     assert "python -m hepph_paper_miner.agent: error:" in capsys.readouterr().err
+
+
+def test_the_traceback_of_a_command_that_died_is_passed_on_and_its_answer_is_not(
+    monkeypatch, capsys
+):
+    # Python ends with code 1 when an error nobody caught ends it, as the command does for
+    # a run without an answer. Only the traceback says which of the two it was.
+    died = (b"run x\nanswer    Ten.\n", b"Traceback (most recent call last):\nKeyError: 'turns'\n")
+    calm = (b"run x\nended     no_answer\n", b"")
+    for printed, said in (died, calm):
+        done = run.subprocess.CompletedProcess([], 1, printed, said)
+        monkeypatch.setattr(run.subprocess, "run", lambda *args, done=done, **kwargs: done)
+        assert run._in_a_process([]) == 1
+    passed_on = capsys.readouterr().err
+    assert passed_on == "Traceback (most recent call last):\nKeyError: 'turns'\n"

@@ -611,9 +611,13 @@ def main(argv: Sequence[str] | None = None, judge: Judge | None = None) -> int:
         return 2
 
     code = code_version()
-    if code["modified"]:
-        # A record names the commit that made it. Changed code has no commit to name.
-        print("refused: the code has changes that are not committed", file=sys.stderr)
+    if code["modified"] is not False:
+        # A record names the commit that made it. Changed code has no commit to name, and
+        # neither has code that git cannot be asked about: run.py refuses both as well.
+        if code["modified"]:
+            print("refused: the code has changes that are not committed", file=sys.stderr)
+        else:
+            print("refused: git cannot say which commit this code is", file=sys.stderr)
         return 1
     given = judge is not None
     judge = judge or ClaudeJudge()

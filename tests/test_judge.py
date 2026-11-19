@@ -700,6 +700,18 @@ def test_changed_code_is_refused_before_anything_is_asked(given, capsys, monkeyp
     assert not given["out"].exists()
 
 
+def test_code_that_git_cannot_name_is_refused_too(given, capsys, monkeypatch):
+    # No git, or a copy of the code outside the repository: no commit to put in the record.
+    monkeypatch.setattr(judge, "code_version", lambda: {"commit": None, "modified": None})
+    scripted = Scripted()
+
+    assert judge.main(given["argv"], scripted) == 1
+
+    assert "git cannot say which commit this code is" in capsys.readouterr().err
+    assert scripted.asked == []
+    assert not given["out"].exists()
+
+
 def test_a_plan_asks_nothing_and_writes_nothing(given, capsys):
     scripted = Scripted()
 

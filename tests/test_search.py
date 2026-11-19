@@ -130,9 +130,12 @@ def test_feed_is_read_into_papers_in_order():
     assert (second.arxiv_id, second.year, len(second.authors)) == ("hep-ph/0404175v2", 2004, 5)
 
 
-def test_error_feed_raises_with_arxivs_message():
+@pytest.mark.parametrize("scheme", [b"http", b"https"])  # arXiv has written the id both ways
+def test_error_feed_raises_with_arxivs_message(scheme):
+    body = (FIXTURES / "api_error.xml").read_bytes()
+    body = body.replace(b"http://arxiv.org/api/errors", scheme + b"://arxiv.org/api/errors")
     with pytest.raises(FeedError, match="incorrect id format for 1234.12345"):
-        parse_feed((FIXTURES / "api_error.xml").read_bytes())
+        parse_feed(body)
 
 
 @pytest.mark.parametrize("body", [b"<html><body>Rate exceeded.</body></html>", b"<feed/>"])

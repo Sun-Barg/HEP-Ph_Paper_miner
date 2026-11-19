@@ -19,7 +19,10 @@ from hepph_paper_miner.sources.base import (
 _ATOM = "{http://www.w3.org/2005/Atom}"
 _OPENSEARCH = "{http://a9.com/-/spec/opensearch/1.1/}"
 _ARXIV = "{http://arxiv.org/schemas/atom}"
-_ERROR_ID = "http://arxiv.org/api/errors"
+# The id of an entry in the API's error feed, without its scheme. The API wrote it with
+# http:// and writes it with https:// now (seen 2026-11-19). Matched on the scheme, an
+# error feed was read as a search that found nothing.
+_ERROR_ID = "arxiv.org/api/errors"
 
 _PHRASE_OR_WORD = re.compile(r'"([^"]*)"|(\S+)')
 # Characters that mean something in the query language (: ( ) " [ ]) must not reach it.
@@ -114,7 +117,7 @@ def parse_feed(body: bytes) -> SearchResult:
     papers = []
     for entry in feed.findall(f"{_ATOM}entry"):
         entry_id = _text(entry, f"{_ATOM}id")
-        if entry_id.startswith(_ERROR_ID):
+        if entry_id.partition("://")[2].startswith(_ERROR_ID):
             raise FeedError(_text(entry, f"{_ATOM}summary"))
         try:
             # "http://arxiv.org/abs/2610.26648v1" or ".../abs/hep-ph/0404175v2"
