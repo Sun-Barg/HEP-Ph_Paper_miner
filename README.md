@@ -102,9 +102,11 @@ through them, with the tool calls that ended in an error and the limit of respon
 | Which difference between the layouts matters | not measured | abstracts in search results and the unit of reading change together |
 | Why staged failed in eval-15 | one observation | text that only a read of the whole section returns: one question about one paper. No run tried a changed outline |
 | Staged is cheaper | only for these 120 runs | $2.78 against $10.90, worked out from the usage at list prices with the API's cache on, and not read from the Console. In eval-15 the two layouts cost the same |
+| A model as judge gives the grades by hand | measured on the 118 answers, where a judge that calls every answer right would agree on 117 | the judge is the model that gave the answers, and it thought before a quarter of its replies. On row 86, the one answer graded wrong, its first request of three said right |
+| That judge tells a wrong answer | measured on 91 controls, each called wrong in all three requests | the controls are made up: wrong answers of these kinds, not the wrong answers a model gives, of which the sheet holds one. The controls of a question come from one row |
 
-This is not "staged is as good as flat and cheaper". The table above is the whole of
-what can be claimed.
+This is not "staged is as good as flat and cheaper", and not "a model can grade these
+answers in place of a person". The table above is the whole of what can be claimed.
 
 ### What the grading leaves open
 
@@ -126,6 +128,20 @@ what can be claimed.
   before the grading that the row missing for eval-13 and for eval-15 was a staged one.
 - The rule of `eval.grade` sent all 118 answers to a person (`by_hand`), so the report
   says nothing here about how far the rule and the grade by hand agree.
+- **A model graded the same answers afterwards, and its verdicts are the grades by hand
+  on all 118 rows. That alone says little.** The grader called 117 rows right, so a
+  judge that calls every answer right would agree on 117. Whether the judge can tell a
+  wrong answer rests on 91 controls, answers made to be wrong: it called every one
+  wrong in all three of its requests, the 44 that the rule of `eval.grade` leaves to a
+  person among them. The controls are made up, and those of a question come from one
+  row of the sheet. The one wrong answer a model gave is row 86, and there the first of
+  the judge's three requests said right, as the grader first did; the two others said
+  wrong, for the reason the row was changed. The judge is the model that gave the
+  answers, and 157 of its 627 replies held a thinking block. This does not show that
+  the judge finds the wrong answers of a model, or that it could stand in for the
+  grader. The analysis was added after the results and is listed in the
+  pre-registration, Section 10; the numbers are in `results/judge/report.md`, and how
+  the judge is run is under [The judge](#the-judge).
 
 ## Development
 

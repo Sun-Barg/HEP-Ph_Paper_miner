@@ -11,6 +11,7 @@ runs that went wrong.
 | `grading-key.csv` | which run each row of the sheet stands for |
 | `report.md` | the report that `eval.report` wrote from the three: every table, question by question |
 | `runs/dev/` | the records of the runs on the development questions, with a README of their own. Nothing there is a result of the evaluation |
+| `judge/` | a model as a second grader: its one run on the 118 answers and on 91 controls made to be wrong (`eval-j2.jsonl`, 2026-11-19, by `9711ca5`), the report that `eval.agree` wrote from it (`report.md`), and its two runs on the development answers. The grades by hand stay the verdicts; the README of the repository says what this shows and what it does not, and `tests/test_agree.py` holds the files against each other |
 
 `eval_data/PREREGISTRATION.md` says what was measured and how each hypothesis is read,
 and lists under Deviations what was done otherwise. `tests/test_results.py` holds the
