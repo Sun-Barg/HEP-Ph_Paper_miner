@@ -589,3 +589,49 @@ def test_make_reads_none_of_the_controls_a_record_was_not_given(given):
         make(
             given["questions"], out, given["sheet"], given["key"], given["controls"], given["runs"]
         )
+
+
+# --- the run on the evaluation -------------------------------------------------------------
+
+RECORD = ROOT / "results" / "judge" / "eval-j2.jsonl"
+REPORT = ROOT / "results" / "judge" / "report.md"
+# The commit that added the entry of Section 10 of the pre-registration: the judge was to
+# be run from it, once.
+PRE_REGISTERED = "9711ca54fe4a4dded8722a101cfdf581c9c01ec3"
+
+
+def test_the_run_on_the_evaluation_is_the_one_the_pre_registration_names():
+    head, lines, end = judge.read_record(RECORD)
+    assert head["code"] == {"commit": PRE_REGISTERED, "modified": False}
+    assert head["judge_version"] == judge.JUDGE_VERSION
+    assert head["texts_sha256"] == judge.texts_digest()
+    assert head["settings"] == {**judge.JUDGE, "sdk": "anthropic 2.8.0"}
+    assert (head["repeats"], head["only"]) == (3, None)
+    assert head["questions"] == {"file": QUESTIONS.name, "sha256": file_digest(QUESTIONS)}
+    assert head["sheet"] == {"file": SHEET.name, "sha256": file_digest(SHEET), "answers": 118}
+    assert head["controls"] == {"file": CONTROLS.name, "sha256": CONTROLS_SHA256, "answers": 91}
+    # One pass of 627 requests: every answer three times, no request failed and none was
+    # asked again, and the last line is what its request lines add up to.
+    replies = [line for line in lines if line["record"] == "verdict"]
+    assert len(replies) == len(lines) == 627
+    assert {(line["item"], line["repeat"]) for line in replies} == {
+        (item, repeat)
+        for item in [f"sheet-{g.number}" for g in read_grades(SHEET, KEY)]
+        + [c.id for c in read_controls(CONTROLS)]
+        for repeat in (1, 2, 3)
+    }
+    assert end == judge.totals(lines)
+
+
+def test_the_record_holds_no_answer_and_no_question():
+    text = RECORD.read_text("utf-8")
+    answers = [row["answer"] for row in read_csv(SHEET)] + [
+        c.answer for c in read_controls(CONTROLS)
+    ]
+    assert not [answer for answer in answers if answer in text]
+    assert not [q.question for q in load_questions(QUESTIONS) if q.question in text]
+
+
+def test_the_report_of_the_judge_is_what_the_command_writes_from_these_files():
+    written = make(QUESTIONS, RECORD, SHEET, KEY, CONTROLS, RUNS)
+    assert written == REPORT.read_text("utf-8")

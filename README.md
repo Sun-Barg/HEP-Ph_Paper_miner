@@ -14,7 +14,7 @@ sections.
 - [x] Tool-calling loop and run records
 - [x] Evaluation set, graders, and the pre-registration of the evaluation
 - [x] Runs of the evaluation, grading by hand, results
-- [ ] A model as a second grader, held against the grades by hand
+- [x] A model as a second grader, held against the grades by hand
 
 ## The two tool layouts
 
@@ -494,8 +494,10 @@ The texts the judge reads have a name, `JUDGE_VERSION`, now `j2`. They were chan
 the development questions only: `results/judge/dev-j1.jsonl` and `dev-j2.jsonl` are the
 two runs on the development answers (`results/judge/dev-sheet.csv`, which nobody
 graded) and their controls, and why the second judge replaced the first is in the
-pre-registration, Section 10. The run on the evaluation and its report are not in this
-repository yet.
+pre-registration, Section 10. The run on the evaluation is `results/judge/eval-j2.jsonl`,
+made once from the commit that added that entry (`9711ca5`), and its report is
+`results/judge/report.md`. `tests/test_agree.py` holds the two against the sheet, the key,
+the controls and the commit, as `tests/test_results.py` does for the runs.
 
 ## Paper text and the cache
 
