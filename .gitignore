@@ -5,6 +5,9 @@
 cache/
 runs_private/
 
+# Files that a Claude session sends to the owner arrive in this folder
+Claude outputs/
+
 # Python
 .venv/
 __pycache__/

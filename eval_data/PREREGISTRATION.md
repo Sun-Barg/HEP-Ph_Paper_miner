@@ -219,3 +219,18 @@ reads the records, the sheet and the key.
   is the documentation's own); what stands is that none of them was given to the judge
   before its texts were fixed, as the first line of its record shows (the commit and
   the digest of the texts).
+- **2026-11-19, a change to the code after the runs, under the same names.** The search
+  told the error feed of arXiv by an entry whose id begins `http://arxiv.org/api/errors`.
+  arXiv writes that id with `https://` now (seen on 2026-11-19), so an error feed was
+  read as a search that found nothing, and the tool said so. Commit `e13cb0d` reads both
+  forms, and such a search comes back as `[bad_query]`. A tool that answers the same
+  call differently is to get a new name (`TOOLSET_VERSION` in `server.py`). The names
+  `staged-5` and `flat-4` were kept. Of the 118 searches asked for in the records of
+  the development runs and of the evaluation, 115 came back, and none of them had been
+  answered with that feed: read as a search, the feed shows no paper of a total that is
+  not zero, and the 41 searches that showed no paper all had a total of zero. So no
+  recorded run would have read anything else. The lookup of a paper was not affected:
+  an error feed there was `not_found` before and after. The same commit changes two
+  checks of the commands that no model reads: `eval.run` now shows the traceback of a
+  run that died, and `eval.judge` refuses to start from code whose state git cannot
+  tell.

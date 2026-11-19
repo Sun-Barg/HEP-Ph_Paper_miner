@@ -18,8 +18,9 @@ sections the answer cites, and not what the rule of grade.py said. The grader wr
 else under `note`. There is no partial credit.
 
 Which run a number stands for is in the key, a file of its own. It goes in runs_private/,
-which is never committed, and stays closed until every row is graded. The report
-(report.py) reads the two together.
+which is never committed, and stays closed until every row is graded. Then the graded
+sheet and the key are committed together under results/: the verdicts are a part of the
+results. The report (report.py) reads the two together.
 
 The sheet is CSV in UTF-8 with a byte-order mark, so that Excel reads its letters right;
 it has to be saved as "CSV UTF-8" again.

@@ -83,3 +83,20 @@ its paper where the search of the run had listed the first; the tool answered
 The limit was kept from development runs that took two to six. Here the staged runs of
 eval-15 took 10, 12 and 12, those of eval-17 took 11, 8 and 9, and one flat run of
 eval-17 took 8. The limit ended one run.
+
+## The cost with and without the API's cache
+
+The evaluation was run with the API's cache on, and the cost in the report is worked
+out for that: $2.78 for the 60 staged runs and $10.90 for the 60 flat runs, a factor of
+3.9. The cache changes what a token costs and not what the model reads, so the same
+usage can be priced without it. Every input token at the plain price gives $5.00 and
+$10.49, a factor of 2.1.
+
+The cache moves the two layouts in opposite directions. A request pays a quarter more
+for what it writes to the cache, and a twentieth of the price for what it reads from
+it. A flat run is mostly over with its second response: the 60 runs wrote 4,147,361
+tokens to the cache and read 876,362 back, and came out a little dearer than without
+it. A staged run goes on for more responses, each asked for with the whole conversation
+so far: the 60 runs wrote 832,385 tokens and read 1,384,589, at a little more than half
+the price. So "staged costs a quarter of flat" is said of these runs with the cache on.
+Without it, staged costs about half of flat.

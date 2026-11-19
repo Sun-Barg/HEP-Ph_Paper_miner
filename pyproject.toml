@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hepph-paper-miner"
 version = "0.0.1"
-description = "An MCP server for searching arXiv and reading papers section by section, with a minimal tool-calling loop and a small evaluation set (work in progress)."
+description = "An MCP server for searching arXiv and reading papers section by section, with a minimal tool-calling loop and a small evaluation set."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -24,7 +24,9 @@ dependencies = [
 ]
 
 [project.scripts]
-# What a host is configured with to start the server: uv run hepph-paper-miner
+# The command of the server. In this folder: uv run hepph-paper-miner
+# A host starts it from a folder of its own, so its configuration names this one too:
+# uv --directory <this folder> run hepph-paper-miner
 hepph-paper-miner = "hepph_paper_miner.server:main"
 
 [dependency-groups]

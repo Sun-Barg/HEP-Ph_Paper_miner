@@ -1,7 +1,7 @@
 """Print what the model thought in a run, turn by turn, beside the tools it asked for.
 
-    uv run python scripts/show_thinking.py "results/runs/20261113T*.jsonl"
-    uv run python scripts/show_thinking.py "results/runs/20261113T*.jsonl" --out thinking.txt
+    uv run python scripts/show_thinking.py "results/runs/dev/diag-1/*.jsonl"
+    uv run python scripts/show_thinking.py "results/runs/dev/diag-1/*.jsonl" --out thinking.txt
 
 For runs made with --show-thinking. Name the public records (files, or a pattern with *
 in quotes); the thinking is read from the private record of the same name, which is

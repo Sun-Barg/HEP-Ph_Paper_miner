@@ -161,8 +161,10 @@ async def run(
     if channel not in PROMPT_VERSION:
         raise ValueError(f"no such way to hand in an answer: {channel!r}")
     listed = (await client.list_tools()).tools
-    # The server's own names, descriptions and schemas, passed on unchanged: the
-    # model is to see what any other MCP host would show it.
+    # The server's own names, descriptions and schemas, passed on unchanged. They are
+    # all of the server that the model is shown. The instructions a server sends when
+    # a client connects (client.instructions) are not passed on, although a host may
+    # put them into its system prompt: the model reads the system prompt of this loop.
     tools = [
         {
             "name": tool.name,

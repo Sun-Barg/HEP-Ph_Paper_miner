@@ -25,6 +25,7 @@ came back as an error, and which runs took more responses than any development r
 """
 
 import csv
+import json
 from collections import Counter
 from collections.abc import Iterable
 from datetime import datetime
@@ -380,3 +381,58 @@ def test_only_runs_of_eval_15_and_eval_17_took_more_than_six_responses(records):
         "eval-17 flat 2": 8,
     }
     assert [str(a.cell) for a in records if a.end["reason"] == "turn_limit"] == ["eval-15 staged 3"]
+
+
+# --- what the READMEs say of the cost, the rule and the searches -------------------------
+
+
+def test_the_factor_between_the_costs_of_the_layouts_belongs_to_the_cache(records):
+    layouts = {name: [a for a in records if a.cell.toolset == name] for name in ("staged", "flat")}
+    assert {name: cost(runs) for name, runs in layouts.items()} == {"staged": 2.78, "flat": 10.90}
+    # The same usage without the cache: every input token at the plain price.
+    price = report.PRICES["claude-sonnet-5-5"]
+
+    def plain(runs: list[Attempt]) -> float:
+        tokens = sum(input_tokens(a) for a in runs), sum(a.end["output_tokens"] for a in runs)
+        return round((tokens[0] * price["input"] + tokens[1] * price["output"]) / 1_000_000, 2)
+
+    assert {name: plain(runs) for name, runs in layouts.items()} == {"staged": 5.00, "flat": 10.49}
+    assert (round(10.90 / 2.78, 1), round(10.49 / 5.00, 1)) == (3.9, 2.1)
+    # Why: a flat run writes much to the cache and reads little back, a staged run reads
+    # back more than it writes.
+    written = {n: sum(a.end["cache_creation_input_tokens"] for a in r) for n, r in layouts.items()}
+    read = {name: sum(read_from_cache(a) for a in runs) for name, runs in layouts.items()}
+    assert written == {"staged": 832_385, "flat": 4_147_361}
+    assert read == {"staged": 1_384_589, "flat": 876_362}
+
+
+def test_no_answer_of_the_evaluation_can_come_out_right_by_the_rule(questions):
+    # grade.py says "right" only when the key leaves nothing to a person. Every question
+    # here leaves something, so that the rule sent all 118 answers to a person says
+    # nothing about the answers.
+    assert len(questions) == 20
+    assert all(question.answer_key.get("by_hand") for question in questions)
+
+
+def test_no_search_in_the_records_was_answered_with_the_error_feed_of_arxiv():
+    # Until e13cb0d the error feed in its https form was read as a search: one entry
+    # counted, no paper shown. The names of the tool texts were kept through that change
+    # because no recorded run met it (README, pre-registration Section 10).
+    folders = [RUNS, *sorted(path for path in (RUNS.parent / "dev").iterdir() if path.is_dir())]
+    lines = [
+        json.loads(line)
+        for folder in folders
+        for path in sorted(folder.glob("*.jsonl"))
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    searches = [
+        call
+        for line in lines
+        if line["record"] == "turn"
+        for call in line["tools"]
+        if call["name"] == "search_papers"
+    ]
+    back = [call["first_line"] for call in searches if call["status"] == "ok"]
+    assert (len(searches), len(back)) == (118, 115)
+    nothing_shown = [line for line in back if line["shown"] == 0]
+    assert len(nothing_shown) == 41 and all(line["total"] == 0 for line in nothing_shown)

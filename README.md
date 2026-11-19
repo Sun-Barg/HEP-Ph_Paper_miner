@@ -1,11 +1,10 @@
 # HEP-Ph_Paper_miner
 
-Work in progress. Not ready for use.
+An MCP server that lets a model search arXiv and read papers, a minimal tool-calling
+loop that drives it, and a small evaluation set that compares two tool layouts: reading
+a whole paper at once, or reading an outline first and then single sections.
 
-The goal is an MCP server that lets a model search arXiv and read papers, a minimal
-tool-calling loop that drives it, and a small evaluation set that compares two tool
-layouts: reading a whole paper at once, or reading an outline first and then single
-sections.
+Everything listed under Status is done, and the results of the evaluation are below.
 
 ## Status
 
@@ -101,7 +100,7 @@ through them, with the tool calls that ended in an error and the limit of respon
 | Staged answers as well as flat | not shown | the layouts agree in 19 of 20 questions, and every wrong run is staged. Twenty questions cannot show that two layouts answer equally well, and these were kept only when a reader of the full text answered them as the reference does |
 | Which difference between the layouts matters | not measured | abstracts in search results and the unit of reading change together |
 | Why staged failed in eval-15 | one observation | text that only a read of the whole section returns: one question about one paper. No run tried a changed outline |
-| Staged is cheaper | only for these 120 runs | $2.78 against $10.90, worked out from the usage at list prices with the API's cache on, and not read from the Console. In eval-15 the two layouts cost the same |
+| Staged is cheaper | only for these 120 runs | $2.78 against $10.90, worked out from the usage at list prices with the API's cache on, and not read from the Console. The factor of 3.9 belongs to the cache: the same tokens at the plain input price are $5.00 against $10.49, a factor of 2.1 (`results/README.md`). In eval-15 the two layouts cost the same |
 | A model as judge gives the grades by hand | measured on the 118 answers, where a judge that calls every answer right would agree on 117 | the judge is the model that gave the answers, and it thought before a quarter of its replies. On row 86, the one answer graded wrong, its first request of three said right |
 | That judge tells a wrong answer | measured on 91 controls, each called wrong in all three requests | the controls are made up: wrong answers of these kinds, not the wrong answers a model gives, of which the sheet holds one. The controls of a question come from one row |
 
@@ -121,13 +120,18 @@ answers in place of a person". The table above is the whole of what can be claim
   tell. With the first verdict staged has eval-15 right in two of three runs, and both
   layouts have all 20 questions right. The criterion is written in that row of the
   sheet. The note in the question file was left as it is, because the file is fixed by
-  its digest. The change is listed under Deviations in the pre-registration.
+  its digest; what it leaves unsaid is written down in `eval_data/QUESTION_NOTES.md`.
+  The change is listed under Deviations in the pre-registration.
 - The grader also revised the questions, and the wording of an answer can hint at its
   layout. The sheet hides the layout, the repetition, the cited sections and what the
   rule said, and nothing more. The runner prints how each run ends, so it was known
   before the grading that the row missing for eval-13 and for eval-15 was a staged one.
-- The rule of `eval.grade` sent all 118 answers to a person (`by_hand`), so the report
-  says nothing here about how far the rule and the grade by hand agree.
+- The rule of `eval.grade` sent all 118 answers to a person (`by_hand`), and it could
+  not have done otherwise. Every question of the evaluation has an item in its answer
+  key that is left to a person, so the rule could only say `wrong` or `by_hand` there:
+  that follows from the question file, not from the answers. The report therefore says
+  nothing about how far the rule and the grade by hand agree. The rule is seen at work
+  on the 91 controls of the judge, of which it calls 47 `wrong`.
 - **A model graded the same answers afterwards, and its verdicts are the grades by hand
   on all 118 rows. That alone says little.** The grader called 117 rows right, so a
   judge that calls every answer right would agree on 117. Whether the judge can tell a
@@ -186,6 +190,11 @@ the tools the model asks for, and stops with a named reason (`answered`, `turn_l
 `tool_timeout`, ...). It needs an API key in the environment variable
 `ANTHROPIC_API_KEY`. Every run costs money and sends requests to arXiv.
 
+The model is given the tools of the server, with their descriptions and schemas as the
+server lists them, and the system prompt of the loop. The loop does not pass on the
+instructions that the server sends when a client connects. A host may show those to
+its model; no run made with this loop read them.
+
 ```
 uv run python -m hepph_paper_miner.agent --question-id dev-01
 uv run python -m hepph_paper_miner.agent --question-id dev-01 --toolset flat
@@ -220,7 +229,7 @@ record only, because a summary can quote a paper. To read them beside the tool c
 of a run:
 
 ```
-uv run python scripts/show_thinking.py "results/runs/20261113T*.jsonl" --out thinking.txt
+uv run python scripts/show_thinking.py "results/runs/dev/diag-1/*.jsonl" --out thinking.txt
 ```
 
 A run hands in its answer in one of three ways (`--answer-channel`). The model reads
@@ -289,6 +298,10 @@ it, and is written down in `src/hepph_paper_miner/eval/conditions.py`:
 These are the defaults of the command, with one exception: the cache is off unless
 asked for, so a run of the evaluation is started with `--cache`.
 
+No run read the instructions of the server, because the loop does not pass them on
+(see [Asking one question](#asking-one-question)). That is the same for both layouts;
+whether a run would have gone differently with them was not measured.
+
 They were fixed while this repository held the five development questions and no
 question of the evaluation. Tool texts and the prompt were tuned on those five, and are
 not tuned on the questions they are then measured with. The thirty runs of
@@ -301,6 +314,15 @@ command, the loop or the model, cannot move away from the conditions
 (`tests/test_conditions.py`). And `differences` in the module holds the first line of a
 record against them, which is how those thirty records are checked, and how the records
 of the evaluation can be.
+
+One thing that a tool answers was changed after the evaluation, under the same names.
+arXiv now writes the id of an entry in its error feed with `https://`, and the search
+knew only the older `http://`, so an error feed was taken for a search that found
+nothing. Since `e13cb0d` such a search comes back as `[bad_query]`. A tool that answers
+the same call differently gets a new name by the rule of `TOOLSET_VERSION`. Here the
+names were kept: none of the 115 searches that came back in the records of the
+development runs and of the evaluation had been answered with that feed, so no recorded
+run would have read anything else. The pre-registration lists this under Deviations.
 
 ## Checking a question file
 
@@ -410,8 +432,10 @@ It prints one line for each run and says four things:
 - `answer`: what a rule can check. `wrong` when there is no answer, when "found" is the
   wrong way round, or when a number or a phrase of the answer key is missing; `by_hand`
   when nothing is missing but the question leaves something to a person; `right`
-  otherwise. This is not the verdict: a person grades every answer, and the rule is kept
-  beside that grade to see how far the two agree.
+  otherwise. A question whose answer key has an item for a person never comes out
+  `right`, and every question of the evaluation has one. This is not the verdict: a
+  person grades every answer. The rule stands beside that grade as a check that needs no
+  model: it finds the answer that lacks a number or has "found" the wrong way round.
 
 ## Grading the answers by hand
 
@@ -522,6 +546,14 @@ Downloads from arXiv are kept in `~/.cache/hepph-paper-miner` (set
 is never committed, and neither is a run record that contains it. The one exception is
 `tests/fixtures/arxiv-2610.26648v1/`: a paper under CC0 by the maintainer of this
 repository, used to test the section parser.
+
+The folder has no expiry. An answer of arXiv that could be used is kept for good, and
+the same request is not sent again. That holds for a search too: a search that listed
+at least one paper gives the same list whenever it is asked again on this machine, so
+it does not show a paper that came to arXiv later. The first line of a result names
+the day on which arXiv gave the answer (`as of`). Two answers are not kept: a search
+that listed nothing, and the lookup of an identifier without a version, whose latest
+version can change. To ask arXiv again, delete the folder or name another one.
 
 This project uses arXiv's API and source downloads. It is not affiliated with or
 endorsed by arXiv.

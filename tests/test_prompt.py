@@ -104,15 +104,17 @@ async def test_no_text_a_model_reads_names_a_paper_of_the_evaluation():
     }
     assert len(targets) == 23
 
-    read_by_the_model = [json.dumps(texts_of(channel)) for channel in PROMPT_VERSION]
+    # Every text that is written for a model. The loop does not pass on the instructions
+    # of the server (agent/loop.py), but a host may, so they are held to the same rule.
+    written_for_a_model = [json.dumps(texts_of(channel)) for channel in PROMPT_VERSION]
     for toolset in TOOLSET_VERSION:
         async with Client(build_server(sample_source(), toolset)) as client:
-            read_by_the_model.append(client.instructions)
+            written_for_a_model.append(client.instructions)
             for tool in (await client.list_tools()).tools:
-                read_by_the_model += [tool.description, json.dumps(tool.input_schema)]
-        read_by_the_model += [explain(SourceError(kind, "x"), toolset) for kind in ErrorKind]
+                written_for_a_model += [tool.description, json.dumps(tool.input_schema)]
+        written_for_a_model += [explain(SourceError(kind, "x"), toolset) for kind in ErrorKind]
 
-    for text in read_by_the_model:
+    for text in written_for_a_model:
         for target in targets:
             assert target not in text
 
