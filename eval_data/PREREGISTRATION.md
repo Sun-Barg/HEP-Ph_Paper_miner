@@ -170,3 +170,52 @@ reads the records, the sheet and the key.
   with text, without a call of `submit_answer`, is wrong by Section 7. The maintainer
   read that text, knowing which run it was, and graded it right by the `accept_note`.
   No count of the report uses this.
+- **2026-11-19, an analysis added after the results: a model as a second grader.**
+  Nothing above changes: the grades by hand stay the verdicts, and no count of
+  `results/report.md` moves. A judge, `eval/judge.py`, is asked to grade every row of
+  the sheet of Section 8 from what the sheet shows the grader: the question, its
+  reference answer, its `accept_note`, the answer and its `found`. It is not given the
+  layout, the run, the cited sections, what the rule said, a grade, or a note the grader
+  wrote while grading. The grader called 117 of the 118 rows right, so a judge that
+  calls every answer right would agree on 117 of them. The judge is therefore also
+  asked to grade 91 controls, answers made to be wrong, in
+  `eval_data/judge_controls_eval.csv` (SHA-256 beginning `dcb047f6f0b675bd`): 27 of a
+  kind that an `accept_note` calls wrong and 64 of other kinds, 71 of them a right answer
+  of the sheet changed only where the fault lies and 20 written anew. A Claude session
+  of the maintainer's research project drafted them, a Claude session that works on this
+  repository held them against the rows they were made from, and the maintainer reviewed
+  each one the way the sheet was graded and decided that it is wrong.
+- The judge is `j2` (its texts SHA-256 beginning `38bc359e5841b16a`), the model and the
+  settings of Section 2 (`claude-sonnet-5-5`, adaptive thinking, effort `high`,
+  `max_tokens` 16000) without a cache. Every answer is asked three times, and the
+  judge's verdict on an answer is the one that two or three of its requests gave. A
+  Claude session that works on this repository wrote its texts, and the maintainer
+  read them. They were changed on the five development questions only: `j1` called one
+  of the 25 development controls right in one of its three requests
+  (`results/judge/dev-j1.jsonl`); `j2` adds one sentence that asks the judge to think
+  before it replies, and called every development control wrong in every request
+  (`results/judge/dev-j2.jsonl`). No row of this sheet and no control of the evaluation
+  had been given to the judge.
+- The judge is run once, from the commit that adds this entry, on the 118 rows and the
+  91 controls: 627 requests. A request that the API fails is asked again by starting the
+  same command; a reply that is no verdict is kept, and an answer without a verdict of
+  two or three requests has none.
+- `eval/agree.py` writes `results/judge/report.md`. For the rows: the grade by hand
+  against the judge's verdict, beside the 117 rows that a judge calling every answer
+  right would agree on, and the rows where the two differ, with what the judge wrote.
+  For the controls: how many the judge called wrong, by two or three requests and by
+  all three, in all, by the kind of fault, by how they were made, by question, and
+  against what the rule of `grade.py` says of the same text (47 `wrong`, 44
+  `by_hand`). Then H2 again, with the judge's verdicts in place of the grades by hand;
+  how often the three requests agreed; how many replies held a thinking block; and the
+  cost from the usage. No rate of agreement is given alone.
+- What this cannot show. The controls are made up: they show whether the judge tells
+  wrong answers of these kinds, not whether it tells the wrong answers a model gives,
+  of which the sheet holds one (row 86, whose grade was changed once). The controls of
+  a question are made from one row, so they are not independent of each other. The 20
+  controls written anew are shorter than the answers on the sheet. The judge is the
+  model that gave the answers. The judge's texts were written by a Claude session that
+  had read the graded sheet, its notes and these controls (the sentence that `j2` adds
+  is the documentation's own); what stands is that none of them was given to the judge
+  before its texts were fixed, as the first line of its record shows (the commit and
+  the digest of the texts).

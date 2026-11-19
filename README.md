@@ -14,6 +14,7 @@ sections.
 - [x] Tool-calling loop and run records
 - [x] Evaluation set, graders, and the pre-registration of the evaluation
 - [x] Runs of the evaluation, grading by hand, results
+- [ ] A model as a second grader, held against the grades by hand
 
 ## The two tool layouts
 
@@ -457,6 +458,44 @@ the report as it was made on the maintainer's computer, and making it again need
 twelve other papers from arXiv: whether a passage of one of them was given to a run,
 and the four rows that are counted over the text of every paper (passages given, new
 paper text, repeat reads, responses from the passage to the answer).
+
+## The judge
+
+```
+uv run python -m hepph_paper_miner.eval.judge --questions eval_data/questions_eval.jsonl --sheet results/grading.csv --controls eval_data/judge_controls_eval.csv --out results/judge/eval-j2.jsonl --parallel 4
+uv run python -m hepph_paper_miner.eval.agree --questions eval_data/questions_eval.jsonl --record results/judge/eval-j2.jsonl --sheet results/grading.csv --key results/grading-key.csv --controls eval_data/judge_controls_eval.csv --runs results/runs/eval --out results/judge/report.md
+```
+
+The grades by hand are the verdicts. The judge is a model asked for a second grade of
+the same answers, so that the two can be held side by side. The first command asks it
+to grade every row of the sheet, from what the sheet shows the grader (the question,
+its reference answer, what is accepted, the answer and its `found`) and nothing else:
+it reads four columns of the sheet and never opens the key. Each answer is one request
+without tools, its reply is held to a form (a verdict and one sentence on why), and
+every answer is asked three times; the verdict on an answer is the one that two or
+three of them gave. The record is one file of JSON lines with no text of an answer or
+a question. `--parallel` sets how many requests go out at a time.
+
+The grader called 117 of the 118 rows right, so a judge that calls every answer right
+would agree on 117 of them. What shows whether the judge can tell a wrong answer are
+controls: answers made to be wrong, asked like the rows. `eval_data/judge_controls_eval.csv`
+holds 91 for the evaluation questions and `eval_data/judge_controls_dev.csv` 25 for the
+development questions.
+
+The second command reads what the judge was never given, the grades, the key, the
+records of the runs and what the file of controls says of each control, and writes the
+report: the rows by hand against the judge, beside what calling every answer right
+would give; the rows where the two differ; the controls the judge called wrong, by the
+kind of fault, by how they were made, by question, and against the rule of `grade.py`;
+and H2 again with the judge's verdicts. It refuses a record that is not complete, that
+asked only some of the answers, or that was begun with other files.
+
+The texts the judge reads have a name, `JUDGE_VERSION`, now `j2`. They were changed on
+the development questions only: `results/judge/dev-j1.jsonl` and `dev-j2.jsonl` are the
+two runs on the development answers (`results/judge/dev-sheet.csv`, which nobody
+graded) and their controls, and why the second judge replaced the first is in the
+pre-registration, Section 10. The run on the evaluation and its report are not in this
+repository yet.
 
 ## Paper text and the cache
 
