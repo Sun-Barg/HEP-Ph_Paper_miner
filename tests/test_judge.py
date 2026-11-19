@@ -50,7 +50,7 @@ from hepph_paper_miner.eval.sheet import (
 ROOT = Path(__file__).parent.parent
 PAPER = "2501.00001v2"
 # The name of the texts the judge reads, and the digest of those texts.
-PINNED = ("j1", "a6adc483e6edb104867575a450e450d0b7af5196fbe4bb523795fc98f0f5b88d")
+PINNED = ("j2", "38bc359e5841b16a9d0367ff8cec556e0a285f2c50eab7e4d0e3b04765fea07f")
 CONTROL_COLUMNS = ("id", "question_id", "kind", "found", "answer", "grade", "why_wrong", "detail")
 
 
@@ -627,7 +627,8 @@ def test_a_record_begun_with_something_else_is_refused(given, capsys, change, di
 def test_a_record_begun_by_other_code_or_another_judge_is_refused(given, capsys, monkeypatch):
     assert judge.main(given["argv"], Scripted()) == 0
     monkeypatch.setattr(judge, "code_version", lambda: {"commit": "decaf", "modified": False})
-    monkeypatch.setattr(judge, "JUDGE_VERSION", "j2")
+    # A name that cannot be the one in use, whatever that is now.
+    monkeypatch.setattr(judge, "JUDGE_VERSION", f"{JUDGE_VERSION}-other")
 
     assert judge.main(given["argv"], Scripted()) == 1
 

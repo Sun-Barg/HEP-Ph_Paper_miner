@@ -69,11 +69,21 @@ from hepph_paper_miner.eval.run import _REFUSALS, _REFUSING_STATUS, API_FAILURES
 
 # The name of everything the judge reads beside the question and the answer: the system
 # prompt, the layout of a request and the form of a verdict. Raise it with any of them.
-JUDGE_VERSION = "j1"
+JUDGE_VERSION = "j2"
 
 # The same text for every question, so it names no paper and no fact of one. It holds
 # none of the criteria that were settled while the sheet was graded: the judge starts
 # from what the grader started from.
+#
+# Its last line asks the judge to think first. With adaptive thinking at high effort, j1
+# thought on 8 of the 165 requests of its run on the development answers
+# (results/judge/dev-j1.jsonl). The one control it called right came from a request
+# without thinking: a control whose only fault is its "found", which the two requests with
+# thinking on the same control called wrong. Whether to think is the model's choice on each
+# request, and the API documentation gives this sentence to encourage it
+# (platform.claude.com/docs/en/build-with-claude/thinking-steering-and-cost, read
+# 2026-11-19). It is that sentence word for word: the same page warns that steering is
+# sensitive to the wording.
 SYSTEM_PROMPT = """\
 You grade one answer to a question about physics papers. You are given the question, a reference answer, a note on what is accepted, and the answer with its "found" flag. You do not have the papers: grade against what is given here, not against what you remember of a paper.
 
@@ -85,6 +95,8 @@ You grade one answer to a question about physics papers. You are given the quest
 - "found" is the answer's own statement about the papers: false says that they do not state what the question asks for. It has to fit the note and the reference answer: false where they say that the papers do not state it, true where they give what the papers state.
 - What the answer says beyond the note and the reference answer cannot be checked here. It counts neither for the answer nor against it.
 - Grade what the answer states. Its length and its wording do not count.
+
+This task involves multistep reasoning. Think carefully before responding.
 """
 
 # One request. The four parts are the columns of the sheet a grader reads, in its order.
