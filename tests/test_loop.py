@@ -150,7 +150,7 @@ async def test_the_record_says_what_was_run_and_what_each_result_was(client, tra
 
     start, *turns, end = records(trace.public_path)
     assert start["record"] == "run" and start["run_id"] == "run-1" and start["question_id"] == "q1"
-    assert start["toolset_version"] == "staged-5"  # as the server reported it over MCP
+    assert start["toolset_version"] == "staged-6"  # as the server reported it over MCP
     assert start["tools"] == ["search_papers", "get_outline", "read_section"]
     # The name of the loop's own texts, and the way the answer was to be handed in.
     assert (start["prompt_version"], start["answer_channel"]) == ("p1", "format")

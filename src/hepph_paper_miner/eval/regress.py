@@ -19,9 +19,10 @@ what they did. What that means was written down here before any such run was mad
        (the median of the characters of the tool results)
 
 All five hold: passed. One does not: failed. One cannot be told (a paper that cannot be
-read, an answer nobody graded): not decided. Responses, characters, cost and the calls
-that came back as errors are shown and decide nothing; a cell whose runs took more
-responses than any run of it before is marked, so that somebody reads its records.
+read, an answer nobody graded): not decided. Responses, characters, cost, the rank at
+which a search listed the paper and the calls that came back as errors are shown and
+decide nothing; a cell whose runs took more responses than any run of it before is
+marked, so that somebody reads its records.
 
 The two sides can be compared only when they differ in the tool texts and the code and
 in nothing else: the same question file, the same cells, the same prompt, model and
@@ -84,6 +85,8 @@ class Facts:
     passage: bool | None  # whether the passage was given; None: its paper could not be read
     rule: str  # RIGHT, WRONG or BY_HAND
     errors: tuple[str, ...] = ()  # the kind of every call that came back as an error
+    searches: int = 0  # searches that came back
+    rank: int | None = None  # where the first search that listed the paper listed it
     by_person: str | None = None  # the grade on the sheet, when a person wrote one
     by_judge: str | None = None  # what more than half of the judge's requests said
 
@@ -156,6 +159,8 @@ def facts_of(attempt: Attempt, question: Question, papers: Mapping[str, Paper]) 
             for call in turn.get("tools", ())
             if call.get("status") == "error"
         ),
+        searches=graded.search.searches,
+        rank=min((hit[1] for hit in graded.search.first_hit.values() if hit), default=None),
     )
 
 
@@ -338,7 +343,7 @@ def _money(runs: Sequence[Facts]) -> str:
 def _of(runs: Sequence[Facts]) -> list[str]:
     """The cells of the table for the runs of one question and layout on one side."""
     if not runs:
-        return ["-"] * 6
+        return ["-"] * 7
     rules = Counter(f.rule for f in runs)
     return [
         f"{sum(1 for f in runs if f.reason == 'answered')} / {len(runs)}",
@@ -349,12 +354,14 @@ def _of(runs: Sequence[Facts]) -> list[str]:
         " ".join(str(f.turns) for f in runs),
         f"{median(f.chars for f in runs):,.0f}",
         _money(runs),
+        # The rank changes with what arXiv holds on the day, so it is shown and no more.
+        " ".join(str(f.rank or "none") for f in runs) if any(f.searches for f in runs) else "-",
     ]
 
 
 def table(before: Side, after: Side, cells: Sequence[Cell]) -> list[str]:
     head = ["question", "layout", "side", "answered", "passage given", "rule", "responses"]
-    head += ["characters (median)", "cost", "calls that failed", ""]
+    head += ["characters (median)", "cost", "rank in a search", "calls that failed", ""]
     lines = [_row(head), _row(["---"] * len(head))]
     asked = dict.fromkeys(cell.question_id for cell in cells)
     for question_id, layout in ((name, layout) for name in asked for layout in LAYOUTS):

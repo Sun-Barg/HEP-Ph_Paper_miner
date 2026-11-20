@@ -81,3 +81,18 @@ def test_text_is_latex_without_comments_or_bibliography():
     assert "\\bibliography" not in sections["D"].text
     # A subsection too long for one read: the reason read_section can continue from a position.
     assert sections["6.3"].chars > 20000
+
+
+def test_five_sections_of_the_paper_have_text_of_their_own_before_the_first_subsection():
+    # What the outline shows as "own", and where a read with that end stops. The passage
+    # of eval-15 stands in the 1,072 characters of section 4 (tests/test_results.py).
+    from hepph_paper_miner.server import own_text
+    from hepph_paper_miner.sources.base import Paper, PaperMeta
+
+    data = tar_gz({p.name: p.read_bytes() for p in OWN_PAPER.iterdir() if p.suffix != ".md"})
+    meta = PaperMeta("2610.26648v1", "The kept paper", ("A",), 2026, "hep-ph", "Abstract.")
+    paper = Paper(meta, parse_source(data), PARSER_VERSION)
+    assert own_text(paper) == {"2": 292, "3": 1804, "4": 1072, "6": 926, "7": 792}
+    sections = {section.section_id: section for section in paper.sections}
+    for section_id, size in own_text(paper).items():
+        assert sections[section_id].text[size:].startswith("\\subsection")

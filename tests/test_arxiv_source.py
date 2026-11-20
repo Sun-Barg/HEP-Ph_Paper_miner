@@ -50,7 +50,11 @@ def test_search_sends_the_query_and_returns_the_listing(tmp_path):
 def test_search_with_nothing_to_search_for_sends_no_request(tmp_path):
     arxiv = FakeArxiv()
     found = arxiv.make(tmp_path).search(SearchQuery("()"))
-    assert found.total == 0
+    assert found.total == 0 and found.searched is False  # so the tool can say so
+    assert arxiv.requests == []
+    # The same for a query of words that arXiv does not look up, and of underscores.
+    for query in ("of the", "__ _"):
+        assert arxiv.make(tmp_path).search(SearchQuery(query)).searched is False
     assert arxiv.requests == []
     assert datetime.fromisoformat(found.fetched_at) <= datetime.now(UTC)  # made here and now
 

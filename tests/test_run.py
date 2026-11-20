@@ -496,3 +496,23 @@ def test_the_traceback_of_a_command_that_died_is_passed_on_and_its_answer_is_not
         assert run._in_a_process([]) == 1
     passed_on = capsys.readouterr().err
     assert passed_on == "Traceback (most recent call last):\nKeyError: 'turns'\n"
+
+
+def test_the_command_names_the_conditions_and_holds_its_runs_against_them(world, capsys):
+    folder, launch, launched = world
+    questions = file_of(folder, "ok")
+    out = ["--questions", str(questions), "--out", str(folder / "public")]
+    assert run.main([*out, "--repeats", "1"], launch=launch) == 0
+    assert "conditions revised | tool texts staged-6, flat-5" in capsys.readouterr().out
+    assert len(launched) == 2
+
+
+def test_code_that_no_conditions_name_runs_nothing(world, capsys, monkeypatch):
+    import hepph_paper_miner.server as server
+
+    folder, launch, launched = world
+    questions = file_of(folder, "ok")
+    monkeypatch.setattr(server, "TOOLSET_VERSION", {"staged": "staged-9", "flat": "flat-9"})
+    code = run.main(["--questions", str(questions), "--out", str(folder / "public")], launch=launch)
+    assert code == 1 and launched == []
+    assert "stopped: the code has texts that no conditions name" in capsys.readouterr().err

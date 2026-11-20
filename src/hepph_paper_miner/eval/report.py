@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from hepph_paper_miner.eval.check import to_find
-from hepph_paper_miner.eval.conditions import differences
+from hepph_paper_miner.eval.conditions import CONDITIONS, differences
 from hepph_paper_miner.eval.grade import Grade, Places, Record, _add, _covers, _reads, grade
 from hepph_paper_miner.eval.questions import Question, QuestionFileError, load_questions
 from hepph_paper_miner.eval.run import LAYOUTS, REPEATS, Attempt, State
@@ -511,6 +511,12 @@ def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -
         default=REPEATS,
         help="repetitions of the plan (default: %(default)s)",
     )
+    parser.add_argument(
+        "--conditions",
+        choices=sorted(CONDITIONS),
+        default="evaluation",
+        help="what the records are held against (default: %(default)s)",
+    )
     arguments = parser.parse_args(argv)
     if (arguments.sheet is None) != (arguments.key is None):
         parser.error("--sheet and --key go together")
@@ -558,14 +564,20 @@ def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -
     facts = [facts_of(a, by_id[a.run["question_id"]], papers, places, hand) for a in attempts]
 
     commits = Counter((a.run.get("code") or {}).get("commit") for a in attempts)
-    off = [(a, differences(a.run, a.end)) for a in attempts]
+    held = CONDITIONS[arguments.conditions]
+    off = [(a, differences(a.run, a.end, held)) for a in attempts]
     off = [(a, found) for a, found in off if found]
     graded = sum(1 for f in facts if f.answered and f.verdict is not None)
     header = [
         f"Questions: {arguments.questions.name}, SHA-256 {digest}",
         f"Records: {arguments.runs.as_posix()}; code "
         + ", ".join(f"{str(c)[:7]} ({n} runs)" for c, n in commits.most_common()),
-        "Held against the conditions (conditions.py): "
+        # The words of the report of the evaluation stay as they were written.
+        (
+            "Held against the conditions (conditions.py): "
+            if arguments.conditions == "evaluation"
+            else f"Held against the conditions {arguments.conditions!r} (conditions.py): "
+        )
         + (
             "no record differs"
             if not off

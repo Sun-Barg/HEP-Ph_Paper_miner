@@ -28,7 +28,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
-from typing import Annotated
+from typing import Annotated, Any
 
 import anyio.to_thread
 from mcp.server import MCPServer
@@ -67,7 +67,7 @@ SERVER_NAME = "hepph-paper-miner"
 # The name also goes up when a tool answers the same call differently although no text
 # has changed, which no test can see: a search that sends other words to arXiv, a
 # marker in the whole text of a paper that stands in another place.
-TOOLSET_VERSION = {"staged": "staged-5", "flat": "flat-4"}
+TOOLSET_VERSION = {"staged": "staged-6", "flat": "flat-5"}
 
 SECTION_CHAR_LIMIT = 20_000  # the most text one read_section call returns
 # The largest paper of the evaluation has 187,527 characters, so every one of them
@@ -156,6 +156,64 @@ def _quoted(value: str) -> str:
     return repr(value if len(value) <= _ECHO_LIMIT else value[:_ECHO_LIMIT] + "...")
 
 
+# The kind of an error that is about the arguments of a call. The SDK refuses arguments
+# that break the schema with a text of its own, which a program reads as this kind too
+# (result_text.error_kind); the sentences written here carry it in brackets.
+_INVALID_ARGUMENTS = "invalid_arguments"
+
+
+def no_such_argument(tool: str, unknown: Sequence[str], known: Sequence[str]) -> str:
+    """What a model is told that gave a tool an argument the tool does not have."""
+    named = ", ".join(_quoted(each) for each in unknown)
+    return (
+        f"[{_INVALID_ARGUMENTS}] {tool} has no argument{'s' if len(unknown) > 1 else ''} {named}. "
+        f"Its arguments are: {', '.join(known)}."
+    )
+
+
+class StrictServer(MCPServer):
+    """A server that refuses an argument its tool does not have, and says so in the schema.
+
+    The SDK makes the schema of a tool from the signature of its function, and drops what
+    a call holds beyond it. So a model that made up an argument was answered as if it
+    had not: in the evaluation three reads carried an `end` that nothing looked at, and
+    two of them returned some 14,000 characters more than they had asked for. Here such a
+    call comes back as an error that names the arguments there are, and the schema a
+    client is shown says that there are no others ("additionalProperties": false).
+
+    Both are done in the two public methods through which the SDK answers `tools/list`
+    and `tools/call` (read in the source of mcp 2.3.0). Its documentation (read on
+    2026-11-20) names other places to step in, and none of them as a way to do this:
+    the low-level `Server` for a schema written by hand, which would mean writing every
+    tool and the check of its arguments by hand as well; an `Extension`, whose
+    `intercept_tool_call` wraps `tools/call` but which is announced to every client as
+    an extension of the protocol, and cannot change a schema; and the middleware list,
+    which the documentation calls provisional and says not to build a server on. So
+    tests/test_server.py holds both things through a client: an SDK that stops calling
+    these two methods is noticed there.
+    """
+
+    async def list_tools(self) -> list[Any]:
+        tools = await super().list_tools()
+        for tool in tools:
+            tool.input_schema = {**tool.input_schema, "additionalProperties": False}
+        return tools
+
+    async def call_tool(self, name: str, arguments: dict[str, Any], context: Any = None) -> Any:
+        known = {
+            tool.name: list(tool.input_schema.get("properties", {}))
+            for tool in await super().list_tools()
+        }
+        # A tool that is not there is refused by the SDK, in its own words.
+        unknown = [each for each in arguments or {} if name in known and each not in known[name]]
+        if unknown:
+            # With the words the SDK puts in front of every other error of a tool, so
+            # that a model reads this one like the others.
+            told = no_such_argument(name, unknown, known[name])
+            raise ToolError(f"Error executing tool {name}: {told}")
+        return await super().call_tool(name, arguments, context)
+
+
 @contextmanager
 def _expected_failures(toolset: str) -> Iterator[None]:
     """Inside a tool: report a SourceError to the model as an error result it can read.
@@ -238,6 +296,51 @@ def _stop(text: str, start: int, limit: int) -> int:
     return hard
 
 
+def _stop_at(text: str, start: int, end: int | None, limit: int) -> tuple[int, bool]:
+    """Where a piece ends, and whether it ends there because the caller said so (`end`).
+
+    An end that one call can reach is taken to the character: the caller chose it, and
+    the text a section has of its own ends right where the heading of its first
+    subsection begins. An end beyond the limit of a call changes nothing: the piece is
+    cut as without it, at a line break. Neither does an end at or after the end of the
+    text, which then comes back as it does without one.
+    """
+    if end is not None and end < len(text) and end - start <= limit:
+        return end, True
+    return _stop(text, start, limit), False
+
+
+def _check_range(start: int, end: int | None) -> None:
+    if end is not None and end <= start:
+        raise ToolError(
+            f"[{_INVALID_ARGUMENTS}] end ({end}) is not after start ({start}), so no text lies "
+            "between them. Leave end out to read on from start."
+        )
+
+
+def own_text(paper: Paper) -> dict[str, int]:
+    """For each section that has text of its own before its first subsection: how much.
+
+    The text of a section holds its subsections, and a reader who takes the subsections
+    one by one never gets what stands in front of the first. The parser says where the
+    heading of a subsection begins (Section.heading_at), and that is where this text ends.
+    """
+    sizes: dict[str, int] = {}
+    top: Section | None = None
+    for section in paper.sections:
+        if section.level == 1:
+            top = section
+        elif top is not None:
+            # Only the first subsection says where that text ends. One made by hand can
+            # be without a place for its heading, and then nobody can tell.
+            at = section.heading_at
+            # Nothing but white space in front of it is not worth a line in an outline.
+            if at is not None and top.text[:at].strip():
+                sizes[top.section_id] = at
+            top = None  # the subsections after the first say nothing about that text
+    return sizes
+
+
 def piece_ends(text: str, limit: int = SECTION_CHAR_LIMIT) -> list[int]:
     """Where the pieces of a text end when it is read from its start, call after call.
 
@@ -310,7 +413,11 @@ _Query = Annotated[
     str,
     Field(
         min_length=1,
-        description='Words that must all appear. Put a phrase in double quotes: "dark matter".',
+        description=(
+            "Words that must all appear. Common small words (of, the, for, by, ...) are not "
+            "searched, because arXiv does not look them up; inside a quoted phrase they are "
+            'kept. Put a phrase in double quotes: "dark matter".'
+        ),
     ),
 ]
 _Author = Annotated[
@@ -367,7 +474,12 @@ def _search(source: PaperSource, toolset: str, query: SearchQuery) -> str:
             # On one line, whatever the listing holds: a program reads the identifiers
             # from the lines that begin with a rank.
             lines.append(f"   Abstract: {' '.join(meta.abstract.split())}")
-    if not found.papers:
+    if not found.searched:
+        lines.append(
+            "Nothing was searched: the query holds no word that arXiv looks up. Common small "
+            "words (of, the, ...) and signs are left out, so use the words that name the subject."
+        )
+    elif not found.papers:
         lines.append(
             "No paper matched. Every word has to occur, so try fewer or different words, "
             "or drop the author, category or year filter."
@@ -391,30 +503,46 @@ def _outline(source: PaperSource, arxiv_id: str) -> str:
                     f"Sections: none. {explain(error)}",
                 ]
             )
+    own = own_text(paper)
+    head = "Sections (id | chars | title). A section's chars include its subsections."
+    if own:
+        head += (
+            ' "own N" after a title: the first N characters of that section stand before its '
+            "first subsection and are in no subsection; read_section with end=N returns just them."
+        )
     lines = [
         outline_line(meta.arxiv_id, paper.chars, len(paper.sections), paper.parser_version),
         *_listing_lines(meta),
-        "Sections (id | chars | title). A section's chars include its subsections.",
+        head,
     ]
     for section in paper.sections:
         indent = "  " if section.level == 2 else ""
-        lines.append(f"{indent}{section.section_id} | {section.chars} | {section.title}")
+        line = f"{indent}{section.section_id} | {section.chars} | {section.title}"
+        if section.section_id in own:
+            line += f" | own {own[section.section_id]}"
+        lines.append(line)
     return "\n".join(lines)
 
 
-def _section(source: PaperSource, arxiv_id: str, section_id: str, start: int) -> str:
+def _section(
+    source: PaperSource, arxiv_id: str, section_id: str, start: int, end: int | None
+) -> str:
+    _check_range(start, end)
     with _expected_failures("staged"):
         paper = source.paper(parse_arxiv_id(arxiv_id))
     section = _find_section(paper, section_id)
     start = min(start, section.chars)
-    stop = _stop(section.text, start, SECTION_CHAR_LIMIT)
+    stop, asked = _stop_at(section.text, start, end, SECTION_CHAR_LIMIT)
     lines = [
         section_line(paper.meta.arxiv_id, section.section_id, start, stop, section.chars),
         f"Title: {section.title}",
         "",
         section.text[start:stop],
     ]
-    if stop < section.chars:
+    if asked:
+        lines.append("")
+        lines.append(f"[stopped at character {stop} of {section.chars}, as asked with end={end}.]")
+    elif stop < section.chars:
         smaller = [
             other.section_id
             for other in paper.sections
@@ -428,7 +556,8 @@ def _section(source: PaperSource, arxiv_id: str, section_id: str, start: int) ->
     return "\n".join(lines)
 
 
-def _whole_paper(source: PaperSource, arxiv_id: str, start: int) -> str:
+def _whole_paper(source: PaperSource, arxiv_id: str, start: int, end: int | None) -> str:
+    _check_range(start, end)
     with _expected_failures("flat"):
         # The listing first: it names the version, and it is there even when the text is not.
         meta = source.listing(parse_arxiv_id(arxiv_id))
@@ -446,7 +575,7 @@ def _whole_paper(source: PaperSource, arxiv_id: str, start: int) -> str:
             )
     text = full_text(paper)
     start = min(start, len(text))
-    stop = _stop(text, start, PAPER_CHAR_LIMIT)
+    stop, asked = _stop_at(text, start, end, PAPER_CHAR_LIMIT)
     lines = [
         paper_line(
             meta.arxiv_id, start, stop, len(text), len(paper.sections), paper.parser_version
@@ -456,7 +585,10 @@ def _whole_paper(source: PaperSource, arxiv_id: str, start: int) -> str:
         "",
         text[start:stop],
     ]
-    if stop < len(text):
+    if asked:
+        lines.append("")
+        lines.append(f"[stopped at character {stop} of {len(text)}, as asked with end={end}.]")
+    elif stop < len(text):
         lines.append("")
         lines.append(
             f"[cut at character {stop} of {len(text)}. To continue, call read_paper with start={stop}.]"
@@ -471,7 +603,7 @@ def build_server(source: PaperSource, toolset: str = "staged") -> MCPServer:
     """
     if toolset not in TOOLSET_VERSION:
         raise ValueError(f"unknown toolset {toolset!r}: expected one of {sorted(TOOLSET_VERSION)}")
-    mcp = MCPServer(
+    mcp = StrictServer(
         SERVER_NAME, version=TOOLSET_VERSION[toolset], instructions=_INSTRUCTIONS[toolset]
     )
     if toolset == "staged":
@@ -515,8 +647,11 @@ def _add_staged_tools(mcp: MCPServer, source: PaperSource) -> None:
         """Show one paper's title, authors, abstract and its list of sections with their sizes.
 
         Use the sizes (in characters) to decide what to read. The size of a section
-        includes its subsections. Without a version in the identifier, the latest
-        version is used and its full identifier is shown on the first line.
+        includes its subsections. A section can also begin with text of its own, which
+        stands in front of its first subsection and is in no subsection: the line of
+        such a section ends with the size of that text ("own N"). Without a version in
+        the identifier, the latest version is used and its full identifier is shown
+        on the first line.
         When the text of a paper cannot be read, the title and abstract are still
         shown, and the last line says why there are no sections.
         """
@@ -539,14 +674,26 @@ def _add_staged_tools(mcp: MCPServer, source: PaperSource) -> None:
                 description="Character to start from. Only needed to continue a truncated read.",
             ),
         ] = 0,
+        end: Annotated[
+            int | None,
+            Field(
+                ge=1,
+                description=(
+                    "Character to stop before. Only needed to read a part of a section: "
+                    'with the size that get_outline shows as a section\'s own ("own N"), '
+                    "only the text in front of its first subsection comes back."
+                ),
+            ),
+        ] = None,
     ) -> str:
         """Read the text of one section (LaTeX source) of one paper.
 
         Reading a section also returns its subsections. At most 20000 characters
         come back per call; when a section is longer, the first line says so and the
-        last line says how to get the rest.
+        last line says how to get the rest. With end, the text stops before that
+        character.
         """
-        return await _in_a_thread(_section, source, arxiv_id, section_id, start)
+        return await _in_a_thread(_section, source, arxiv_id, section_id, start, end)
 
 
 def _add_flat_tools(mcp: MCPServer, source: PaperSource) -> None:
@@ -585,6 +732,13 @@ def _add_flat_tools(mcp: MCPServer, source: PaperSource) -> None:
                 description="Character to start from. Only needed to continue a truncated read.",
             ),
         ] = 0,
+        end: Annotated[
+            int | None,
+            Field(
+                ge=1,
+                description="Character to stop before. Only needed to read a part of the text.",
+            ),
+        ] = None,
     ) -> str:
         """Read one whole paper: its title, authors and abstract, then its full text (LaTeX source).
 
@@ -592,12 +746,13 @@ def _add_flat_tools(mcp: MCPServer, source: PaperSource) -> None:
         "=== <section id> | <title> | <size> chars ===". The size of a section
         includes its subsections. At most 400000 characters of text come back per
         call; when a paper is longer, the first line says so and the last line says
-        how to get the rest. Without a version in the identifier, the latest version
+        how to get the rest. With end, the text stops before that character.
+        Without a version in the identifier, the latest version
         is used and its full identifier is shown on the first line. When the text of
         a paper cannot be read, the title and abstract are still shown, and the last
         line says why there is no text.
         """
-        return await _in_a_thread(_whole_paper, source, arxiv_id, start)
+        return await _in_a_thread(_whole_paper, source, arxiv_id, start, end)
 
 
 def main(argv: Sequence[str] | None = None) -> None:

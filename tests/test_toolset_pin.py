@@ -35,13 +35,13 @@ from hepph_paper_miner.sources.base import ErrorKind, Paper, PaperMeta, Section
 from hepph_paper_miner.sources.fixture import FixtureSource
 
 PINNED = {
-    "staged-5": (
-        "2894e85cc947d591dc3e5d54e7040d0e7ccd6a997af8f6f19c3cda018d6e3a41",
-        "9c6711f52057a8ec5d111df0aa2464dea8183f381adb80edc35e3ae8d54bcb6d",
+    "staged-6": (
+        "d2885898bcc6851ab75f19054e5ac7c818338937cdb70168f2f7145eb278ff27",
+        "032f7182fd7a8b4936d9076fb49900bad0b6a2b076af9c54716effa5646b16a8",
     ),
-    "flat-4": (
-        "5ad3886f3fe1fe8dc11162c12ca5e4a73588041cef0701bffdec3bcfb57e9dc9",
-        "f4394ca761a399f0219caea67848d381405229fbf81521924256b12254f46870",
+    "flat-5": (
+        "1e7e72289ad64e1bbfb5406e969fae34903052dfe40bf6c701a69e2de3d183e9",
+        "286b870a380b4dd8ac83078ad5d35422e0b725ae34e0dbda1cce134e81e0fe93",
     ),
 }
 
@@ -94,6 +94,7 @@ CALLS = {
         ("search_papers", {"query": "nothing matches this"}),
         ("search_papers", {"query": "x", "year_from": 2020, "year_to": 2010}),  # bad_query
         ("search_papers", {"query": ""}),  # refused by the schema
+        ("search_papers", {"query": "- :"}),  # nothing to search for
         ("get_outline", {"arxiv_id": "2501.00001"}),
         ("get_outline", {"arxiv_id": "2503.00001v1"}),  # no sections: no_full_text
         ("get_outline", {"arxiv_id": "2503.00002v1"}),  # no sections: parse_error
@@ -108,6 +109,10 @@ CALLS = {
         ("read_section", {"arxiv_id": ID, "section_id": "9"}),  # no_such_section
         ("read_section", {"arxiv_id": "2503.00001v1", "section_id": "1"}),  # no_full_text
         ("read_section", {"arxiv_id": "2503.00002v1", "section_id": "1"}),  # parse_error
+        ("read_section", {"arxiv_id": ID, "section_id": "1", "end": 10}),  # its own text
+        ("read_section", {"arxiv_id": ID, "section_id": "2", "start": 60, "end": 180}),
+        ("read_section", {"arxiv_id": ID, "section_id": "1", "start": 9, "end": 9}),
+        ("read_section", {"arxiv_id": ID, "section": "1", "limit": 5}),  # no such arguments
     ],
     "flat": [
         ("search_papers", {"query": "paper", "author": "Alpha", "year_from": 2020}),
@@ -123,6 +128,10 @@ CALLS = {
         ("read_paper", {"arxiv_id": "2412.00009v1"}),
         ("read_paper", {"arxiv_id": "https://arxiv.org/abs/2501.00001"}),
         ("read_paper", {"arxiv_id": ID, "start": -1}),  # refused by the schema
+        ("search_papers", {"query": "- :"}),  # nothing to search for
+        ("read_paper", {"arxiv_id": ID, "start": 60, "end": 180}),
+        ("read_paper", {"arxiv_id": ID, "start": 9, "end": 9}),
+        ("read_paper", {"arxiv_id": ID, "end": 100, "section_id": "1"}),  # no such argument
     ],
 }
 

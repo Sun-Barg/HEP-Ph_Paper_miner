@@ -26,7 +26,9 @@ runner skips what is done, so it can be stopped and resumed.
 
 It stops at once when the API refuses for a reason more runs cannot change (the key, the
 credit, the spending limit of the workspace), after three runs in a row that the API
-failed, and when a record names anything but the conditions of the evaluation.
+failed, and when a record names anything but the conditions. Those are the conditions
+that name the texts the code has (conditions.py): the command says which at its start,
+and does not start when the code has texts that no conditions name.
 """
 
 from __future__ import annotations
@@ -42,7 +44,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from hepph_paper_miner.eval.conditions import differences
+from hepph_paper_miner.eval.conditions import CONDITIONS, differences, of_the_code
 
 LAYOUTS = ("staged", "flat")
 REPEATS = 3
@@ -250,7 +252,13 @@ class Runner:
     private: Path | None
     launch: Launch
     say: Callable[[str], None] = print
+    # What every record is held against: when not given, what the code has now.
+    conditions: Mapping[str, Any] | None = None
     failures_in_a_row: int = field(default=0, init=False)
+
+    def __post_init__(self) -> None:
+        if self.conditions is None:
+            self.conditions = CONDITIONS[conditions_of_the_code()]
 
     def arguments(self, cell: Cell) -> list[str]:
         """The command line of one run, as the README says a run of the evaluation starts."""
@@ -284,7 +292,7 @@ class Runner:
             raise Stop(f"{cell}: the command wrote no record (exit code {code})")
         attempt = made[-1]
 
-        found = differences(attempt.run, attempt.end)
+        found = differences(attempt.run, attempt.end, self.conditions)
         if found:
             raise Stop(f"{cell}: the run was not made under the conditions: " + "; ".join(found))
         end = attempt.end or {}
@@ -312,6 +320,18 @@ class Runner:
                 return state
             for index, cell in enumerate(todo, start=1):
                 self.run_one(cell, f"[{index}/{len(todo)}]")
+
+
+def conditions_of_the_code() -> str:
+    """The name of the conditions the runs of this code are held against."""
+    name = of_the_code()
+    if name is None:
+        # Found before the first run and not after it, when a run has been paid for.
+        raise Stop(
+            "the code has texts that no conditions name (eval/conditions.py), so its runs "
+            "could be held against nothing"
+        )
+    return name
 
 
 def _in_a_process(argv: list[str]) -> int:
@@ -418,11 +438,18 @@ def main(argv: Sequence[str] | None = None, launch: Launch | None = None) -> int
         print(f"code      {code.get('commit')} | modified {code.get('modified')}")
         if code.get("modified") is not False:
             raise Stop("files the repository keeps have been changed, so no commit names this code")
+        named = conditions_of_the_code()
+        texts = ", ".join(CONDITIONS[named]["toolset_version"].values())
+        print(f"conditions {named} | tool texts {texts}")
         if not os.environ.get("ANTHROPIC_API_KEY"):
             raise Stop("ANTHROPIC_API_KEY is not set in this shell")
         check_folder(attempts, digest, code, arguments.allow_other_code)
         runner = Runner(
-            arguments.questions, arguments.out, arguments.private, launch or _in_a_process
+            arguments.questions,
+            arguments.out,
+            arguments.private,
+            launch or _in_a_process,
+            conditions=CONDITIONS[named],
         )
         state = runner.run(cells)
     except Stop as stop:

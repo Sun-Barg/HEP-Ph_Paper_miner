@@ -295,8 +295,11 @@ it, and is written down in `src/hepph_paper_miner/eval/conditions.py`:
 | Limits of a run | 12 responses; 700 s for one tool call; 900 s for the run, looked at between responses |
 | Requests to the API | 600 s for one request, which the SDK tries again up to twice; the API's cache on |
 
-These are the defaults of the command, with one exception: the cache is off unless
-asked for, so a run of the evaluation is started with `--cache`.
+These were the defaults of the command when the evaluation was run, with one exception:
+the cache is off unless asked for, so a run of the evaluation is started with `--cache`.
+The tool texts have been changed since (see
+[What was changed after the evaluation](#what-was-changed-after-the-evaluation)); the
+rest are its defaults still.
 
 No run read the instructions of the server, because the loop does not pass them on
 (see [Asking one question](#asking-one-question)). That is the same for both layouts;
@@ -310,7 +313,7 @@ not tuned on the questions they are then measured with. The thirty runs of
 
 Tests keep the conditions in place. A text that a model reads cannot change under its
 name (`tests/test_toolset_pin.py`, `tests/test_prompt.py`). A name, or a default of the
-command, the loop or the model, cannot move away from the conditions
+command, the loop or the model, cannot move away from the conditions that name the code
 (`tests/test_conditions.py`). And `differences` in the module holds the first line of a
 record against them, which is how those thirty records are checked, and how the records
 of the evaluation can be.
@@ -323,6 +326,43 @@ the same call differently gets a new name by the rule of `TOOLSET_VERSION`. Here
 names were kept: none of the 115 searches that came back in the records of the
 development runs and of the evaluation had been answered with that feed, so no recorded
 run would have read anything else. The pre-registration lists this under Deviations.
+
+### What was changed after the evaluation
+
+The code no longer has the tool texts of the evaluation. Four things were changed, for
+what its runs and a review of the whole repository had shown:
+
+- **An argument that a tool does not have.** The SDK drops what a call holds beyond the
+  schema of a tool, so a made-up argument was answered as if it were not there. In the
+  records of the evaluation four calls carried one (an `end` three times, a `max_results`
+  once); two reads with an `end` returned some 14,000 characters more than they had
+  asked for. Such a call now comes back as an error that names the arguments the tool
+  has, the schema says that there are no others, and `read_section` and `read_paper`
+  have an `end`.
+- **The text a section has of its own.** A section can begin with text in front of its
+  first subsection. No subsection holds it, and the outline did not show it: the passage
+  of eval-15 stands in such text. The line of such a section now ends with the size of
+  that text (`own N`), and a read with `end=N` returns just it.
+- **Small words in a search.** The description said that every word has to appear, and
+  did not say that common small words are left out. It says so now, and a query that
+  holds nothing to search for is answered as one that was not searched.
+- **An underscore in a search word.** arXiv found nothing for a word that holds one
+  (tried on 2026-11-19), and every word of a search has to match. An underscore now
+  parts words.
+
+The new texts have the names `staged-6` and `flat-5`. `conditions.py` keeps the
+conditions of the evaluation as they were (`EVALUATION`) and names beside them what the
+code has now (`REVISED`: the same, but for the tool texts). The records of the
+evaluation stay held against the first. The command as it is now writes records of the
+second, and `eval.run` holds its runs against the conditions that name the code.
+
+The twenty questions of the evaluation were not run again with the new texts: that
+would check a change on the questions that suggested it. Instead the five development
+questions are run again and held against the runs the conditions were fixed with, by
+criteria that were written down before those runs (`eval/regress.py`), and three
+questions written for the changed outline (`eval_data/questions_target.jsonl`) are run
+with the texts before and after. Those runs are not all made yet, and nothing is
+claimed for the change here.
 
 ## Checking a question file
 
@@ -383,7 +423,10 @@ how each hypothesis is read, was fixed before the first run in
 `--questions-sha256`. Each run is the command
 of one question in a process of its own, started as a run of the evaluation is started
 (`--cache --show-thinking`, the layout and the repetition), and its record is held
-against the conditions as soon as it is written. The repetition is the outer loop, and
+against the conditions as soon as it is written: the ones that name the texts the code
+has, which the command says at its start. The code as it is now has the tool texts
+`staged-6` and `flat-5`, so runs of the evaluation as it was are made with the code as
+it was (`70c7384`). The repetition is the outer loop, and
 within it the questions come in the order of the file; which layout of a question runs
 first alternates from question to question and from repetition to repetition.
 
@@ -398,7 +441,8 @@ counts as spoilt (move its record out of the folder if it should not).
 It stops at once when the API refuses the key, the credit or the spending limit of the
 workspace, after three runs in a row that the API failed, and when a record names
 anything but the conditions. It does not start when files the repository keeps have
-been changed, when the folder holds runs of another question file, or runs made by
+been changed, when the code has texts that no conditions name, when the folder holds
+runs of another question file, or runs made by
 another commit (`--allow-other-code` adds to them anyway), or, with `--questions-sha256`,
 when the file is not the one named. `--plan` says what is done and what would run, and
 runs nothing; `--only` and `--repeats` run a part, as for a rehearsal:

@@ -45,7 +45,8 @@ class ArxivSource:
         params = search_params(query)
         if params is None:
             # Nothing to ask arXiv for, so this answer is made here and now.
-            return SearchResult((), 0, datetime.now(UTC).isoformat(timespec="seconds"))
+            now = datetime.now(UTC).isoformat(timespec="seconds")
+            return SearchResult((), 0, now, searched=False)
         try:
             return self._feed(params, about=query.query)
         except FeedError as error:

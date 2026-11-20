@@ -197,6 +197,8 @@ class SearchResult:
     # When the source gave this answer (UTC, ISO 8601), "" when that is not known. An
     # answer that is kept is not asked for again, and what a search finds changes.
     fetched_at: str = ""
+    # False when the query held nothing to search for, so that the source was not asked.
+    searched: bool = True
 
 
 class PaperSource(Protocol):

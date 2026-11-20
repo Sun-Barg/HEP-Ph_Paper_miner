@@ -204,7 +204,11 @@ def test_the_table_marks_a_cell_that_took_more_responses_than_any_run_before():
     lines = table(a_side(), after, CELLS)
     marked = [line for line in lines if "read the records" in line]
     assert len(marked) == 1 and marked[0].startswith("| q-2 | staged | after | 3 / 3 | 3 / 3 |")
-    assert "| 4 7 7 | 10,000 | $0.15 |" in marked[0]
+    assert "| 4 7 7 | 10,000 | $0.15 | - | - |" in marked[0]
+    # Where a run searched, the rank at which its paper was listed is shown, or that it was not.
+    searched = {"q-1 flat 1": {"searches": 2, "rank": 3}, "q-1 flat 2": {"searches": 1}}
+    (line,) = [x for x in table(a_side(), a_side(**searched), CELLS) if "| q-1 | flat | after" in x]
+    assert "| $0.15 | 3 none none | - |" in line
     # One long run is not the median.
     one = table(a_side(), a_side(**{"q-2 staged 2": {"turns": 7}}), CELLS)
     assert not [line for line in one if "read the records" in line]
@@ -287,7 +291,9 @@ def test_the_runs_the_conditions_rest_on_held_against_themselves(capsys):
     )
     assert "| dev-01 | staged | before | 3 / 3 | 3 / 3 | 3 right | 4 4 4 | 10,566 |" in text
     # A cell whose paper is missing shows that, not a count.
-    assert "| dev-03 | staged | before | 3 / 3 | ? | 3 right | 4 5 4 | 9,758 |" in text
+    assert (
+        "| dev-03 | staged | before | 3 / 3 | ? | 3 right | 4 5 4 | 9,758 | $0.11 | 1 1 1 |" in text
+    )
     assert "3 invalid_arguments" in text and "has changed since" not in text
 
 

@@ -5,9 +5,11 @@ Three things are held together here.
     the conditions     They stand below a second time, as they were fixed. A change to
                        them has to be made in two places, by somebody who means it.
     the code           The command, started the way a run of the evaluation is started,
-                       has to write a record that names the conditions. That fails when
-                       a default of the command, of the loop or of the model moves, and
-                       when a text that a model reads gets a new name.
+                       has to write a record that names the conditions the code has now
+                       (REVISED: those of the evaluation with the tool texts as they
+                       were changed after it). That fails when a default of the command,
+                       of the loop or of the model moves, and when a text that a model
+                       reads gets a new name.
     the pilot          The conditions were chosen from thirty runs on the development
                        questions. Their records are in the repository, and name them too.
 
@@ -26,7 +28,15 @@ from conftest import asks, sample_source, says
 from hepph_paper_miner.agent import __main__ as command
 from hepph_paper_miner.agent.model import ClaudeModel, Reply
 from hepph_paper_miner.agent.prompt import PROMPT_VERSION
-from hepph_paper_miner.eval.conditions import EVALUATION, PARSER, differences
+from hepph_paper_miner.eval import conditions
+from hepph_paper_miner.eval.conditions import (
+    CONDITIONS,
+    EVALUATION,
+    PARSER,
+    REVISED,
+    differences,
+    of_the_code,
+)
 from hepph_paper_miner.eval.grade import Record, read_record
 from hepph_paper_miner.server import TOOLSET_VERSION
 from hepph_paper_miner.sources.arxiv_latex import PARSER_VERSION
@@ -72,12 +82,35 @@ def test_the_conditions_are_the_ones_that_were_fixed():
     assert (EVALUATION, PARSER) == (FIXED, "4")
 
 
-def test_the_conditions_name_the_texts_that_the_code_has():
+# The tool texts as they were changed after the evaluation, for what its runs had shown.
+NOW = {"staged": "staged-6", "flat": "flat-5"}
+
+
+def test_the_revised_conditions_are_those_of_the_evaluation_with_other_tool_texts():
+    assert REVISED == {**FIXED, "toolset_version": NOW}
+    assert CONDITIONS == {"evaluation": EVALUATION, "revised": REVISED}
+    assert [name for name in EVALUATION if EVALUATION[name] != REVISED[name]] == ["toolset_version"]
+
+
+def test_the_revised_conditions_name_the_texts_that_the_code_has():
     # A text cannot change under its name (test_toolset_pin.py, test_prompt.py). When a
-    # name here differs, a text of the evaluation was changed and renamed.
-    assert TOOLSET_VERSION == EVALUATION["toolset_version"]
-    assert PROMPT_VERSION[EVALUATION["answer_channel"]] == EVALUATION["prompt_version"]
+    # name here differs, a text was changed and renamed, and no conditions name the code.
+    assert TOOLSET_VERSION == REVISED["toolset_version"]
+    assert PROMPT_VERSION[REVISED["answer_channel"]] == REVISED["prompt_version"]
     assert PARSER_VERSION == PARSER
+    assert of_the_code() == "revised"
+
+
+def test_code_with_texts_that_no_conditions_name_is_code_of_no_conditions(monkeypatch):
+    import hepph_paper_miner.server as server
+
+    monkeypatch.setattr(server, "TOOLSET_VERSION", {"staged": "staged-7", "flat": "flat-5"})
+    assert of_the_code() is None
+    # And the code of the evaluation, were it here again, would be named by its own.
+    monkeypatch.setattr(server, "TOOLSET_VERSION", dict(EVALUATION["toolset_version"]))
+    assert of_the_code() == "evaluation"
+    monkeypatch.setattr(conditions, "PARSER", "5")
+    assert of_the_code() is None
 
 
 # --- the code ----------------------------------------------------------------------------
@@ -120,12 +153,17 @@ def test_the_command_started_as_for_the_evaluation_runs_under_the_conditions(
     record = started(monkeypatch, tmp_path, *options, replies=[READ[toolset], SUBMIT])
 
     assert record.end["parser_versions"] == ["4"]  # so the parser was looked at below
-    assert differences(record.run, record.end) == []
+    assert differences(record.run, record.end, REVISED) == []
+    # Against the conditions of the evaluation it differs in the one thing that was changed.
+    was = EVALUATION["toolset_version"][toolset]
+    assert differences(record.run, record.end) == [
+        f"toolset_version is {NOW[toolset]!r}, not {was!r}"
+    ]
 
 
 def test_the_cache_is_the_one_condition_that_the_command_has_to_be_asked_for(monkeypatch, tmp_path):
     record = started(monkeypatch, tmp_path, replies=[READ["staged"], SUBMIT])
-    assert differences(record.run, record.end) == [
+    assert differences(record.run, record.end, REVISED) == [
         "model.cache_control is None, not {'type': 'ephemeral'}"
     ]
 
@@ -160,7 +198,7 @@ def test_a_run_started_with_another_option_says_so_in_its_record(
     monkeypatch, tmp_path, options, last, said
 ):
     record = started(monkeypatch, tmp_path, "--cache", *options, replies=[READ["staged"], last])
-    assert differences(record.run, record.end) == said
+    assert differences(record.run, record.end, REVISED) == said
 
 
 # --- holding a record against the conditions ---------------------------------------------
@@ -270,6 +308,18 @@ def test_a_record_that_names_the_conditions_has_no_difference():
 )
 def test_every_departure_from_the_conditions_is_named_by_itself(changes, said):
     assert differences(line(**changes)) == [said]
+
+
+def test_a_record_is_held_against_the_conditions_that_are_given():
+    now = line(toolset_version="staged-6")
+    assert differences(now, None, REVISED) == []
+    assert differences(now) == ["toolset_version is 'staged-6', not 'staged-5'"]
+    assert differences(line(), None, REVISED) == ["toolset_version is 'staged-5', not 'staged-6'"]
+    flat = line(toolset="flat", toolset_version="flat-5")
+    assert differences(flat, {"parser_versions": ["4"]}, REVISED) == []
+    # Everything else is held as before.
+    slower = line(toolset_version="staged-6", limits={**LIMITS, "max_turns": 20})
+    assert differences(slower, None, REVISED) == ["limits.max_turns is 20, not 12"]
 
 
 def test_a_result_of_another_parser_is_named_from_the_last_line():

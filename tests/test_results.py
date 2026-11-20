@@ -383,6 +383,44 @@ def test_only_runs_of_eval_15_and_eval_17_took_more_than_six_responses(records):
     assert [str(a.cell) for a in records if a.end["reason"] == "turn_limit"] == ["eval-15 staged 3"]
 
 
+def test_four_calls_carried_an_argument_that_no_tool_had_and_two_reads_returned_more(records):
+    # What the tool texts were changed for after the evaluation (README): the SDK dropped
+    # an argument beyond the schema, and the call was answered as if it were not there.
+    had = {
+        "search_papers": {"query", "author", "category", "year_from", "year_to", "max_results"},
+        "get_outline": {"arxiv_id"},
+        "read_section": {"arxiv_id", "section_id", "start"},
+        "read_paper": {"arxiv_id", "start"},
+    }
+    beyond = [
+        (attempt, call, name)
+        for attempt in records
+        for turn in attempt.turns
+        for call in turn["tools"]
+        if call["name"] in had
+        for name in sorted(set(call["arguments"]) - had[call["name"]])
+    ]
+    counted = Counter((call["name"], name, call["status"]) for _, call, name in beyond)
+    assert counted == {
+        ("read_section", "end", "ok"): 2,
+        ("read_paper", "end", "error"): 1,  # not_found, for the version it asked for
+        ("read_section", "max_results", "ok"): 1,
+        # "section" for "section_id": refused all the same, because section_id was missing.
+        ("read_section", "section", "error"): 5,
+    }
+    # The two reads that came back: asked for 5,100 and 5,200 characters, given 19,821.
+    more = []
+    for attempt, call, name in beyond:
+        if (name, call["status"]) == ("end", "ok"):
+            asked = call["arguments"]["end"] - call["arguments"]["start"]
+            given = call["first_line"]["stop"] - call["first_line"]["start"]
+            more.append((str(attempt.cell), asked, given, given - asked))
+    assert more == [
+        ("eval-04 staged 2", 5100, 19821, 14721),
+        ("eval-04 staged 3", 5200, 19821, 14621),
+    ]
+
+
 # --- what the READMEs say of the cost, the rule and the searches -------------------------
 
 

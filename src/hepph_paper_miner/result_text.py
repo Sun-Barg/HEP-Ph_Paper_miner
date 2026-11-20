@@ -173,8 +173,11 @@ def error_kind(text: str) -> str:
     "Error executing tool <name>: " in front. What comes back is one of:
 
         the bracketed kind     an expected failure, for example "not_found"
-        "invalid_arguments"    the SDK refused the arguments before the tool ran
-                               (they broke the schema); its text has no bracket
+        "invalid_arguments"    the arguments were refused before the tool ran: by the
+                               SDK when they broke the schema (its text has no
+                               bracket), by the server when the tool has no such
+                               argument or an end is not after its start (in
+                               brackets, like the kinds above)
         "unexpected"           the tool raised something nobody planned for; the SDK
                                sends the bare "Error executing tool <name>"
         "unknown_tool"         the server has no tool of that name

@@ -147,3 +147,28 @@ def test_xml_that_is_not_an_atom_feed_is_not_an_empty_result(body):
 def test_feed_without_entries_is_an_empty_result():
     found = parse_feed((FIXTURES / "api_empty.xml").read_bytes())
     assert (found.papers, found.total) == ((), 0)
+
+
+@pytest.mark.parametrize(
+    ("typed", "sent"),
+    [
+        # For a word with an underscore, at its edge or inside, arXiv found nothing
+        # (2026-11-19). It parts words, as a slash does.
+        ("N_eff bounds", "all:N AND all:eff AND all:bounds"),
+        ("_excess galactic_ J/psi", "all:excess AND all:galactic AND all:J AND all:psi"),
+        ('"dark_matter halo"', 'all:"dark matter halo"'),
+        ("__ _", None),  # nothing left to search for
+        # The signs that did no harm at the edge of a word are sent as they were.
+        (
+            "excess. -excess 'excess' excess-",
+            "all:excess. AND all:-excess AND all:'excess' AND all:excess-",
+        ),
+    ],
+)
+def test_an_underscore_parts_words_and_other_signs_at_an_edge_stay(typed, sent):
+    built = search_params(SearchQuery(typed))
+    assert (built and built["search_query"]) == sent
+
+
+def test_an_author_filter_loses_its_underscores_too():
+    assert 'au:"de Boer"' in search_params(SearchQuery("halo", author="de_Boer"))["search_query"]

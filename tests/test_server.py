@@ -16,7 +16,7 @@ from conftest import (
 from mcp import Client, MCPError
 from mcp.types import REQUEST_TIMEOUT
 
-from hepph_paper_miner.result_text import END, MORE_FOLLOWS, read_first_line
+from hepph_paper_miner.result_text import END, MORE_FOLLOWS, error_kind, read_first_line
 from hepph_paper_miner.server import (
     SECTION_CHAR_LIMIT,
     SERVER_NAME,
@@ -46,7 +46,7 @@ async def test_server_reports_its_name_and_the_name_of_its_tool_texts(client):
     # The version a client sees is the name of what the model reads, not of the package:
     # a run record has to say which tool texts were in front of the model.
     assert client.server_info.name == SERVER_NAME
-    assert client.server_info.version == TOOLSET_VERSION["staged"] == "staged-5"
+    assert client.server_info.version == TOOLSET_VERSION["staged"] == "staged-6"
 
 
 def test_a_layout_that_does_not_exist_is_refused():
@@ -66,6 +66,14 @@ async def test_three_tools_with_text_output_only(client):
     assert search["required"] == ["query"]
     assert search["properties"]["max_results"]["maximum"] == 10
     assert tools["read_section"].input_schema["required"] == ["arxiv_id", "section_id"]
+    assert list(tools["read_section"].input_schema["properties"]) == [
+        "arxiv_id",
+        "section_id",
+        "start",
+        "end",
+    ]
+    # What a client is shown says that a tool has these arguments and no others.
+    assert [tool.input_schema["additionalProperties"] for tool in tools.values()] == [False] * 3
 
 
 @pytest.mark.anyio
@@ -410,3 +418,173 @@ async def test_arguments_that_break_the_schema_never_reach_the_tool(
     assert text.startswith(f"Error executing tool {tool}: ")
     assert "[" not in text.removeprefix(f"Error executing tool {tool}: ")[:1]
     assert source.calls == []
+
+
+# --- arguments that a tool does not have -------------------------------------------------
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("tool", "arguments", "said"),
+    [
+        (
+            "read_section",
+            {"arxiv_id": "2501.00001v2", "section": "2"},  # eight times in the records
+            "read_section has no argument 'section'. "
+            "Its arguments are: arxiv_id, section_id, start, end.",
+        ),
+        (
+            "read_section",
+            {"arxiv_id": "2501.00001v2", "section_id": "2", "max_results": 3, "upto": 5},
+            "read_section has no arguments 'max_results', 'upto'. "
+            "Its arguments are: arxiv_id, section_id, start, end.",
+        ),
+        (
+            "get_outline",
+            {"arxiv_id": "2501.00001v2", "end": 100},
+            "get_outline has no argument 'end'. Its arguments are: arxiv_id.",
+        ),
+        (
+            "search_papers",
+            {"query": "galactic", "x" * 200: 1},
+            f"search_papers has no argument '{'x' * 80}...'. Its arguments are: "
+            "query, author, category, year_from, year_to, max_results.",
+        ),
+    ],
+)
+async def test_an_argument_a_tool_does_not_have_is_refused_and_the_ones_it_has_are_named(
+    client, source, tool, arguments, said
+):
+    # Dropped without a word, as the SDK does, a made-up argument was answered as if it
+    # were not there: a read with an `end` returned everything from `start` on.
+    result = await client.call_tool(tool, arguments)
+    assert result.is_error is True
+    text = only_text(result)
+    # It begins as every other error of a tool does, and a program reads its kind.
+    assert text == f"Error executing tool {tool}: [invalid_arguments] {said}"
+    assert error_kind(text) == "invalid_arguments"
+    assert source.calls == []  # the tool did not run
+
+
+@pytest.mark.anyio
+async def test_a_tool_that_is_not_there_is_refused_in_the_words_of_the_sdk(client):
+    result = await client.call_tool("read_paper", {"arxiv_id": "2501.00001v2", "nope": 1})
+    assert result.is_error is True and only_text(result) == "Unknown tool: read_paper"
+
+
+# --- the text a section has of its own, and a read that ends where it is told to ---------
+
+
+@pytest.mark.anyio
+async def test_the_outline_shows_the_text_a_section_has_before_its_first_subsection(client):
+    lines = (await call(client, "get_outline", arxiv_id="2501.00001v2")).splitlines()
+    assert lines[5] == (
+        "Sections (id | chars | title). A section's chars include its subsections. "
+        '"own N" after a title: the first N characters of that section stand before its '
+        "first subsection and are in no subsection; read_section with end=N returns just them."
+    )
+    assert lines[6:] == [
+        f"1 | {lines[6].split(' | ')[1]} | Introduction",
+        "2 | 115 | Methods and the $\\mathcal{O}(1)$ case | own 18",
+        "  2.1 | 10 | Data",
+        "  2.u1 | 15 | A side note",
+        "  2.2 | 9 | Fit",
+        "u1 | 7 | Acknowledgements",
+        "A | 43 | Extra tables | own 15",
+        "  A.1 | 10 | More",
+    ]
+    # Read with that end, the section gives its own text and stops in front of the heading.
+    text = await call(client, "read_section", arxiv_id="2501.00001v2", section_id="2", end=18)
+    assert text == (
+        "section | 2501.00001v2 | 2 | chars 0-18 of 115 | partial, more follows\n"
+        "Title: Methods and the $\\mathcal{O}(1)$ case\n\n"
+        "Methods overview.\n\n\n"  # its last character is the line break before the heading
+        "[stopped at character 18 of 115, as asked with end=18.]"
+    )
+    rest = await call(client, "read_section", arxiv_id="2501.00001v2", section_id="2", start=18)
+    assert rest.split("\n")[3] == "\\subsection{Data}"
+
+
+@pytest.mark.anyio
+async def test_an_outline_without_such_text_does_not_speak_of_it():
+    latex = (
+        "\\documentclass{article}\\begin{document}\n\\section{One}\n" + "Text. " * 200 + "\n"
+        "\\section{Two}\n\\subsection{Part}\nPart text.\n\\end{document}"
+    )
+    meta = PaperMeta("2504.00001v1", "No Text Of Its Own", ("Ada Alpha",), 2025, "hep-ph", "Short.")
+    async with Client(build_server(FixtureSource([paper_from_latex(meta, latex)]))) as client:
+        lines = (await call(client, "get_outline", arxiv_id="2504.00001v1")).splitlines()
+    assert lines[5] == "Sections (id | chars | title). A section's chars include its subsections."
+    assert [line for line in lines if "own" in line] == []
+
+
+@pytest.mark.anyio
+async def test_a_read_stops_where_end_says_to_the_character(client, source):
+    section = source.paper_by_id("2502.00002v1").sections[0]
+
+    async def read(**more) -> tuple[dict, str, str]:
+        text = await call(client, "read_section", arxiv_id="2502.00002v1", section_id="1", **more)
+        _header, _title, _blank, *rest = text.split("\n")
+        return read_first_line(text), "\n".join(rest), rest[-1]
+
+    said, body, last = await read(end=100)
+    assert (said["start"], said["stop"], said["extent"]) == (0, 100, MORE_FOLLOWS)
+    assert last == f"[stopped at character 100 of {section.chars}, as asked with end=100.]"
+    assert body.removesuffix("\n\n" + last) == section.text[:100]  # not moved to a line break
+    said, body, last = await read(start=40, end=100)
+    assert (said["start"], said["stop"]) == (40, 100)
+    assert body.removesuffix("\n\n" + last) == section.text[40:100]
+
+    # The limit of a call holds: an end beyond it changes nothing about the piece.
+    plain = await read()
+    cut = plain[0]["stop"]
+    assert cut < SECTION_CHAR_LIMIT < section.chars  # the limit cuts at a line break or a space
+    assert plain[2].startswith(f"[cut at character {cut} of {section.chars}. ")
+    assert await read(end=SECTION_CHAR_LIMIT + 1) == plain
+    assert await read(end=SECTION_CHAR_LIMIT + 5000) == plain
+    # An end that one call can reach is kept to the character, also behind that cut.
+    said, body, last = await read(end=SECTION_CHAR_LIMIT)
+    assert (said["stop"], said["extent"]) == (SECTION_CHAR_LIMIT, MORE_FOLLOWS)
+    assert last.startswith(f"[stopped at character {SECTION_CHAR_LIMIT} of {section.chars}, ")
+    assert body.removesuffix("\n\n" + last) == section.text[:SECTION_CHAR_LIMIT]
+    # What counts is how far the end is from the start, not from the beginning.
+    said, _, last = await read(start=5000, end=SECTION_CHAR_LIMIT + 5000)
+    assert (said["start"], said["stop"]) == (5000, SECTION_CHAR_LIMIT + 5000)
+    said, _, last = await read(start=5000, end=SECTION_CHAR_LIMIT + 5001)
+    assert said["stop"] < SECTION_CHAR_LIMIT + 5000 and last.startswith("[cut at character ")
+
+    # An end at or past the end of the text is the whole text, with nothing said of it.
+    for end in (10, 11, 999):
+        text = await call(
+            client, "read_section", arxiv_id="2501.00001v2", section_id="2.1", end=end
+        )
+        assert (
+            text == "section | 2501.00001v2 | 2.1 | 10 chars | complete\nTitle: Data\n\nData text."
+        )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("start", "end"), [(5, 5), (18, 3)])
+async def test_an_end_that_is_not_after_the_start_is_refused_before_arxiv_is_asked(
+    client, source, start, end
+):
+    text = await failure(
+        client, "read_section", arxiv_id="2501.00001v2", section_id="2", start=start, end=end
+    )
+    assert text == (
+        f"[invalid_arguments] end ({end}) is not after start ({start}), so no text lies between "
+        "them. Leave end out to read on from start."
+    )
+    assert source.calls == []
+
+
+@pytest.mark.anyio
+async def test_a_search_that_holds_nothing_to_search_for_says_that_nothing_was_searched(client):
+    text = await call(client, "search_papers", query="- : ()")
+    assert text.splitlines() == [
+        "search | 0 of 0 results | as of 2026-01-01 | query='- : ()'",
+        "Nothing was searched: the query holds no word that arXiv looks up. Common small "
+        "words (of, the, ...) and signs are left out, so use the words that name the subject.",
+    ]
+    # A search that was made and found nothing says something else.
+    assert "No paper matched." in await call(client, "search_papers", query="nothing matches this")

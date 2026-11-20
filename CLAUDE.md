@@ -52,10 +52,16 @@ works here follows the rules below.
   when one of them changes under an unchanged version: raise the version first, then pin the
   digest the failure prints.
 - `src/hepph_paper_miner/eval/conditions.py` names the versions the evaluation uses, with the
-  model, its settings and the limits of a run. They are fixed. Do not change that file, a
-  version it names or a default it covers unless the owner asks for exactly that.
+  model, its settings and the limits of a run (`EVALUATION`). They are fixed. Do not change
+  that file, a version it names or a default it covers unless the owner asks for exactly that.
   `tests/test_conditions.py` fails when one of them moves, and editing the expected values
   until it passes is not a fix.
+- The same file names what the code has now (`REVISED`: `EVALUATION` with the tool texts as
+  they were changed after the evaluation). When the owner has a text changed, its new name
+  goes there, never into `EVALUATION`: the records of the evaluation stay held against the
+  conditions they were made under. Runs made before a change are no runs of what comes after,
+  so the development questions are run again and held against the runs before
+  (`eval/regress.py`).
 
 ## Style
 

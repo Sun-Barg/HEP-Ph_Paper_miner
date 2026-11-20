@@ -50,7 +50,7 @@ async def test_two_tools_with_text_output_only(client):
         assert tool.description
     assert tools["read_paper"].input_schema["required"] == ["arxiv_id"]
 
-    assert client.server_info.version == TOOLSET_VERSION["flat"] == "flat-4"
+    assert client.server_info.version == TOOLSET_VERSION["flat"] == "flat-5"
     # Nothing a model reads in this layout may name a tool it does not have.
     told = client.instructions + "".join(tool.description for tool in tools.values())
     assert "read_paper" in told
@@ -282,3 +282,35 @@ async def test_a_start_that_breaks_the_schema_never_reaches_the_tool(client, sou
     assert result.is_error is True
     assert "[" not in only_text(result).removeprefix("Error executing tool read_paper: ")[:1]
     assert source.calls == []
+
+
+@pytest.mark.anyio
+async def test_read_paper_takes_an_end_and_no_argument_it_does_not_have(client, source):
+    tools = {tool.name: tool for tool in (await client.list_tools()).tools}
+    assert list(tools["read_paper"].input_schema["properties"]) == ["arxiv_id", "start", "end"]
+    assert [tool.input_schema["additionalProperties"] for tool in tools.values()] == [False] * 2
+
+    whole = full_text(source.paper_by_id("2501.00001v2"))
+    result = await client.call_tool("read_paper", {"arxiv_id": "2501.00001v2", "end": 60})
+    text = result.content[0].text
+    said = read_first_line(text)
+    assert (said["start"], said["stop"], said["chars"], said["extent"]) == (
+        0,
+        60,
+        len(whole),
+        MORE_FOLLOWS,
+    )
+    assert text.endswith(
+        f"Text:\n\n{whole[:60]}\n\n[stopped at character 60 of {len(whole)}, as asked with end=60.]"
+    )
+
+    result = await client.call_tool("read_paper", {"arxiv_id": "2501.00001v2", "section_id": "2"})
+    assert result.is_error is True
+    assert result.content[0].text == (
+        "Error executing tool read_paper: [invalid_arguments] read_paper has no argument 'section_id'. "
+        "Its arguments are: arxiv_id, start, end."
+    )
+    result = await client.call_tool(
+        "read_paper", {"arxiv_id": "2501.00001v2", "start": 9, "end": 9}
+    )
+    assert result.is_error is True and "end (9) is not after start (9)" in result.content[0].text

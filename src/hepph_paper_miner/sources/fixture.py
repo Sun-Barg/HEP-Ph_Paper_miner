@@ -57,7 +57,10 @@ class FixtureSource:
     def search(self, query: SearchQuery) -> SearchResult:
         """Papers whose title or abstract contains every word of the query, in the order given."""
         self.calls.append(("search", query.query))
-        words = query.query.lower().split()
+        words = [w for w in query.query.lower().split() if any(c.isalnum() for c in w)]
+        if not words:
+            # As arXiv's source does it: nothing to search for, so nothing is searched.
+            return SearchResult((), 0, FETCHED_AT, searched=False)
         matches = []
         for paper in self._papers.values():
             meta = paper.meta

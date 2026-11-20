@@ -138,7 +138,7 @@ def test_one_question_from_the_command_line_to_the_two_files(
     assert (first["question_id"], first["toolset"], first["toolset_version"]) == (
         "adhoc",
         "staged",
-        "staged-5",
+        "staged-6",
     )
     # A question typed on the command line comes from no file, and nobody said which
     # repetition this is. The code that ran is named all the same.

@@ -26,7 +26,12 @@ _ERROR_ID = "arxiv.org/api/errors"
 
 _PHRASE_OR_WORD = re.compile(r'"([^"]*)"|(\S+)')
 # Characters that mean something in the query language (: ( ) " [ ]) must not reach it.
-_NOT_A_WORD = re.compile(r"[^\w.'-]+")
+# An underscore parts words like a space. arXiv finds nothing for a word that holds one,
+# at its edge or inside (tried on 2026-11-19: "excess galactic" returned 3,322 papers, and
+# "_excess galactic", "excess_ galactic" and "galactic_excess" none), and a search needs
+# every word. A full stop, a hyphen or an apostrophe at the edge of a word does no harm
+# ("excess.", "-excess", "'excess'" and "excess-" returned the same 3,322), so they stay.
+_NOT_A_WORD = re.compile(r"[^\w.'-]+|_+")
 _OPERATORS = {"AND", "OR", "ANDNOT"}
 # Words that arXiv does not look up in titles and abstracts. They are the standard
 # English stop words of Lucene, and each was tried on arXiv in November 2026: asked for
@@ -51,7 +56,8 @@ class FeedError(Exception):
 
 def _words(text: str) -> list[str]:
     """The search words in a piece of text. What holds no letter and no digit is not a word:
-    the "-" of "B - L" would otherwise be sent as a word that nothing matches."""
+    the "-" of "B - L" would otherwise be sent as a word that nothing matches. "N_eff" is
+    the two words "N" and "eff", as "J/psi" is "J" and "psi"."""
     return [
         each for each in _NOT_A_WORD.sub(" ", text).split() if any(char.isalnum() for char in each)
     ]

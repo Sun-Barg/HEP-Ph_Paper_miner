@@ -117,8 +117,13 @@ def make_sheet(folder: Path, questions: Path, runs: Path, grade_of) -> tuple[Pat
     return paths[0], paths[1]
 
 
+# The records of these tests are made by the code as it is, so they are held against the
+# conditions that name its texts, not against those of the evaluation.
+NOW = ["--conditions", "revised"]
+
+
 def reported(questions: Path, runs: Path, *more: str, capsys) -> str:
-    argv = ["--questions", str(questions), "--runs", str(runs), *more]
+    argv = ["--questions", str(questions), "--runs", str(runs), *NOW, *more]
     assert report.main(argv, source=sample_source()) == 0
     return capsys.readouterr().out
 
@@ -344,3 +349,23 @@ def test_a_layout_answers_a_question_right_with_more_than_half_of_its_runs():
     assert report._majority(runs("right", "wrong")) is False  # a cell given up leaves two
     assert report._majority(runs("right", None, "right")) is None
     assert report._majority([]) is None
+
+
+def test_the_report_holds_records_against_the_conditions_of_the_evaluation_unless_told(
+    evaluated, capsys
+):
+    # The report of the evaluation is written by the command without this option, and has
+    # to come out as it was written (test_results.py). Records of the code as it is now
+    # name other tool texts, and are named for it.
+    _, questions, runs = evaluated
+    assert (
+        report.main(["--questions", str(questions), "--runs", str(runs)], source=sample_source())
+        == 0
+    )
+    text = capsys.readouterr().out
+    assert "Held against the conditions (conditions.py): 24 record(s) differ, first " in text
+    assert "toolset_version is 'staged-6', not 'staged-5'" in text or (
+        "toolset_version is 'flat-5', not 'flat-4'" in text
+    )
+    text = reported(questions, runs, capsys=capsys)
+    assert "Held against the conditions 'revised' (conditions.py): no record differs" in text
