@@ -7,4 +7,7 @@ conditions.py   what every run of the evaluation is made with, and holding a rec
 run.py          running the evaluation: every question, both layouts, in a fixed order
 sheet.py        the sheet on which a person grades the answers, blind to the layout
 report.py       the report of the evaluation: the layouts compared, question by question
+judge.py        a model as a second grader of the answers of a sheet
+agree.py        the judge held against the grades a person gave
+regress.py      the runs of a changed version held against the runs of the one before
 """
