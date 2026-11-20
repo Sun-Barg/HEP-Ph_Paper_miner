@@ -69,5 +69,8 @@ in the first five folders, `p2-tool` in `diag-3-tool/` and `p2-text` in `diag-3-
 - When these runs were made, the command handed in an answer with `format` unless it was
   told otherwise. It now does so with `tool`. To run again what a folder before
   `diag-3-tool/` ran, add `--answer-channel format` to the options in the table.
+- The runs made after the tool texts were changed (2026-11-20, `staged-6` and `flat-5`)
+  are in `../regress/`, with a README of their own. `diag-3-tool/` is what they are held
+  against.
 - A file is named after its run: `<UTC time>_<question id>_<layout>_<four random
   characters>.jsonl`.

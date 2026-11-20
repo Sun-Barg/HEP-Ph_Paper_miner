@@ -14,6 +14,7 @@ Everything listed under Status is done, and the results of the evaluation are be
 - [x] Evaluation set, graders, and the pre-registration of the evaluation
 - [x] Runs of the evaluation, grading by hand, results
 - [x] A model as a second grader, held against the grades by hand
+- [x] Tool texts changed for what the evaluation showed, and held against the runs before
 
 ## The two tool layouts
 
@@ -99,7 +100,7 @@ through them, with the tool calls that ended in an error and the limit of respon
 | Staged takes fewer input tokens | measured in 18 of the 20 questions | the two others, and what a miss costs: in eval-15 staged took 3.7 times the tokens of flat |
 | Staged answers as well as flat | not shown | the layouts agree in 19 of 20 questions, and every wrong run is staged. Twenty questions cannot show that two layouts answer equally well, and these were kept only when a reader of the full text answered them as the reference does |
 | Which difference between the layouts matters | not measured | abstracts in search results and the unit of reading change together |
-| Why staged failed in eval-15 | one observation | text that only a read of the whole section returns: one question about one paper. No run tried a changed outline |
+| Why staged failed in eval-15 | one observation | text that only a read of the whole section returns: one question about one paper. No run of the evaluation tried a changed outline; three other questions did, afterwards ([What was changed after the evaluation](#what-was-changed-after-the-evaluation)) |
 | Staged is cheaper | only for these 120 runs | $2.78 against $10.90, worked out from the usage at list prices with the API's cache on, and not read from the Console. The factor of 3.9 belongs to the cache: the same tokens at the plain input price are $5.00 against $10.49, a factor of 2.1 (`results/README.md`). In eval-15 the two layouts cost the same |
 | A model as judge gives the grades by hand | measured on the 118 answers, where a judge that calls every answer right would agree on 117 | the judge is the model that gave the answers, and it thought before a quarter of its replies. On row 86, the one answer graded wrong, its first request of three said right |
 | That judge tells a wrong answer | measured on 91 controls, each called wrong in all three requests | the controls are made up: wrong answers of these kinds, not the wrong answers a model gives, of which the sheet holds one. The controls of a question come from one row |
@@ -358,11 +359,22 @@ second, and `eval.run` holds its runs against the conditions that name the code.
 
 The twenty questions of the evaluation were not run again with the new texts: that
 would check a change on the questions that suggested it. Instead the five development
-questions are run again and held against the runs the conditions were fixed with, by
+questions were run again and held against the runs the conditions were fixed with, by
 criteria that were written down before those runs (`eval/regress.py`), and three
-questions written for the changed outline (`eval_data/questions_target.jsonl`) are run
-with the texts before and after. Those runs are not all made yet, and nothing is
-claimed for the change here.
+questions written for the changed outline (`eval_data/questions_target.jsonl`) were run
+with the texts before and after. All of it was run on 2026-11-20, with the model and
+the settings of the evaluation. The records are in `results/runs/regress/`, and the
+README of that folder goes through them.
+
+| Claim | Strength | What it does not cover |
+|---|---|---|
+| With the new texts the development runs do what they did before | not shown: the comparison failed, by two of the five criteria fixed before the runs | Two of the thirty runs, both of dev-02, ended their turn with the answer written as text, without the call that hands it in, as one run of the evaluation had. One answer to dev-03 is now left to a person by the rule, which had called every answer to it right before; the judge calls it right. The three other criteria held |
+| The new texts make a run end without handing in its answer | not shown, either way | dev-02 was asked again, ten times with each layout by the code before the change and by the code after it: 0 of 20 runs ended so before, and 0 of 20 after. Forty runs show a large difference only. How the count would be read was fixed before those runs, but outside this repository |
+| The new outline leads a model to the text a section has of its own | shown on three questions written for it: the passage was given in 8 of 9 staged runs, against 4 of 9 with the texts before | The Claude session that wrote the change drafted the questions, about one paper and two pieces of its text, and the answers were not graded. Nothing about questions in general, and nothing about eval-15, which was not asked again |
+
+This is not "the new texts are better". The comparison failed by criteria that were
+fixed in advance, and it stays failed. The new texts were left as they are: the runs
+made to tell whether they were the cause did not show that they were.
 
 ## Checking a question file
 

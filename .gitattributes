@@ -2,3 +2,8 @@
 # Section sizes (character counts) and result hashes are part of the run records,
 # so the same file has to be the same bytes on Windows and on Linux.
 * text=auto eol=lf
+
+# Two files are kept byte for byte. The record of the judge beside them names the sheet
+# by the SHA-256 it had on the computer that made it, and the csv module ends a row
+# with CRLF: turned into LF, the sheet would no longer be the file the judge read.
+results/runs/regress/*.csv -text

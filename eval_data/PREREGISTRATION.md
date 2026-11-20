@@ -234,3 +234,40 @@ reads the records, the sheet and the key.
   checks of the commands that no model reads: `eval.run` now shows the traceback of a
   run that died, and `eval.judge` refuses to start from code whose state git cannot
   tell.
+- **2026-11-20, the tool texts were changed after the runs, under new names.** Nothing
+  above changes: no count of `results/report.md` moves, and the records of the
+  evaluation stay held against the conditions of Section 2. Commit `1b2baa3` changes
+  what a model reads and what a tool answers in four places. A call that holds an
+  argument its tool does not have comes back as an error, and `read_section` and
+  `read_paper` take an `end` (the SDK had dropped such an argument without a word, and
+  four calls in the records of the evaluation carried one). The outline shows how much
+  text a section has before its first subsection, which is where the passage of
+  eval-15 stands. The description of the search says that small words are left out.
+  And the search parts a word at an underscore. The texts have the names `staged-6` and `flat-5`. `eval/conditions.py`
+  keeps the conditions of Section 2 as they were and names beside them what the code
+  has now.
+- The questions of the evaluation were not asked again with the new texts, and nothing
+  is claimed for those texts on them: these questions are what suggested the change.
+  Two other things were run on 2026-11-20, with the model and the settings of Section
+  2. The five development questions were asked again and held against the thirty runs
+  the conditions were fixed with, by five criteria that `eval/regress.py` names, written
+  in the commit before the change (`e66a854`) and before any such run. And three
+  questions whose passage stands in such text of a section
+  (`eval_data/questions_target.jsonl`, SHA-256 beginning `63e37b9575d564b7`, in the same
+  commit) were asked by the code before the change and by the code after it, to be
+  counted and neither passed nor failed. The Claude session that wrote the change
+  drafted the three, and the maintainer reviewed them.
+- The comparison failed. Two of the thirty runs, one of each layout of dev-02, ended
+  their turn with text and no call of `submit_answer` (criterion 1, and criterion 3,
+  since no answer is wrong by the rule), and one answer to dev-03 is left to a person
+  by the rule, which had called every answer to it right before (criterion 3). The
+  three other criteria held. A
+  measurement was added after that result: dev-02 again, ten times with each layout by
+  the code before the change and by the code after it. How its count would be read was
+  written down before it, in the notes of the work and not in this repository: "more
+  often after the change" only for a one-sided Fisher test below 0.05. No run of the
+  twenty before ended without an answer, and none of the twenty after, so no difference
+  is shown; forty runs show a large one only. The texts were not changed again, and
+  the comparison stays failed. On the three target questions the passage was given in
+  4 of the 9 staged runs before the change and in 8 of 9 after it. The records, and
+  what can and cannot be said of them, are in `results/runs/regress/`.

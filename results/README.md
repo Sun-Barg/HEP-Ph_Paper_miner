@@ -11,6 +11,7 @@ runs that went wrong.
 | `grading-key.csv` | which run each row of the sheet stands for |
 | `report.md` | the report that `eval.report` wrote from the three: every table, question by question |
 | `runs/dev/` | the records of the runs on the development questions, with a README of their own. Nothing there is a result of the evaluation |
+| `runs/regress/` | the records of the runs made on 2026-11-20, after the tool texts were changed, and what was made from them, with a README of their own. Nothing there is a result of the evaluation |
 | `judge/` | a model as a second grader: its one run on the 118 answers and on 91 controls made to be wrong (`eval-j2.jsonl`, 2026-11-19, by `9711ca5`), the report that `eval.agree` wrote from it (`report.md`), and its two runs on the development answers. The grades by hand stay the verdicts; the README of the repository says what this shows and what it does not, and `tests/test_agree.py` holds the files against each other |
 
 `eval_data/PREREGISTRATION.md` says what was measured and how each hypothesis is read,
@@ -51,9 +52,12 @@ responses. They took 3.7 times the input tokens of the flat runs (medians 251,33
 runs is the same in both layouts ($0.51).
 
 Every section of this paper that has subsections begins with such text, 292 to 1,804
-characters of it. The tool texts are fixed with the conditions, so nothing was changed.
-A later version could show in the outline how much text a section has of its own, or let
-that text be read by itself. Neither was tried, so whether it helps is not known.
+characters of it. The tool texts are fixed with the conditions, so nothing was changed
+while the evaluation ran. Afterwards they were (`staged-6`): the outline now shows how
+much text a section has of its own, and a read can stop where that text ends. eval-15
+was not asked again, so whether its runs would have gone differently is not known.
+Three questions written for such text were asked before and after the change
+(`runs/regress/README.md`).
 
 ### eval-13, third run: an answer written as text
 
@@ -66,7 +70,10 @@ that rule, the maintainer read the text of that response on 2026-11-18, knowing 
 run it was, and graded it by the note of the question: right. By that reading, what
 failed in this run is how the answer was handed in. The text is kept outside this
 repository. It is one run of 120; none of the thirty runs of the third diagnosis
-(`runs/dev/README.md`) ended this way.
+(`runs/dev/README.md`) ended this way. Two of the thirty runs made on the development
+questions after the tool texts were changed did, both of one question; none of forty
+more runs of that question did, twenty with the texts of the evaluation and twenty with
+the changed ones (`runs/regress/README.md`).
 
 ## Tool calls that ended in an error
 
