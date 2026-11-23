@@ -72,5 +72,8 @@ in the first five folders, `p2-tool` in `diag-3-tool/` and `p2-text` in `diag-3-
 - The runs made after the tool texts were changed (2026-11-20, `staged-6` and `flat-5`)
   are in `../regress/`, with a README of their own. `diag-3-tool/` is what they are held
   against.
+- The runs made after the loop began to ask for the call (2026-11-23, prompt `p3-tool`)
+  are in `../asking-again/`, with a README of their own. They are held against the
+  runs of `../regress/dev-after/`.
 - A file is named after its run: `<UTC time>_<question id>_<layout>_<four random
   characters>.jsonl`.

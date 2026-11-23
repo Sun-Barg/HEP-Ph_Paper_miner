@@ -50,9 +50,14 @@ SETS = {
     "dev02-after": (DEV, CHANGE, REVISED, 10, ("dev-02",), 20, ("08:01", "08:06")),
 }
 
-# Every folder of records that the repository keeps: the evaluation, the sets of
-# development runs, and the five sets above. Named and not looked for, as DEV_SETS is.
-KEPT = ("eval", *(f"dev/{name}" for name in DEV_SETS), *(f"regress/{name}" for name in SETS))
+# Every folder of records that the repository held when these runs were written up: the
+# evaluation, the sets of development runs, and the five sets above. Named and not looked
+# for, as DEV_SETS is.
+THEN = ("eval", *(f"dev/{name}" for name in DEV_SETS), *(f"regress/{name}" for name in SETS))
+# And every folder it keeps now. The last was made on 2026-11-23 by a loop that asks for
+# the call when a turn ends without it (tests/test_asking_again_results.py).
+ASKING = "asking-again/dev-after"
+KEPT = (*THEN, ASKING)
 
 
 def records(folder: str) -> list[Attempt]:
@@ -382,8 +387,11 @@ def test_of_the_runs_that_hand_in_with_the_tool_one_before_the_change_ended_with
     old, new = EVALUATION["toolset_version"].values(), REVISED["toolset_version"].values()
     ended: Counter = Counter()
     with_the_tool: Counter = Counter()
-    # "Every run in this repository" is every run of the folders it keeps. Whatever else
-    # lies under results/runs in a checkout is not counted.
+    without_the_call: Counter = Counter()
+    # "Every run that this repository held then" is every run of the folders it kept when
+    # the README of this folder was written (THEN), and "every run in this repository"
+    # every run of the folders it keeps (KEPT). Whatever else lies under results/runs in
+    # a checkout is not counted.
     for folder in KEPT:
         runs = counted(attempts_in(RUNS / folder))
         assert runs, folder
@@ -393,10 +401,18 @@ def test_of_the_runs_that_hand_in_with_the_tool_one_before_the_change_ended_with
             texts = attempt.run["toolset_version"]
             assert (texts in old) != (texts in new), attempt.run["run_id"]
             with_the_tool[folder] += 1
+            # A loop that asks for the call says in the record whether it asked. The
+            # runs of ASKING were made by such a loop, and no run of a folder before.
+            assert ("asked_again" in attempt.end) == (folder == ASKING), attempt.run["run_id"]
+            if folder == ASKING:
+                without_the_call[folder] += attempt.end["asked_again"] is not None
+                assert attempt.end["reason"] == "answered" and texts in new
+                continue
+            without_the_call[folder] += attempt.end["reason"] == "no_answer"
             ended["changed" if texts in new else "evaluation", attempt.end["reason"]] += 1
             if attempt.end["reason"] == "no_answer" and texts in old:
                 assert str(cell) == "eval-13 staged 3"
-    # The 188 are the first four of these folders, the 68 the last three.
+    # The 188 are the first four of these folders, the 68 the three after them.
     assert with_the_tool == {
         "eval": 120,
         "dev/diag-3-tool": 30,
@@ -405,6 +421,7 @@ def test_of_the_runs_that_hand_in_with_the_tool_one_before_the_change_ended_with
         "regress/dev-after": 30,
         "regress/target-after": 18,
         "regress/dev02-after": 20,
+        ASKING: 30,
     }
     assert ended == {
         ("evaluation", "answered"): 186,
@@ -413,10 +430,16 @@ def test_of_the_runs_that_hand_in_with_the_tool_one_before_the_change_ended_with
         ("changed", "answered"): 66,
         ("changed", "no_answer"): 2,
     }
+    # (The plus leaves out the folders that have no such run.)
+    assert +without_the_call == {"eval": 1, "regress/dev-after": 2}
     # "3 of the 256 runs": what the README says of a turn that ends without the call,
-    # where it tells why thirty new runs will hardly meet one.
-    without = sum(number for (_, reason), number in ended.items() if reason == "no_answer")
-    assert (without, sum(ended.values())) == (3, 256)
+    # where it tells why thirty new runs would hardly meet one.
+    then = sum(with_the_tool[folder] for folder in THEN)
+    assert (sum(without_the_call[folder] for folder in THEN), then) == (3, 256)
+    assert then == sum(ended.values())
+    # "286 such runs, and still three with such a turn": with the thirty made since, in
+    # none of which the loop had to ask.
+    assert (sum(without_the_call.values()), sum(with_the_tool.values())) == (3, 286)
 
 
 # --- the three target questions -----------------------------------------------------------

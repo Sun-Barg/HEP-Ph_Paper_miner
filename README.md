@@ -15,7 +15,7 @@ Everything listed under Status is done, and the results of the evaluation are be
 - [x] Runs of the evaluation, grading by hand, results
 - [x] A model as a second grader, held against the grades by hand
 - [x] Tool texts changed for what the evaluation showed, and held against the runs before
-- [ ] The loop asks for an answer that was written and not handed in; its runs are not made yet
+- [x] The loop asks for an answer that was written and not handed in, tried on two such ends
 
 ## The two tool layouts
 
@@ -404,9 +404,23 @@ has the message and where the loop does not ask). The message belongs to the pro
 which is `p3-tool` now, and `conditions.py` names a third set of conditions for it
 (`ASKING_AGAIN`: `REVISED` with that prompt and nothing else).
 
-The runs with the new prompt are not made yet. What they will be held against was
-written down with the change, before any of them:
+What would be run with the new prompt, and how it would be read, was written down with
+the change (`0af1c02`), before any of it. Both things were run on 2026-11-23. The
+records are in `results/runs/asking-again/`, and the README of that folder goes through
+them.
 
+- **The two ends of dev-02, sent again.** A turn had ended this way in about one run in
+  a hundred (3 of the 256 runs that this repository then held, of those that count and
+  hand in with the tool), so thirty new runs would most likely not meet the message at
+  all. `eval.replay` builds the conversation of each of the two runs again from its
+  private record, puts the reply and the message at its end as the loop now would, and
+  sends that request ten times. Written down before the requests: when eighteen or more
+  of the twenty responses hand in an answer by the call, the message is said to have
+  got the answer handed in at these two ends; with fewer it is said not to have, and
+  another way to get such an answer is tried. A response that asks for other tools
+  instead counts against the message, although a run of the loop might have ended with
+  an answer after it. Eighteen is nine in ten, a choice made before the requests.
+  **All twenty responses handed in an answer**, ten of each conversation.
 - **The development questions again.** Thirty runs, held against the thirty of
   2026-11-20 that were made with the same tool texts (`results/runs/regress/dev-after`),
   by `eval.regress --criteria 2`: the five criteria as before, with the third as "the
@@ -415,23 +429,20 @@ written down with the change, before any of them:
   answer is wrong is what the fourth criterion asks. The comparison of that day stays
   as it was written, by the first set. An answer that is handed in after the loop
   asked is an answer; the text of the comparison names the runs in which the loop
-  asked and how each of them ended.
-- **The two ends of dev-02, sent again.** A turn ends this way in about one run in a
-  hundred (3 of the 256 runs in this repository that count and hand in with the tool),
-  so thirty new runs will most likely not meet the message at all. `eval.replay` builds the
-  conversation of each of the two runs again from its private record, puts the reply
-  and the message at its end as the loop now would, and sends that request ten times.
-  When eighteen or more of the twenty responses hand in an answer by the call, the
-  message is said to have got the answer handed in at these two ends. With fewer it is
-  said not to have, and another way to get such an answer is tried. A response that
-  asks for other tools instead counts against the message, although a run of the loop
-  might have ended with an answer after it. Eighteen is nine in ten, a choice made
-  before the requests.
+  asked and how each of them ended. **All five criteria held**, and every run ended
+  with an answer. **The loop asked in none of the thirty runs**: no turn of them ended
+  without the call, and the text of the comparison names no run.
 
-Either way this stays small: two conversations of one question sent again, and thirty
-runs that may never meet the case. It says nothing of how often a run ends this way.
-The run of the evaluation that ended so is not sent again, and the twenty questions of
-the evaluation are not run with the new prompt.
+| Claim | Strength | What it does not cover |
+|---|---|---|
+| Asked for the call after a turn that held the answer as text, the model hands the answer in | shown at the two ends of dev-02: 20 of 20 responses, where 18 had been fixed as enough | Two conversations of one question, each sent ten times as one request and not as a run. Nothing about how often a turn ends this way, and nothing about an end that looks different: the end of eval-13 was not sent. Nobody graded the twenty answers; the rule finds nothing missing in any of them and leaves each to a person, as it does every answer to dev-02 |
+| With the new prompt the development runs do what they did before | shown: the comparison passed, by the five criteria of the second set, which was fixed before the runs | The loop asked in none of these runs, so they say nothing of the message. A run that is not asked reads the same texts as a run before the change, so that all thirty ended with an answer, where two of the thirty before had not, is no effect of the change. The judge stands in for a person in the fourth criterion, since nobody graded the sheet |
+| The loop gets an answer out of a run that would have ended without one | not shown by a run | No run with the model behind it has been asked by the loop yet. What stands for it is the twenty requests, a test that holds the request the loop sends after it has asked to be the request that was sent in them, and tests of the loop with replies that are made up |
+
+This stays small: two conversations of one question sent again, and thirty runs that
+never met the case. It says nothing of how often a run ends this way. The run of the
+evaluation that ended so is not sent again and stays a run without an answer, and the
+twenty questions of the evaluation are not run with the new prompt.
 
 ## Checking a question file
 

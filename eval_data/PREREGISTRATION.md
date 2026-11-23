@@ -288,3 +288,13 @@ reads the records, the sheet and the key.
   README ("An answer that was written and not handed in"), in `eval/regress.py` (the
   second set of criteria) and in `eval/replay.py` (twenty requests, and the eighteen
   that decide how they are read).
+- Both were run on 2026-11-23, from that commit (`0af1c02`). All twenty responses handed
+  in an answer by the call, ten of each of the two conversations, where eighteen had
+  been fixed as enough: the message got the answer handed in at these two ends, and no
+  other way was tried. The thirty runs of the development questions passed, by the five
+  criteria of the second set, held against the thirty of 2026-11-20 with the same tool
+  texts; every run ended with an answer. The loop asked in none of the thirty, since no
+  turn of them ended without the call. So no run has yet been asked by the loop, and
+  what is shown of the message is the twenty requests: two conversations of one
+  question. The records, and what can and cannot be said of them, are in
+  `results/runs/asking-again/`.

@@ -12,6 +12,7 @@ runs that went wrong.
 | `report.md` | the report that `eval.report` wrote from the three: every table, question by question |
 | `runs/dev/` | the records of the runs on the development questions, with a README of their own. Nothing there is a result of the evaluation |
 | `runs/regress/` | the records of the runs made on 2026-11-20, after the tool texts were changed, and what was made from them, with a README of their own. Nothing there is a result of the evaluation |
+| `runs/asking-again/` | what was run on 2026-11-23, after the loop began to ask for the call when a turn ends without it: twenty requests that sent the end of two such runs again, the records of the development questions run once more, and what was made from them, with a README of their own. Nothing there is a result of the evaluation |
 | `judge/` | a model as a second grader: its one run on the 118 answers and on 91 controls made to be wrong (`eval-j2.jsonl`, 2026-11-19, by `9711ca5`), the report that `eval.agree` wrote from it (`report.md`), and its two runs on the development answers. The grades by hand stay the verdicts; the README of the repository says what this shows and what it does not, and `tests/test_agree.py` holds the files against each other |
 
 `eval_data/PREREGISTRATION.md` says what was measured and how each hypothesis is read,
@@ -73,7 +74,9 @@ repository. It is one run of 120; none of the thirty runs of the third diagnosis
 (`runs/dev/README.md`) ended this way. Two of the thirty runs made on the development
 questions after the tool texts were changed did, both of one question; none of forty
 more runs of that question did, twenty with the texts of the evaluation and twenty with
-the changed ones (`runs/regress/README.md`).
+the changed ones (`runs/regress/README.md`). The loop has since been changed to ask for
+the call when a turn ends this way (`runs/asking-again/README.md`). This run was made
+before that, and stays a run without an answer.
 
 ## Tool calls that ended in an error
 

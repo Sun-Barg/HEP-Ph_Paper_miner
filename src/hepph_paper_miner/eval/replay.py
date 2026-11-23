@@ -4,9 +4,10 @@
         --repeats 10 --out results/runs/asking-again/replay-dev-02.jsonl
 
 Since the prompt p3-tool the loop asks for the call that hands in the answer when a turn
-ends without it (agent/loop.py). Runs seldom end that way: three of the 256 runs in this
-repository that hand in with the tool and count. So thirty runs made anew will most
-likely not meet the message at all, and say nothing of what it does.
+ends without it (agent/loop.py). Runs seldom end that way: three of the 256 runs that
+this repository held when the loop was changed, of those that hand in with the tool and
+count. So thirty runs made anew will most likely not meet the message at all, and say
+nothing of what it does.
 
 This command makes the case happen. It takes runs that did end their turn without the
 call, builds the conversation of each again from its private record, as the loop had
@@ -29,7 +30,7 @@ eighteen or more of the twenty are "handed in", the message is said to have got 
 answer handed in at these two ends. With fewer it is said not to have, and another way
 to get such an answer is tried. Eighteen is nine in ten, a choice made before the
 requests; "asked on" counts against the message, although a run of the loop might still
-have ended with an answer.
+have ended with an answer. (What came back is in results/runs/asking-again/README.md.)
 
 What this can show is small. It is two conversations of one question, sent again; it
 says nothing of how often a run ends this way, or of an end that looks different. The

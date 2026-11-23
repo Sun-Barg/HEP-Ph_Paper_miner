@@ -90,11 +90,12 @@ Forty runs show a large difference only. If one run in three with the changed te
 ended without the call, as two of the first six of dev-02 did, twenty in a row with an
 answer would come about 3 times in 10,000. If one run in twenty did, it would come once
 in three times. So the changed texts do not make a third of these runs fail, and
-whether they make a few in a hundred fail is not known. Over every run in this
-repository that counts and hands in its answer with the tool, 1 of 188 ended without
-the call with the texts of the evaluation (eval-13) and 2 of 68 with the changed ones.
-The two sets differ in their questions and in their days, so those two rates are not a
-comparison.
+whether they make a few in a hundred fail is not known. Over every run that this
+repository held then, of those that count and hand in their answer with the tool, 1 of
+188 ended without the call with the texts of the evaluation (eval-13) and 2 of 68 with
+the changed ones. The two sets differ in their questions and in their days, so those
+two rates are not a comparison. (Thirty more runs with the changed texts were made on
+2026-11-23, by a loop that asks for the call: `../asking-again/`.)
 
 ## The three target questions: shown
 
