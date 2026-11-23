@@ -19,7 +19,7 @@ from pathlib import Path
 from statistics import median
 
 import pytest
-from test_results import OWN, cost, input_tokens, own_paper, read_from_cache
+from test_results import DEV_SETS, OWN, cost, input_tokens, own_paper, read_from_cache
 
 from hepph_paper_miner.agent.origin import file_digest
 from hepph_paper_miner.eval import judge, regress
@@ -49,6 +49,10 @@ SETS = {
     "dev02-before": (DEV, BEFORE_IT, EVALUATION, 10, ("dev-02",), 20, ("07:50", "07:54")),
     "dev02-after": (DEV, CHANGE, REVISED, 10, ("dev-02",), 20, ("08:01", "08:06")),
 }
+
+# Every folder of records that the repository keeps: the evaluation, the sets of
+# development runs, and the five sets above. Named and not looked for, as DEV_SETS is.
+KEPT = ("eval", *(f"dev/{name}" for name in DEV_SETS), *(f"regress/{name}" for name in SETS))
 
 
 def records(folder: str) -> list[Attempt]:
@@ -377,15 +381,31 @@ def test_asked_again_no_run_of_dev_02_ended_without_an_answer_before_or_after_th
 def test_of_the_runs_that_hand_in_with_the_tool_one_before_the_change_ended_without_the_call():
     old, new = EVALUATION["toolset_version"].values(), REVISED["toolset_version"].values()
     ended: Counter = Counter()
-    for folder in sorted(path for path in RUNS.rglob("*") if path.is_dir()):
-        for cell, attempt in counted(attempts_in(folder)).items():
+    with_the_tool: Counter = Counter()
+    # "Every run in this repository" is every run of the folders it keeps. Whatever else
+    # lies under results/runs in a checkout is not counted.
+    for folder in KEPT:
+        runs = counted(attempts_in(RUNS / folder))
+        assert runs, folder
+        for cell, attempt in runs.items():
             if attempt.run.get("answer_channel") != "tool":
                 continue
             texts = attempt.run["toolset_version"]
             assert (texts in old) != (texts in new), attempt.run["run_id"]
+            with_the_tool[folder] += 1
             ended["changed" if texts in new else "evaluation", attempt.end["reason"]] += 1
             if attempt.end["reason"] == "no_answer" and texts in old:
                 assert str(cell) == "eval-13 staged 3"
+    # The 188 are the first four of these folders, the 68 the last three.
+    assert with_the_tool == {
+        "eval": 120,
+        "dev/diag-3-tool": 30,
+        "regress/target-before": 18,
+        "regress/dev02-before": 20,
+        "regress/dev-after": 30,
+        "regress/target-after": 18,
+        "regress/dev02-after": 20,
+    }
     assert ended == {
         ("evaluation", "answered"): 186,
         ("evaluation", "no_answer"): 1,

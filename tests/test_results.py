@@ -57,6 +57,12 @@ REPORT = ROOT / "results" / "report.md"
 
 OWN = "2610.26648v1"  # the maintainer's paper: the one whose text is in this repository
 
+# The sets of development runs, each a folder of results/runs/dev. They are named here and
+# not looked for: a checkout can hold folders of records that the repository does not keep
+# (an old copy, or the rehearsal that the README shows how to make), and what is said of
+# the records of the repository must not move with them.
+DEV_SETS = ("first-run", "pilot-1", "pilot-2", "diag-1", "diag-2", "diag-3-tool", "diag-3-text")
+
 
 @pytest.fixture(scope="module")
 def questions() -> tuple[Question, ...]:
@@ -456,7 +462,8 @@ def test_no_search_in_the_records_was_answered_with_the_error_feed_of_arxiv():
     # Until e13cb0d the error feed in its https form was read as a search: one entry
     # counted, no paper shown. The names of the tool texts were kept through that change
     # because no recorded run met it (README, pre-registration Section 10).
-    folders = [RUNS, *sorted(path for path in (RUNS.parent / "dev").iterdir() if path.is_dir())]
+    folders = [RUNS, *(RUNS.parent / "dev" / name for name in DEV_SETS)]
+    assert all(any(folder.glob("*.jsonl")) for folder in folders)
     lines = [
         json.loads(line)
         for folder in folders
