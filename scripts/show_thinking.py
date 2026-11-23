@@ -11,8 +11,9 @@ For every turn this prints what the API counted, the summary of each thinking bl
 and each tool call with its arguments and the facts of the first line of its result.
 It also prints the text of a response that was not read as the answer of the run: a
 run made with --no-answer-format ends with such a text, and so can a run that was to
-call the answer tool or to write JSON (--answer-channel). It prints no text that a tool
-returned. A summary of thinking and a text are the model's own wording and can quote
+call the answer tool or to write JSON (--answer-channel). Where the loop asked again
+for the call of the answer tool after such a text, a line says so. It prints no text
+that a tool returned. A summary of thinking and a text are the model's own wording and can quote
 a few words of a paper, so the output is something to read and to show, and not
 something to commit.
 """
@@ -98,6 +99,9 @@ def render(public: list[dict[str, Any]], private: list[dict[str, Any]] | None) -
                     + (f" [{tool['error_kind']}]" if tool.get("error_kind") else "")
                     + (f", {tool['result_chars']} chars, {facts}" if "result_chars" in tool else "")
                 )
+            if line.get("asked_again"):
+                # The turn ended without the call that hands in the answer (agent/loop.py).
+                lines.append("   then: the loop asked again for the call of the answer tool")
         elif line["record"] == "end":
             answer = line.get("answer") or {}
             cited = "; ".join(

@@ -305,7 +305,9 @@ class Runner:
         spoilt = f" | spoilt: {attempt.spoilt}" if attempt.spoilt else ""
         reason, turns = end.get("reason", "no last line"), end.get("turns", "?")
         chars = end.get("tool_result_chars", "?")
-        self.say(f"{number} {cell} | {reason} | {turns} turn(s) | {chars} chars{spoilt}")
+        # The loop asked for the call that hands in the answer (agent/loop.py).
+        asked = " | asked again" if end.get("asked_again") else ""
+        self.say(f"{number} {cell} | {reason}{asked} | {turns} turn(s) | {chars} chars{spoilt}")
         if self.failures_in_a_row >= API_FAILURES_IN_A_ROW:
             detail = end.get("detail", "")[:300]
             raise Stop(f"the API failed {self.failures_in_a_row} runs in a row: {detail}")
@@ -440,7 +442,8 @@ def main(argv: Sequence[str] | None = None, launch: Launch | None = None) -> int
             raise Stop("files the repository keeps have been changed, so no commit names this code")
         named = conditions_of_the_code()
         texts = ", ".join(CONDITIONS[named]["toolset_version"].values())
-        print(f"conditions {named} | tool texts {texts}")
+        prompt = CONDITIONS[named]["prompt_version"]
+        print(f"conditions {named} | tool texts {texts} | prompt {prompt}")
         if not os.environ.get("ANTHROPIC_API_KEY"):
             raise Stop("ANTHROPIC_API_KEY is not set in this shell")
         check_folder(attempts, digest, code, arguments.allow_other_code)

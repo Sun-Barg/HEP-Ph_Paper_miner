@@ -134,6 +134,29 @@ def test_an_answer_the_rule_called_right_before_has_to_be_right_by_the_rule_now(
     assert criteria(before, after, CELLS)[2].state == PASSED
 
 
+def test_the_second_set_asks_of_the_rule_only_that_it_calls_no_answer_wrong():
+    # What failed the third criterion on 2026-11-20 beside the two runs without an
+    # answer: an answer the rule had called right in every run before and leaves to a
+    # person now. Whether such an answer is wrong is what the fourth criterion asks.
+    after = a_side(**{"q-1 flat 1": {"rule": BY_HAND, "by_judge": RIGHT}})
+    assert criteria(a_side(), after, CELLS)[2].state == FAILED
+    assert criteria(a_side(), after, CELLS, "1")[2].state == FAILED
+    assert [finding.state for finding in criteria(a_side(), after, CELLS, "2")] == [PASSED] * 5
+    # An answer the rule calls wrong fails it in the second set as in the first,
+    wrong = a_side(**{"q-1 flat 1": {"rule": WRONG}})
+    for which in regress.SETS:
+        third = criteria(a_side(), wrong, CELLS, which)[2]
+        assert (third.state, third.lines) == (
+            FAILED,
+            ("q-1 flat 1: the rule calls the answer wrong",),
+        )
+    # and one left to a person that the judge calls wrong waits for a person, as before.
+    waits = a_side(**{"q-1 flat 1": {"rule": BY_HAND, "by_judge": WRONG}})
+    states = [finding.state for finding in criteria(a_side(), waits, CELLS, "2")]
+    assert states == [PASSED, PASSED, PASSED, OPEN, PASSED]
+    assert regress.SETS == ("1", "2")
+
+
 def test_the_fifth_criterion_holds_the_medians_of_the_two_layouts_against_each_other():
     # One staged run that was given more than a flat one does not move the median.
     assert states(a_side(**{"q-1 staged 1": {"chars": 200_000}}))[4] == PASSED
@@ -223,6 +246,38 @@ def test_the_text_ends_in_one_word_for_each_way_of_reading():
     assert "- q-1: 0 of 3 before, 3 after" in text and "passed" not in text
 
 
+def test_the_text_names_the_runs_that_the_loop_asked_again_for_the_call():
+    # Records of a loop that could not ask say nothing of it, and neither does the text.
+    text, _ = text_of(["Head."], a_side(), a_side(), CELLS, targets=False)
+    assert "asked again" not in text
+    # Records that say whether it asked: here it asked in none,
+    said_so = {str(cell): {"asks": True} for cell in CELLS}
+    text, said = text_of(["Head."], a_side(), a_side(**said_so), CELLS, targets=False)
+    assert said == PASSED
+    assert "held against the runs before: passed.\n\nNo run after was asked again" in text
+    # and here in two. An answer that was handed in then is an answer: it fails nothing.
+    said_so["q-2 flat 2"] = {"asks": True, "asked_again": 2}
+    text, said = text_of(["Head."], a_side(), a_side(**said_so), CELLS, targets=False)
+    assert said == PASSED
+    assert "\n\nAsked again for the call, after: q-2 flat 2 (then answered).\n" in text
+    # A run that ended without the call a second time is a run without an answer.
+    said_so["q-1 staged 3"] = {
+        "asks": True,
+        "asked_again": 4,
+        "reason": "no_answer",
+        "rule": WRONG,
+    }
+    text, said = text_of(["Head."], a_side(), a_side(**said_so), CELLS, targets=False)
+    assert said == FAILED and "    - q-1 staged 3: ended as no_answer\n" in text
+    assert (
+        "Asked again for the call, after: "
+        "q-2 flat 2 (then answered), q-1 staged 3 (then no_answer).\n"
+    ) in text
+    # Read as target questions the text says it too, and nothing passes or fails.
+    text, said = text_of(["Head."], a_side(), a_side(**said_so), CELLS, targets=True)
+    assert said == NOT_SHOWN and "Asked again for the call, after: q-2 flat 2" in text
+
+
 # --- the two sides -----------------------------------------------------------------------
 
 
@@ -252,6 +307,18 @@ def test_two_sides_can_be_compared_when_only_tool_texts_and_code_differ():
     slower = [replace(a, run={**a.run, "model": {**a.run["model"], "effort": "low"}}) for a in tool]
     with pytest.raises(RegressError, match="the two sides differ in model"):
         comparable(tool, slower)
+
+
+def test_two_sides_may_differ_in_the_prompt_of_the_loop_as_in_the_tool_texts():
+    # The prompt holds the message of the loop, and a changed message is a change like
+    # one to a tool text: the runs after are held against the runs before it.
+    tool = runs_in("diag-3-tool")
+    asking = [replace(a, run={**a.run, "prompt_version": "p3-tool"}) for a in tool]
+    before, after = comparable(tool, asking)
+    assert (before["prompt_version"], after["prompt_version"]) == ("p2-tool", "p3-tool")
+    # Each side still has one prompt: runs of two are runs of two versions.
+    with pytest.raises(RegressError, match="the runs after do not name one prompt_version"):
+        comparable(tool, asking[:15] + tool[15:])
 
 
 # --- the command, on the records of the repository ---------------------------------------
@@ -295,6 +362,46 @@ def test_the_runs_the_conditions_rest_on_held_against_themselves(capsys):
         "| dev-03 | staged | before | 3 / 3 | ? | 3 right | 4 5 4 | 9,758 | $0.11 | 1 1 1 |" in text
     )
     assert "3 invalid_arguments" in text and "has changed since" not in text
+
+
+def with_another_prompt(tmp_path, asked: str) -> Path:
+    """The thirty runs again, as a loop that can ask would have recorded them.
+
+    Every record names the prompt p3-tool and says in its last line whether the loop
+    asked again. It did in the runs whose file name holds `asked`, after the first response.
+    """
+    folder = tmp_path / "after"
+    folder.mkdir()
+    for path in sorted((RUNS / "diag-3-tool").glob("*.jsonl")):
+        first, *turns, end = (json.loads(line) for line in path.read_text("utf-8").splitlines())
+        first["prompt_version"] = "p3-tool"
+        end = {**end, "asked_again": 1 if asked in path.name else None}
+        lines = [json.dumps(line) for line in (first, *turns, end)]
+        (folder / path.name).write_text("\n".join(lines) + "\n", "utf-8")
+    return folder
+
+
+def test_runs_with_another_prompt_are_held_against_the_runs_before_it(capsys, tmp_path):
+    after = with_another_prompt(tmp_path, asked="_dev-02_flat_")
+    sides = [*SIDES[:4], "--after", str(after)]
+    code, text, _ = run(capsys, *sides, *GRADED, "--criteria", "2")
+    head = text.splitlines()[1:4]
+    # The prompt is named, because the sides differ in it, and so is the set of criteria.
+    assert head[0].endswith("; 30 runs; tool texts staged-5, flat-4; prompt p2-tool; code 9d8024c")
+    assert head[1].endswith("; 30 runs; tool texts staged-5, flat-4; prompt p3-tool; code 9d8024c")
+    assert head[2] == "Criteria: the second set (3 asks only that the rule calls no answer wrong)"
+    assert code == 1 and "held against the runs before: not decided." in text  # dev-03's paper
+    # Three runs of dev-02 with the flat layout were made in that folder.
+    said = "Asked again for the call, after: " + ", ".join(
+        f"dev-02 flat {n} (then answered)" for n in (1, 2, 3)
+    )
+    assert f"\n\n{said}.\n\n| question |" in text
+    # With the first set, which is the default, the text does not name a set.
+    code, text, _ = run(capsys, *sides, *GRADED)
+    assert "Criteria:" not in text and "prompt p3-tool; code" in text
+    # Read as target questions there are no criteria to name.
+    _, text, _ = run(capsys, *sides, "--targets", "--criteria", "2")
+    assert "Criteria:" not in text
 
 
 def test_without_a_judge_the_answers_left_to_a_person_are_open(capsys):

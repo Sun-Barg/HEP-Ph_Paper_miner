@@ -10,7 +10,7 @@ from collections import Counter
 from pathlib import Path
 
 import pytest
-from conftest import asks, sample_source
+from conftest import asks, sample_source, says
 
 from hepph_paper_miner.agent import __main__ as command
 from hepph_paper_miner.agent import loop, origin
@@ -83,6 +83,8 @@ def world(monkeypatch, tmp_path):
                 raise ModelError(*CREDIT_400)
             if "flaky" in text:
                 raise ModelError("APIConnectionError", "Connection error.", None)
+            if "written" in text and self.turn == 2:
+                return says("Ten.")  # the answer as text: the loop asks for the call
             if self.turn > 1:
                 return asks(("submit_answer", ANSWER))
             seen[(text, layout)] += 1
@@ -498,12 +500,30 @@ def test_the_traceback_of_a_command_that_died_is_passed_on_and_its_answer_is_not
     assert passed_on == "Traceback (most recent call last):\nKeyError: 'turns'\n"
 
 
+def test_a_run_the_loop_asked_again_is_done_and_the_runner_says_that_it_was_asked(world):
+    folder, launch, _ = world
+    said: list[str] = []
+    state = runner(folder, file_of(folder, "written", "ok"), launch, said).run(
+        plan(["written", "ok"], 1)
+    )
+    # An answer that was handed in after the loop had asked for the call is an answer:
+    # the run is under the conditions, and its cell is done.
+    assert all(state.done(cell) for cell in state.cells)
+    ended = {line.split(" | ")[0].split("] ")[1]: line for line in said if "running" not in line}
+    for cell in ("written staged 1", "written flat 1"):
+        assert " | answered | asked again | 3 turn(s) | " in ended[cell]
+        assert state.line(Cell(*cell.rsplit(" ", 2)[:2], 1)) == f"{cell} | done (answered)"
+    for cell in ("ok staged 1", "ok flat 1"):
+        assert " | answered | 2 turn(s) | " in ended[cell]
+
+
 def test_the_command_names_the_conditions_and_holds_its_runs_against_them(world, capsys):
     folder, launch, launched = world
     questions = file_of(folder, "ok")
     out = ["--questions", str(questions), "--out", str(folder / "public")]
     assert run.main([*out, "--repeats", "1"], launch=launch) == 0
-    assert "conditions revised | tool texts staged-6, flat-5" in capsys.readouterr().out
+    said = "conditions asking-again | tool texts staged-6, flat-5 | prompt p3-tool"
+    assert said in capsys.readouterr().out
     assert len(launched) == 2
 
 

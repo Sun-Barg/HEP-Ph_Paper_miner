@@ -119,7 +119,7 @@ def make_sheet(folder: Path, questions: Path, runs: Path, grade_of) -> tuple[Pat
 
 # The records of these tests are made by the code as it is, so they are held against the
 # conditions that name its texts, not against those of the evaluation.
-NOW = ["--conditions", "revised"]
+NOW = ["--conditions", "asking-again"]
 
 
 def reported(questions: Path, runs: Path, *more: str, capsys) -> str:
@@ -162,6 +162,36 @@ def test_the_report_counts_what_each_layout_did(evaluated, capsys):
     assert cells(text, "repeat reads") == ["3", "0"]  # again-4 reads 2.1 twice, three times
     assert cells(text, "answered wrong, its paper was given but not the passage") == ["3", "0"]
     assert cells(text, "no answer: no_answer") == ["3", "0"]
+
+
+def test_the_report_counts_the_answers_that_came_after_the_loop_had_asked_again(evaluated, capsys):
+    folder, questions, runs = evaluated
+    row = "of them after the loop had asked again"
+    capsys.readouterr()
+
+    def rewritten(path: Path, change) -> None:
+        *lines, last = path.read_text("utf-8").splitlines()
+        end = json.loads(last)
+        change(end)
+        path.write_text("\n".join([*lines, json.dumps(end)]) + "\n", "utf-8")
+
+    # The loop asked in the three staged runs of silent-3, and none of them answered then.
+    asked = [json.loads(p.read_text("utf-8").splitlines()[-1]) for p in runs.glob("*_silent-3_*")]
+    assert sorted((end["reason"], end["asked_again"]) for end in asked) == [
+        *[("answered", None)] * 3,  # the flat runs
+        *[("no_answer", 2)] * 3,  # asked after the second response, and no call then either
+    ]
+    text = reported(questions, runs, capsys=capsys)
+    assert cells(text, row) == ["0", "0"]
+    assert text.index("| answered |") < text.index(f"| {row}") < text.index("| 1 search listed")
+    # One answer that did come so, as the record of its run would say it.
+    rewritten(next(runs.glob("*_good-1_flat_*.jsonl")), lambda end: end.update(asked_again=1))
+    assert cells(reported(questions, runs, capsys=capsys), row) == ["0", "1"]
+    # Records of a loop that could not ask say nothing of it, and their report has no
+    # such row: the report of the evaluation stays as it was written.
+    for path in runs.glob("*.jsonl"):
+        rewritten(path, lambda end: end.pop("asked_again"))
+    assert row not in reported(questions, runs, capsys=capsys)
 
 
 def test_h1_and_h2_are_held_up_question_by_question(evaluated, capsys):
@@ -368,4 +398,4 @@ def test_the_report_holds_records_against_the_conditions_of_the_evaluation_unles
         "toolset_version is 'flat-5', not 'flat-4'" in text
     )
     text = reported(questions, runs, capsys=capsys)
-    assert "Held against the conditions 'revised' (conditions.py): no record differs" in text
+    assert "Held against the conditions 'asking-again' (conditions.py): no record differs" in text

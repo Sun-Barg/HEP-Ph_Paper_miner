@@ -24,6 +24,7 @@ from hepph_paper_miner.agent.origin import code_version
 from hepph_paper_miner.agent.prompt import (
     ANSWER_SCHEMA,
     ANSWER_TOOL,
+    ASK_AGAIN_TEXT,
     FORMAT,
     INVALID_ANSWER_TEXT,
     SYSTEM_PROMPT,
@@ -618,12 +619,15 @@ async def test_a_call_of_the_answer_tool_is_the_answer_and_ends_the_run(client, 
     ]
 
     start, _, second, end = records(trace.public_path)
-    assert (start["prompt_version"], start["answer_channel"]) == ("p2-tool", "tool")
+    assert (start["prompt_version"], start["answer_channel"]) == ("p3-tool", "tool")
     assert start["tools"] == ["search_papers", "get_outline", "read_section", "submit_answer"]
     (handed_in,) = second["tools"]
     assert (handed_in["name"], handed_in["status"]) == ("submit_answer", "answer")
     assert handed_in["arguments"] == ANSWER and "result_chars" not in handed_in
     assert (end["reason"], end["answer"]) == ("answered", ANSWER)
+    # The loop had nothing to ask for, and the record says so.
+    assert outcome.asked_again is None and end["asked_again"] is None
+    assert "asked_again" not in second
     # The model read one result, the section. Nothing was returned for the answer.
     assert end["tool_calls"] == 1 and end["tool_result_chars"] == 74
     private = records(trace.private_path)[0]
@@ -693,15 +697,136 @@ async def test_of_several_answers_in_one_response_the_first_that_is_one_counts(c
     assert statuses == ["not_run", "answer", "not_run"]
 
 
+# --- a turn that ends without the call is asked for it, once --------------------------------
+
+WITHOUT = "the turn ended without a call of submit_answer"
+
+
 @pytest.mark.anyio
-@pytest.mark.parametrize("text", ["It is ten.", json.dumps(ANSWER), ""])
-async def test_text_is_no_answer_where_the_answer_is_to_come_through_the_tool(client, trace, text):
-    # Also not text that has the very form of an answer: the way is part of what is run.
+@pytest.mark.parametrize("text", ["It is ten.", json.dumps(ANSWER)])
+async def test_a_turn_that_ends_without_the_call_is_asked_for_it(client, source, trace, text):
+    # Text is no answer where the answer is to come through the tool, also not text that
+    # has the very form of an answer: the way is part of what is run. The loop asks for
+    # the call, and what is handed in then is the answer of the run.
+    written = says(text)
+    model = ScriptedModel(asks(SECTION), written, asks(SUBMIT))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=TOOL)
+
+    assert (outcome.reason, outcome.answer, outcome.turns) == (EndReason.ANSWERED, ANSWER, 3)
+    assert outcome.asked_again == 2
+    # The third request is the second with two messages more: the reply as it came, and
+    # the message of the loop. The system prompt and the tools are what they were.
+    second, third = model.asked[1], model.asked[2]
+    assert third["messages"][:-2] == second["messages"]
+    assert third["messages"][-2:] == [
+        {"role": "assistant", "content": written.content},
+        {"role": "user", "content": ASK_AGAIN_TEXT},
+    ]
+    assert (third["system"], third["tools"]) == (second["system"], second["tools"])
+    assert third["schema"] is None
+
+    _, _, asked, last, end = records(trace.public_path)
+    assert asked["asked_again"] is True and asked["tools"] == []
+    assert "asked_again" not in last
+    assert (end["reason"], end["answer"]) == ("answered", ANSWER)
+    assert (end["asked_again"], end["turns"]) == (2, 3)
+    # The message is no result of a tool: the model read one result, the section.
+    assert end["tool_calls"] == 1 and end["tool_result_chars"] == 74
+    # The private record holds the message, as it holds everything the model was given.
+    kept = records(trace.private_path)
+    assert kept[2]["asked_with"] == ASK_AGAIN_TEXT and "asked_with" not in kept[3]
+    assert "asked_with" not in asked
+
+
+@pytest.mark.anyio
+async def test_asked_for_the_call_a_run_may_read_on_before_it_hands_in(client, source, trace):
+    model = ScriptedModel(says("It is ten."), asks(SECTION), asks(SUBMIT))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=TOOL)
+
+    # The message asks for the call and forbids nothing: the tools are run as ever.
+    assert (outcome.reason, outcome.turns, outcome.asked_again) == (EndReason.ANSWERED, 3, 1)
+    assert [what[0] for what in source.calls] == ["paper"]
+    read = model.asked[2]["messages"][-1]["content"][0]["content"]
+    assert read.startswith("section | 2501.00001v2 | 2.1 | ")
+
+
+@pytest.mark.anyio
+async def test_a_second_turn_without_the_call_ends_the_run_without_an_answer(client, trace):
+    model = ScriptedModel(says("It is ten."), says("As I said: ten."), asks(SUBMIT))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=TOOL)
+
+    assert (outcome.reason, outcome.answer, outcome.turns) == (EndReason.NO_ANSWER, None, 2)
+    assert outcome.detail == WITHOUT + ", also after the loop had asked for it"
+    assert len(model.asked) == 2  # asked for the call once, and not a second time
+    _, first, second, end = records(trace.public_path)
+    assert first["asked_again"] is True and "asked_again" not in second
+    assert (end["reason"], end["asked_again"], outcome.asked_again) == ("no_answer", 1, 1)
+
+
+@pytest.mark.anyio
+async def test_the_last_response_the_limit_allows_is_not_asked_about(client, trace):
+    model = ScriptedModel(asks(SECTION), says("It is ten."), asks(SUBMIT))
+
     outcome = await run(
-        "Q?", client=client, model=ScriptedModel(says(text)), trace=trace, channel=TOOL
+        "Q?", client=client, model=model, trace=trace, limits=Limits(max_turns=2), channel=TOOL
     )
-    assert (outcome.reason, outcome.answer) == (EndReason.NO_ANSWER, None)
-    assert outcome.detail == "the turn ended without a call of submit_answer"
+
+    # The limit is on the responses of the model, and asking would take one more.
+    assert (outcome.reason, outcome.turns, outcome.asked_again) == (EndReason.NO_ANSWER, 2, None)
+    assert outcome.detail == WITHOUT + ", with the last response the limit allows"
+    assert len(model.asked) == 2
+    assert "asked_again" not in records(trace.public_path)[2]
+
+
+@pytest.mark.anyio
+async def test_an_answer_that_was_asked_for_may_come_with_the_last_response(client, trace):
+    model = ScriptedModel(says("It is ten."), asks(SUBMIT))
+
+    outcome = await run(
+        "Q?", client=client, model=model, trace=trace, limits=Limits(max_turns=2), channel=TOOL
+    )
+
+    assert (outcome.reason, outcome.turns, outcome.asked_again) == (EndReason.ANSWERED, 2, 1)
+
+
+@pytest.mark.anyio
+async def test_a_response_that_holds_nothing_is_not_asked_about(client, trace):
+    # There is no reply to send back, and the API takes no empty turn.
+    model = ScriptedModel(says(""), asks(SUBMIT))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=TOOL)
+
+    assert (outcome.reason, outcome.turns, outcome.asked_again) == (EndReason.NO_ANSWER, 1, None)
+    assert outcome.detail == WITHOUT + ", and the response held nothing"
+    assert len(model.asked) == 1
+
+
+@pytest.mark.anyio
+async def test_a_response_that_was_cut_off_is_not_asked_about(client, trace):
+    # Only a turn that the model ended: a response the API ended has its own reason.
+    model = ScriptedModel(says("It is", stop="max_tokens"), asks(SUBMIT))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=TOOL)
+
+    assert (outcome.reason, outcome.asked_again) == (EndReason.MAX_TOKENS, None)
+    assert len(model.asked) == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("channel", [FORMAT, TEXT])
+async def test_where_the_answer_is_a_text_no_turn_is_asked_about(client, trace, channel):
+    # In the two other ways the text that ends a turn is what is read for the answer.
+    model = ScriptedModel(says("It is ten."), says(json.dumps(ANSWER)))
+
+    outcome = await run("Q?", client=client, model=model, trace=trace, channel=channel)
+
+    assert (outcome.reason, outcome.turns, outcome.asked_again) == (EndReason.NO_ANSWER, 1, None)
+    assert outcome.detail == "the text was not an answer of the expected form"
+    assert len(model.asked) == 1
+    assert records(trace.public_path)[-1]["asked_again"] is None
 
 
 @pytest.mark.anyio

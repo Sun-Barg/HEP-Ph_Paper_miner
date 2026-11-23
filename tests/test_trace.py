@@ -103,6 +103,36 @@ def test_the_record_names_the_model_that_answered(tmp_path):
     assert end["response_models"] == ["model-a", "model-b"]
 
 
+def test_a_record_says_whether_the_loop_asked_again_for_the_call(tmp_path):
+    # The line of the response the loop asked about says that it did, in both files, and
+    # the private one keeps the message, as it keeps everything the model was given. The
+    # last line always says it: the number of that response, or null.
+    trace = Trace("run-1", tmp_path / "public", tmp_path / "private")
+    trace.start({}, private={})
+    trace.turn(1, says("It is ten."), 0.1, [], asked_again="Call the tool.")
+    trace.turn(2, says("{}"), 0.1, [])
+    trace.end("no_answer", "", None, turns=2, seconds=0.2, asked_again=1)
+    public, private = (
+        [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+        for path in (trace.public_path, trace.private_path)
+    )
+    assert public[1]["asked_again"] is True and "asked_again" not in public[2]
+    assert private[1]["asked_again"] is True and "asked_again" not in private[2]
+    assert private[1]["asked_with"] == "Call the tool." and "asked_with" not in private[2]
+    assert "Call the tool." not in trace.public_path.read_text(encoding="utf-8")
+    assert public[3]["asked_again"] == private[3]["asked_again"] == 1
+
+    quiet = Trace("run-2", tmp_path / "public", None)
+    quiet.start({}, private={})
+    quiet.turn(1, says("{}"), 0.1, [])
+    quiet.end("answered", "", None, turns=1, seconds=0.1)
+    _, turn, end = (
+        json.loads(line) for line in quiet.public_path.read_text(encoding="utf-8").splitlines()
+    )
+    # Written, not left out: a record without it is one of a loop that could not ask.
+    assert "asked_again" in end and end["asked_again"] is None and "asked_again" not in turn
+
+
 def test_the_public_facts_of_a_tool_call_leave_its_text_out():
     facts = ToolRecord(CALL, OK, TEXT, 1.23456).public()
     assert "Data text." not in json.dumps(facts)

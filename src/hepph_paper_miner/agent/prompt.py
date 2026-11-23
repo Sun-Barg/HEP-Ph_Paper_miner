@@ -3,7 +3,7 @@
 The tools speak for themselves (their texts belong to the server and to
 TOOLSET_VERSION). What is written here is the rest of what the model reads: the
 system prompt, the descriptions inside the answer schema, the loop's own tool, and
-the error messages the loop writes itself. A change to any of them is a different
+the messages the loop writes itself. A change to any of them is a different
 experiment, so the name in PROMPT_VERSION has to go up with it.
 
 A run hands in its answer in one of three ways. The model reads something else with
@@ -13,7 +13,8 @@ each of them, so each has its own name for its texts:
              to the schema. Nothing here asks for the form: the API adds its own
              words about it to the request.
     tool     The answer is the arguments of a call of ANSWER_TOOL, which the loop
-             adds to the tools of the server. One line of the prompt says so.
+             adds to the tools of the server. One line of the prompt says so, and a
+             turn that ends without the call is asked for it once (ASK_AGAIN_TEXT).
     text     The text that ends the turn is the answer, and a paragraph of the prompt
              asks for it as JSON. Nothing holds the model to that.
 
@@ -22,6 +23,10 @@ There are three because of what the runs on the development questions showed
 tools long after they had been given what the question needs. The two other ways are
 there to see with which of them a run ends when it could. With `tool` all thirty runs
 handed in an answer, and that is the way the evaluation uses (eval/conditions.py).
+
+p3-tool is p2-tool with the message for a turn that ends without the call. In the runs
+made with p2-tool, three ended that way, each with its answer written as text
+(results/README.md, results/runs/regress/README.md), and the loop called that no answer.
 
 The same texts are used with both tool layouts, so they name no tool of the server.
 They also name no paper and no fact from a paper: an example in a prompt is a hint.
@@ -38,7 +43,7 @@ FORMAT = "format"
 TOOL = "tool"
 TEXT = "text"
 
-PROMPT_VERSION = {FORMAT: "p1", TOOL: "p2-tool", TEXT: "p2-text"}
+PROMPT_VERSION = {FORMAT: "p1", TOOL: "p3-tool", TEXT: "p2-text"}
 
 SYSTEM_PROMPT = """\
 You answer questions about physics papers on arXiv. You can read papers only through the tools.
@@ -93,8 +98,9 @@ ANSWER_SCHEMA: dict[str, Any] = {
 }
 
 # The loop's own tool, for the way "tool". This model cannot be made to call a tool
-# (the API rejects a forced tool choice for it), so a run can still end without the
-# call: that is a run without an answer. The tool is not marked strict either. Strict
+# (the API rejects a forced tool choice for it), so a turn can still end without the
+# call. The loop asks for it once (ASK_AGAIN_TEXT below); a run that ends without the
+# call after that is a run without an answer. The tool is not marked strict either. Strict
 # input is made under the same constraint as a text held to a form, and whether that
 # constraint is what keeps a run from ending is the thing to find out. The loop checks
 # the arguments itself (as_answer).
@@ -141,6 +147,16 @@ INVALID_ANSWER_TEXT = (
     "The answer was not accepted. Its arguments have to be: answer (text, not empty), "
     "found (true or false) and evidence (a list, each item with arxiv_id and section_id "
     f"as text), and nothing else. Call {ANSWER_TOOL['name']} again."
+)
+
+# What the model is told, once in a run, when it ends its turn without a call of the
+# loop's tool. It says what the prompt says already, in the words of the prompt, and
+# nothing of the answer or of reading on: the runs that ended this way had written
+# their answer as text, and the message is there to get an answer handed in, not to
+# change it. It goes back as a message of the user, after the reply as it came.
+ASK_AGAIN_TEXT = (
+    f"That reply ended without a call of {ANSWER_TOOL['name']}, so no answer was handed in. "
+    f"Give the final answer by calling {ANSWER_TOOL['name']}."
 )
 
 

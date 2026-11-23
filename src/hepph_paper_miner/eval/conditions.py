@@ -24,11 +24,18 @@ below. So a record can be held against the conditions: see `differences`.
 After the evaluation the tool texts were changed, for what its runs had shown (an
 argument that no tool has was taken without a word, and an outline did not show the
 text a section has of its own). EVALUATION stays as it was fixed: the records of the
-evaluation, and the runs it rests on, are held against it for good. REVISED names what
-the code has now. It is EVALUATION with other tool texts and nothing else, and is
-written that way. Runs made now are held against the conditions that name the texts of
-the code (`of_the_code`), so a run of the evaluation as it was has to be made with the
-code as it was.
+evaluation, and the runs it rests on, are held against it for good. REVISED is
+EVALUATION with other tool texts and nothing else, and is written that way.
+
+Then the loop was changed: a turn that ends without the call that hands in the answer
+is asked for the call once, with a message that belongs to the prompt (agent/prompt.py,
+p3-tool). ASKING_AGAIN is REVISED with that prompt and nothing else. REVISED stays as
+well, because runs were made under it (results/runs/regress/).
+
+So every set of conditions that runs were made under keeps its name and its values, and
+a text that changes gets a new set. Runs made now are held against the conditions that
+name the texts of the code (`of_the_code`), so a run under earlier conditions has to be
+made with the code as it was.
 """
 
 from __future__ import annotations
@@ -66,13 +73,21 @@ EVALUATION: dict[str, Any] = {
     "limits": {"max_turns": 12, "tool_seconds": 700.0, "run_seconds": 900.0},
 }
 
-# What the code has since the tool texts were changed: the same, but for their names.
+# What the code had once the tool texts were changed: the same, but for their names.
 REVISED: dict[str, Any] = {
     **EVALUATION,
     "toolset_version": {"staged": "staged-6", "flat": "flat-5"},
 }
 
-CONDITIONS: dict[str, dict[str, Any]] = {"evaluation": EVALUATION, "revised": REVISED}
+# What the code has since the loop asks again for the call: the same as REVISED, but for
+# the name of the prompt, which holds the message of the loop.
+ASKING_AGAIN: dict[str, Any] = {**REVISED, "prompt_version": "p3-tool"}
+
+CONDITIONS: dict[str, dict[str, Any]] = {
+    "evaluation": EVALUATION,
+    "revised": REVISED,
+    "asking-again": ASKING_AGAIN,
+}
 
 # The parser that splits a paper into sections. The server names it in a result, and a
 # record keeps the names in its last line.

@@ -11,6 +11,7 @@ from mcp import Client
 from hepph_paper_miner.agent.prompt import (
     ANSWER_SCHEMA,
     ANSWER_TOOL,
+    ASK_AGAIN_TEXT,
     FORMAT,
     INVALID_ANSWER_TEXT,
     PROMPT_VERSION,
@@ -29,7 +30,7 @@ TARGETS = Path(__file__).parent.parent / "eval_data" / "target_papers.txt"
 # The name of the texts of each way to hand in an answer, and the digest of those texts.
 PINNED = {
     FORMAT: ("p1", "5168eaef77a8e36f9ddaadac653d6da085aa3acd7aa1c0715b54b373ce8d98b4"),
-    TOOL: ("p2-tool", "11ecefd73fee6a0943d5dab1bf2941b735e8b3859e61d400b0cc6931cc0b4762"),
+    TOOL: ("p3-tool", "6ec4b91b99fa36822125c0dd08cb4e45f9cfc6c567a673371fb0a37cd0d33ac3"),
     TEXT: ("p2-text", "f37463bd535ed066b8b7cf5b5d895710f38930abcc662b01f9276db19008f2d1"),
 }
 GOOD = {
@@ -140,7 +141,7 @@ def texts_of(channel: str) -> list:
     if channel == FORMAT:
         return [SYSTEM_PROMPT, ANSWER_SCHEMA, unknown]
     if channel == TOOL:
-        return [system_prompt(TOOL), ANSWER_TOOL, unknown, INVALID_ANSWER_TEXT]
+        return [system_prompt(TOOL), ANSWER_TOOL, unknown, INVALID_ANSWER_TEXT, ASK_AGAIN_TEXT]
     return [system_prompt(TEXT), unknown]
 
 
@@ -188,6 +189,24 @@ def test_the_tool_for_the_answer_takes_an_answer_and_is_not_strict():
     assert "strict" not in ANSWER_TOOL
     assert ANSWER_TOOL["name"] in INVALID_ANSWER_TEXT and ANSWER_TOOL["name"] in system_prompt(TOOL)
     assert ANSWER_TOOL["name"] not in system_prompt(TEXT) + system_prompt(FORMAT)
+
+
+# The texts of the way "tool" before the loop asked again for the call (p2-tool).
+P2_TOOL = "11ecefd73fee6a0943d5dab1bf2941b735e8b3859e61d400b0cc6931cc0b4762"
+
+
+def test_the_third_prompt_of_the_tool_is_the_second_with_one_message_more():
+    # The runs made with p2-tool read every text that a run reads now, but for the message
+    # after a turn that ended without the call: nothing else of the prompt was changed.
+    *before, message = texts_of(TOOL)
+    assert hashlib.sha256(json.dumps(before).encode("utf-8")).hexdigest() == P2_TOOL
+    assert message == (
+        "That reply ended without a call of submit_answer, so no answer was handed in. "
+        "Give the final answer by calling submit_answer."
+    )
+    # It asks for the call with the sentence of the prompt, and says nothing of the answer.
+    asked_for = "Give the final answer by calling submit_answer."
+    assert asked_for in system_prompt(TOOL) and message.endswith(asked_for)
 
 
 def test_arguments_are_an_answer_by_the_same_rule_as_a_text():

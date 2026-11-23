@@ -333,6 +333,14 @@ def report(
         "cost, computed",
     ]
     columns = {layout: column(by[layout]) for layout in LAYOUTS}
+    if any("asked_again" in f.attempt.end for f in facts):
+        # The records say whether the loop asked again for the call that hands in the
+        # answer (agent/loop.py). Records of a loop that could not ask have no such
+        # line, and their report has no such row: that of the evaluation stays as it was.
+        names.insert(2, "of them after the loop had asked again for the call")
+        for layout in LAYOUTS:
+            asked = [f for f in by[layout] if f.answered and f.attempt.end.get("asked_again")]
+            columns[layout].insert(2, str(len(asked)))
     lines += ["## By layout", ""]
     lines += _table(
         ["", *LAYOUTS], ([name, *(columns[l][i] for l in LAYOUTS)] for i, name in enumerate(names))

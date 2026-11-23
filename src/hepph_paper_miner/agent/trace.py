@@ -152,8 +152,21 @@ class Trace:
         self._write(self.public_path, line)
         self._write(self.private_path, {**line, **private})
 
-    def turn(self, number: int, reply: Reply, seconds: float, tools: Sequence[ToolRecord]) -> None:
-        """One response of the model and the tool calls that followed it."""
+    def turn(
+        self,
+        number: int,
+        reply: Reply,
+        seconds: float,
+        tools: Sequence[ToolRecord],
+        asked_again: str | None = None,
+    ) -> None:
+        """One response of the model and what followed it: its tool calls, or a message.
+
+        `asked_again` is the message the loop wrote after this response, when the turn
+        had ended without the call that hands in the answer (loop.py). The public line
+        says that it did; the private line has the message as well, since it holds
+        everything the model was given.
+        """
         for name in self._tokens:
             self._tokens[name] += int(reply.usage.get(name) or 0)
         public_tools = [tool.public() for tool in tools]
@@ -178,6 +191,10 @@ class Trace:
             "blocks": list(reply.blocks),
             "usage": reply.usage,
         }
+        if asked_again is not None:
+            # Only on the line of that response: a line without it is the line of a
+            # response the loop did not ask about, in a record of any age.
+            line["asked_again"] = True
         self._write(self.public_path, {**line, "tools": public_tools})
         self._write(
             self.private_path,
@@ -186,19 +203,33 @@ class Trace:
                 "tools": public_tools,
                 "reply": reply.raw if reply.raw is not None else {"text": reply.text},
                 "tool_results": [{"id": tool.call.id, "text": tool.text} for tool in tools],
+                **({"asked_with": asked_again} if asked_again is not None else {}),
             },
         )
 
     def end(
-        self, reason: str, detail: str, answer: dict[str, Any] | None, turns: int, seconds: float
+        self,
+        reason: str,
+        detail: str,
+        answer: dict[str, Any] | None,
+        turns: int,
+        seconds: float,
+        asked_again: int | None = None,
     ) -> None:
-        """The last line: why the run ended, the answer if there is one, and the totals."""
+        """The last line: why the run ended, the answer if there is one, and the totals.
+
+        `asked_again` is the number of the response after which the loop asked for the
+        call that hands in the answer, or None when it did not ask.
+        """
         line = {
             "record": "end",
             "run_id": self.run_id,
             "reason": reason,
             "detail": detail,
             "answer": answer,
+            # Always written, so that a record says of itself that the loop did not ask.
+            # A record without it was made by a loop that could not (before p3-tool).
+            "asked_again": asked_again,
             "turns": turns,
             "seconds": round(seconds, 3),
             # Every result the model was given counts, error texts included: this is

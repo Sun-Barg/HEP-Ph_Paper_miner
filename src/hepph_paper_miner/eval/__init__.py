@@ -10,4 +10,5 @@ report.py       the report of the evaluation: the layouts compared, question by 
 judge.py        a model as a second grader of the answers of a sheet
 agree.py        the judge held against the grades a person gave
 regress.py      the runs of a changed version held against the runs of the one before
+replay.py       the end of a run sent again with the message of the loop, and what came back
 """

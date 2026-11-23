@@ -179,6 +179,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     print(f"ended     {outcome.reason.value}" + (f" ({outcome.detail})" if outcome.detail else ""))
     print(f"turns     {outcome.turns}")
+    if outcome.asked_again is not None:
+        # The loop asked for the call that hands in the answer (loop.py), once.
+        print(f"asked     again for the call, after response {outcome.asked_again}")
     if outcome.answer is not None:
         print(f"found     {outcome.answer['found']}")
         print(f"answer    {outcome.answer['answer']}")

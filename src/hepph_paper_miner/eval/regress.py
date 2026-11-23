@@ -24,9 +24,24 @@ which a search listed the paper and the calls that came back as errors are shown
 decide nothing; a cell whose runs took more responses than any run of it before is
 marked, so that somebody reads its records.
 
-The two sides can be compared only when they differ in the tool texts and the code and
-in nothing else: the same question file, the same cells, the same prompt, model and
-limits. Otherwise the command refuses.
+These five are the first set, and the runs of 2026-11-20 were held against them
+(results/runs/regress/). The second half of 3 turned out to ask more than the rule it
+speaks of: an answer that holds a number the key lists for a person to look at is left
+to a person by the rule, not called wrong, and whether such an answer is wrong is what
+4 asks. With --criteria 2 the runs are held against the second set, which was written
+down before any run with the prompt p3-tool was made: the same five, with 3 as its
+first half alone (the rule calls no answer wrong). The first set stays the default, so
+that the comparison of 2026-11-20 comes out again as it was written.
+
+An answer that was handed in after the loop had asked again for the call (agent/loop.py,
+since the prompt p3-tool) is an answer in all of this. When the records after say
+whether the loop asked, the text names the runs in which it did and how each of them
+ended. That is shown and decides nothing.
+
+The two sides can be compared only when they differ in the texts a model reads (those of
+the tools, the prompt of the loop) and the code and in nothing else: the same question
+file, the same cells, the same way to hand in an answer, model and limits. Otherwise the
+command refuses.
 
 With --targets the questions are ones written to show an effect of the change (the
 passage stands where the version before did not lead a model). Then nothing passes or
@@ -63,9 +78,12 @@ from hepph_paper_miner.sources.base import Paper, PaperSource, SourceError, pars
 PASSED, FAILED, OPEN = "passed", "failed", "not decided"
 SHOWN, NOT_SHOWN = "shown", "not shown"
 
-# What the first line of a record names and the two sides have to agree in. The tool
-# texts and the code are what was changed, and the packages belong to the code.
-_SAME = ("answer_channel", "prompt_version", "limits", "questions", "model")
+# What the first line of a record names and the two sides have to agree in. The texts
+# a model reads (the tool texts, the prompt of the loop) and the code are what can have
+# been changed, and the packages belong to the code.
+_SAME = ("answer_channel", "limits", "questions", "model")
+# The second set of criteria (see above), and the first, which is the default.
+SETS = ("1", "2")
 
 
 class RegressError(ValueError):
@@ -89,6 +107,8 @@ class Facts:
     rank: int | None = None  # where the first search that listed the paper listed it
     by_person: str | None = None  # the grade on the sheet, when a person wrote one
     by_judge: str | None = None  # what more than half of the judge's requests said
+    asks: bool = False  # the record says whether the loop asked again for the call
+    asked_again: int | None = None  # the response after which it asked
 
 
 @dataclass(frozen=True)
@@ -117,7 +137,7 @@ def _names(attempts: Sequence[Attempt], which: str) -> dict[str, Any]:
             raise RegressError(f"the runs {which} do not name one {what}: {different}")
         found[what] = different[0]
 
-    for name in _SAME:
+    for name in (*_SAME, "prompt_version"):
         values = [attempt.run.get(name) for attempt in attempts]
         if name == "model":  # the SDK that sent the requests belongs to the code
             values = [{k: v for k, v in (value or {}).items() if k != "sdk"} for value in values]
@@ -161,6 +181,8 @@ def facts_of(attempt: Attempt, question: Question, papers: Mapping[str, Paper]) 
         ),
         searches=graded.search.searches,
         rank=min((hit[1] for hit in graded.search.first_hit.values() if hit), default=None),
+        asks="asked_again" in attempt.end,
+        asked_again=attempt.end.get("asked_again"),
     )
 
 
@@ -236,8 +258,14 @@ def _state(failed: Sequence[str], undecided: Sequence[str]) -> str:
     return FAILED if failed else OPEN if undecided else PASSED
 
 
-def criteria(before: Side, after: Side, cells: Sequence[Cell]) -> list[Finding]:
-    """The five things the runs after have to do, each passed, failed or not decided."""
+def criteria(
+    before: Side, after: Side, cells: Sequence[Cell], which: str = SETS[0]
+) -> list[Finding]:
+    """The five things the runs after have to do, each passed, failed or not decided.
+
+    `which` names the set: in the second, 3 is that the rule calls no answer wrong and
+    no more (the head of this module says why).
+    """
     there = [after[cell] for cell in cells if cell in after]
     pairs = sorted({(cell.question_id, cell.toolset) for cell in cells})
 
@@ -256,7 +284,7 @@ def criteria(before: Side, after: Side, cells: Sequence[Cell]) -> list[Finding]:
     )
 
     by_rule = [f"{f.cell}: the rule calls the answer wrong" for f in there if f.rule == WRONG]
-    for question_id, layout in pairs:
+    for question_id, layout in pairs if which == SETS[0] else ():
         of_pair = [c for c in cells if (c.question_id, c.toolset) == (question_id, layout)]
         earlier = [before[cell].rule for cell in of_pair if cell in before]
         if earlier and set(earlier) == {RIGHT}:
@@ -385,12 +413,28 @@ def table(before: Side, after: Side, cells: Sequence[Cell]) -> list[str]:
     return lines
 
 
+def asked_again(after: Side, cells: Sequence[Cell]) -> list[str]:
+    """What the text says of the runs after that the loop asked again for the call.
+
+    Nothing when their records do not say whether it asked: those were made by a loop
+    that could not.
+    """
+    there = [after[cell] for cell in cells if cell in after]
+    if not any(facts.asks for facts in there):
+        return []
+    asked = [f"{f.cell} (then {f.reason})" for f in there if f.asked_again is not None]
+    if not asked:
+        return ["", "No run after was asked again for the call."]
+    return ["", f"Asked again for the call, after: {', '.join(asked)}."]
+
+
 def text_of(
     header: Sequence[str],
     before: Side,
     after: Side,
     cells: Sequence[Cell],
     targets: bool,
+    which: str = SETS[0],
 ) -> tuple[str, str]:
     """The whole text, and the one word it comes to."""
     lines = [*header, ""]
@@ -400,12 +444,13 @@ def text_of(
         lines += [f"- {line}" for line in counted]
         lines += ["", f"The effect of the change on these questions: {said}."]
     else:
-        findings = criteria(before, after, cells)
+        findings = criteria(before, after, cells, which)
         said = verdict(findings)
         for finding in findings:
             lines.append(f"- {finding.name}: {finding.state}")
             lines += [f"    - {line}" for line in finding.lines]
         lines += ["", f"The runs after, held against the runs before: {said}."]
+    lines += asked_again(after, cells)
     lines += ["", *table(before, after, cells), ""]
     return "\n".join(lines), said
 
@@ -444,6 +489,13 @@ def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -
         "--targets",
         action="store_true",
         help="the questions were written to show an effect: count, and pass or fail nothing",
+    )
+    parser.add_argument(
+        "--criteria",
+        choices=SETS,
+        default=SETS[0],
+        help="the set of criteria: 2 asks of the rule only that it calls no answer wrong "
+        "(default: %(default)s, as the runs of 2026-11-20 were held)",
     )
     parser.add_argument("--out", type=Path, help="write the text here instead of printing it")
     arguments = parser.parse_args(argv)
@@ -495,6 +547,9 @@ def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -
         return 2
 
     header = [f"Questions: {arguments.questions.name}, SHA-256 {digest}"]
+    # The prompt is named where the sides differ in it, and only there: a comparison of
+    # two versions of the tool texts reads as it did before a prompt could differ.
+    prompts = named[0]["prompt_version"] != named[1]["prompt_version"]
     for which, folder, names, runs in (
         ("Before", arguments.before, named[0], then),
         ("After", arguments.after, named[1], now),
@@ -504,12 +559,15 @@ def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -
             for layout in LAYOUTS
             if f"toolset_version of {layout}" in names
         )
+        prompt = f"prompt {names['prompt_version']}; " if prompts else ""
         header.append(
-            f"{which}: {folder.as_posix()}; {len(runs)} runs; tool texts {texts}; "
+            f"{which}: {folder.as_posix()}; {len(runs)} runs; tool texts {texts}; {prompt}"
             f"code {str(names['commit of the code'])[:7]}"
         )
+    if arguments.criteria != SETS[0] and not arguments.targets:
+        header.append("Criteria: the second set (3 asks only that the rule calls no answer wrong)")
     header += notes
-    text, said = text_of(header, before, after, cells, arguments.targets)
+    text, said = text_of(header, before, after, cells, arguments.targets, arguments.criteria)
     if arguments.out:
         arguments.out.parent.mkdir(parents=True, exist_ok=True)
         arguments.out.write_text(text, encoding="utf-8", newline="\n")

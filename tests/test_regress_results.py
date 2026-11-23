@@ -413,6 +413,10 @@ def test_of_the_runs_that_hand_in_with_the_tool_one_before_the_change_ended_with
         ("changed", "answered"): 66,
         ("changed", "no_answer"): 2,
     }
+    # "3 of the 256 runs": what the README says of a turn that ends without the call,
+    # where it tells why thirty new runs will hardly meet one.
+    without = sum(number for (_, reason), number in ended.items() if reason == "no_answer")
+    assert (without, sum(ended.values())) == (3, 256)
 
 
 # --- the three target questions -----------------------------------------------------------

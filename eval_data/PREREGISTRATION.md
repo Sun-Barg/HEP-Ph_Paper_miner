@@ -271,3 +271,20 @@ reads the records, the sheet and the key.
   the comparison stays failed. On the three target questions the passage was given in
   4 of the 9 staged runs before the change and in 8 of 9 after it. The records, and
   what can and cannot be said of them, are in `results/runs/regress/`.
+- **2026-11-23, the loop was changed after the runs, under a new name of the prompt.**
+  Nothing above changes: no count of `results/report.md` moves, and the run of eval-13
+  that ended its turn without the call stays a run without an answer, by the rule that
+  was fixed before the runs. Since this change the loop asks for the call when a turn
+  ends without it: the reply goes back as it came, with one message of the loop after
+  it, once in a run. That message is a text a model reads, so the prompt of the way
+  `tool` has a new name, `p3-tool`, and `eval/conditions.py` names a third set of
+  conditions beside the two there were. The reason is the three runs that ended so, the
+  one of the evaluation and two of dev-02 on 2026-11-20, each with its answer written
+  as text; the API refuses a forced tool choice for this model, so the call cannot be
+  made to come.
+- The questions of the evaluation are not asked again with the new prompt, and the end
+  of the run of eval-13 is not sent again either. What the runs with the new prompt
+  will be held against was written down with the change, before any of them, in the
+  README ("An answer that was written and not handed in"), in `eval/regress.py` (the
+  second set of criteria) and in `eval/replay.py` (twenty requests, and the eighteen
+  that decide how they are read).

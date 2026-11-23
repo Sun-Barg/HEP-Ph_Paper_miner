@@ -1,7 +1,7 @@
 """The loop: ask the model, run the tools it asks for, hand back the results, until it answers.
 
 The Claude SDK has a tool runner that does this. This one is written by hand for
-three things the runner does not give:
+four things the runner does not give:
 
     why a run ended     Every run ends with one of the reasons below, and the caller
                         gets it as a value. The runner stops without saying why, and
@@ -9,6 +9,10 @@ three things the runner does not give:
     what counts as      Only what comes in the way chosen for the run, and has the
     the answer          expected form, is an answer (prompt.py names the ways). The
                         runner returns the last message, whatever it is.
+    one recovery        When the answer is to come as a call of the loop's tool and a
+                        turn ends without that call, the loop asks for the call, once
+                        in a run. The model cannot be made to call a tool, and the
+                        runs that ended this way had written their answer as text.
     a record            Every turn is written down as it happens (trace.py).
 
 What it leaves to others: retries of API requests are the SDK's (model.py), and the
@@ -32,6 +36,7 @@ from hepph_paper_miner.agent.origin import code_version
 from hepph_paper_miner.agent.prompt import (
     ANSWER_SCHEMA,
     ANSWER_TOOL,
+    ASK_AGAIN_TEXT,
     FORMAT,
     INVALID_ANSWER_TEXT,
     PROMPT_VERSION,
@@ -125,6 +130,10 @@ class Outcome:
     detail: str
     answer: dict[str, Any] | None  # {"answer", "found", "evidence"} when reason is ANSWERED
     turns: int
+    # The response after which the loop asked for the call that hands in the answer, or
+    # None when it did not ask. An answer that came after it is an answer like any other;
+    # this says that it took the asking.
+    asked_again: int | None = None
 
 
 class _ToolFailure(Exception):
@@ -156,6 +165,13 @@ async def run(
     system prompt the model reads, whether it is given the loop's own tool, and
     what is taken for the answer. It has no default: whoever starts a run says which
     way it uses, so that no run is made in a way that nobody chose.
+
+    With the loop's tool, a turn that ends without a call of it is asked for the call:
+    the reply goes back as it came, followed by one message of the loop (prompt.py), and
+    the run goes on as after any other response. That happens once in a run, and not
+    after the last response the limit allows, which is the last time the model is
+    asked whatever it says. A second turn that ends without the call ends the run
+    without an answer.
     """
     limits = limits or Limits()
     if channel not in PROMPT_VERSION:
@@ -215,10 +231,18 @@ async def run(
     messages: list[dict[str, Any]] = [{"role": "user", "content": question}]
     started = clock()
     turn = 0
+    asked_again: int | None = None  # the response after which the loop asked for the call
 
     def end(reason: EndReason, detail: str = "", answer: dict[str, Any] | None = None) -> Outcome:
-        trace.end(reason.value, detail, answer, turns=turn, seconds=clock() - started)
-        return Outcome(reason, detail, answer, turn)
+        trace.end(
+            reason.value,
+            detail,
+            answer,
+            turns=turn,
+            seconds=clock() - started,
+            asked_again=asked_again,
+        )
+        return Outcome(reason, detail, answer, turn, asked_again)
 
     while True:
         if clock() - started > limits.run_seconds:
@@ -231,9 +255,26 @@ async def run(
         turn += 1
         seconds = clock() - asked_at
 
+        if reply.stop_reason == "end_turn" and channel == TOOL:
+            # The turn ended without the call that hands in the answer. Text is no
+            # answer in this way, whatever it says: one rule for every run.
+            why_not = _why_not_asked(reply, turn, limits, asked_again)
+            if why_not is not None:
+                trace.turn(turn, reply, seconds, [])
+                detail = f"the turn ended without a call of {ANSWER_TOOL['name']}{why_not}"
+                return end(EndReason.NO_ANSWER, detail)
+            asked_again = turn
+            trace.turn(turn, reply, seconds, [], asked_again=ASK_AGAIN_TEXT)
+            # The reply goes back as it came, like a turn that asked for tools, and the
+            # request stays what it was but for the one message at its end: the system
+            # prompt and the tools are the same, so the API reads the conversation so
+            # far from its cache and the model has every tool it had.
+            messages.append({"role": "assistant", "content": reply.content})
+            messages.append({"role": "user", "content": ASK_AGAIN_TEXT})
+            continue
         if reply.stop_reason != "tool_use":
             trace.turn(turn, reply, seconds, [])
-            return end(*_final(reply, channel))
+            return end(*_final(reply))
         if not reply.tool_calls:
             trace.turn(turn, reply, seconds, [])
             return end(EndReason.UNEXPECTED_STOP, "stop_reason 'tool_use' without a tool call")
@@ -297,14 +338,32 @@ def _handed_in(calls: tuple[ToolCall, ...]) -> tuple[ToolCall, dict[str, Any]] |
     return None
 
 
-def _final(reply: Reply, channel: str) -> tuple[EndReason, str, dict[str, Any] | None]:
-    """Reason, detail and answer for a response that did not ask for tools."""
+def _why_not_asked(reply: Reply, turn: int, limits: Limits, asked_again: int | None) -> str | None:
+    """Why a turn that ended without the call is not asked for it, or None when it is.
+
+    The words go into the detail of the run, after "the turn ended without a call of".
+    """
+    if asked_again is not None:
+        # Once in a run. A model that was told and ends its turn again is not told again.
+        return ", also after the loop had asked for it"
+    if turn >= limits.max_turns:
+        # The limit is on the responses of the model, and this was the last.
+        return ", with the last response the limit allows"
+    if not reply.blocks:
+        # A response with nothing in it cannot go back as a turn of the conversation
+        # (the API takes no empty one), so there is nothing the message could follow.
+        return ", and the response held nothing"
+    return None
+
+
+def _final(reply: Reply) -> tuple[EndReason, str, dict[str, Any] | None]:
+    """Reason, detail and answer for a response that did not ask for tools.
+
+    A turn that ended in the way `tool` never comes here: the loop deals with that one
+    itself, because it may ask for the call. So a text that ends a turn is read as an
+    answer, as the two other ways have it.
+    """
     stop = reply.stop_reason
-    if stop == "end_turn" and channel == TOOL:
-        # Text is no answer in this way, whatever it says. One rule for every run, and
-        # the records show how often a model ends a run like this.
-        detail = f"the turn ended without a call of {ANSWER_TOOL['name']}"
-        return EndReason.NO_ANSWER, detail, None
     if stop == "end_turn":
         answer = read_answer(reply.text)
         if answer is not None:

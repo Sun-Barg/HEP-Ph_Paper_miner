@@ -15,6 +15,7 @@ Everything listed under Status is done, and the results of the evaluation are be
 - [x] Runs of the evaluation, grading by hand, results
 - [x] A model as a second grader, held against the grades by hand
 - [x] Tool texts changed for what the evaluation showed, and held against the runs before
+- [ ] The loop asks for an answer that was written and not handed in; its runs are not made yet
 
 ## The two tool layouts
 
@@ -239,7 +240,7 @@ record, beside `answer_channel`):
 
 | Channel | The answer is | Prompt |
 |---|---|---|
-| `tool` (default) | the arguments of a call of `submit_answer`, a tool that the loop adds to the tools of the server | `p2-tool`: `p1` and one line that says to call it |
+| `tool` (default) | the arguments of a call of `submit_answer`, a tool that the loop adds to the tools of the server | `p3-tool`: `p1`, one line that says to call it, and a message for a turn that ends without the call |
 | `format` | the text that ends the turn, which the API holds to the form of an answer | `p1` |
 | `text` | the text that ends the turn, which the prompt asks for as one JSON object | `p2-text`: `p1` and a paragraph with the form |
 
@@ -258,12 +259,27 @@ runs handed in an answer, with `text` twenty-six of the thirty. The evaluation u
 `format` and `text` are kept, for the records that were made with them and to run those
 conditions again.
 
-Neither `tool` nor `text` holds the model to anything. With `tool`, a turn that ends
-without the call is `no_answer`, whatever its text says; a call whose arguments are not
-an answer gets an error result, and the run goes on. The model cannot be made to call a
-tool, and the tool is not marked strict, because strict input is made under the same
-constraint as text held to a form. With `text`, a last text that is anything but the
-one JSON object is `no_answer`.
+Neither `tool` nor `text` holds the model to anything. With `tool`, text is no answer,
+whatever it says, and a turn that ends without the call is asked for the call: the
+reply goes back as it came, followed by one message of the loop, and the run goes on.
+
+```
+That reply ended without a call of submit_answer, so no answer was handed in. Give the final answer by calling submit_answer.
+```
+
+The loop asks once in a run. It does not ask after the last response the limit allows,
+or after a response that holds nothing, and a run that ends its turn without the call
+after it was asked is `no_answer`. The request stays what it was but for that message:
+the same system prompt and the same tools, so the model can still read on. A record
+says whether the loop asked: `asked_again` in its last line is the number of the
+response it asked after, or null, and the line of that response has `asked_again` as
+well. The loop asks since the prompt `p3-tool`; with `p2-tool`, which the evaluation
+used, such a turn ended the run ("An answer that was written and not handed in", below).
+A call whose arguments are not an answer gets an error result, and the run goes on. The
+model cannot be made to call a tool (the API refuses a forced tool choice for it), and
+the tool is not marked strict, because strict input is made under the same constraint
+as text held to a form. With `text`, a last text that is anything but the one JSON
+object is `no_answer`.
 
 With `--no-answer-format`, which goes with `--answer-channel format` only, a request
 leaves out the form of the final answer, so the model ends the run with whatever text
@@ -353,9 +369,10 @@ what its runs and a review of the whole repository had shown:
 
 The new texts have the names `staged-6` and `flat-5`. `conditions.py` keeps the
 conditions of the evaluation as they were (`EVALUATION`) and names beside them what the
-code has now (`REVISED`: the same, but for the tool texts). The records of the
-evaluation stay held against the first. The command as it is now writes records of the
-second, and `eval.run` holds its runs against the conditions that name the code.
+code had then (`REVISED`: the same, but for the tool texts). The records of the
+evaluation stay held against the first, and the runs of 2026-11-20 against the second.
+`eval.run` holds its runs against the conditions that name the code, which are a third
+set by now (below).
 
 The twenty questions of the evaluation were not run again with the new texts: that
 would check a change on the questions that suggested it. Instead the five development
@@ -375,6 +392,46 @@ README of that folder goes through them.
 This is not "the new texts are better". The comparison failed by criteria that were
 fixed in advance, and it stays failed. The new texts were left as they are: the runs
 made to tell whether they were the cause did not show that they were.
+
+### An answer that was written and not handed in
+
+Three runs in the records ended their turn with the answer written as text and no call
+of `submit_answer`: one of the evaluation (eval-13) and the two of dev-02 in the table
+above. The loop called each a run without an answer, as its rule said. Nothing makes
+this model call a tool, so the loop now does what is left to it, and asks: the reply
+goes back as it came with one message after it, once in a run ("Asking one question"
+has the message and where the loop does not ask). The message belongs to the prompt,
+which is `p3-tool` now, and `conditions.py` names a third set of conditions for it
+(`ASKING_AGAIN`: `REVISED` with that prompt and nothing else).
+
+The runs with the new prompt are not made yet. What they will be held against was
+written down with the change, before any of them:
+
+- **The development questions again.** Thirty runs, held against the thirty of
+  2026-11-20 that were made with the same tool texts (`results/runs/regress/dev-after`),
+  by `eval.regress --criteria 2`: the five criteria as before, with the third as "the
+  rule calls no answer wrong" and no more. On 2026-11-20 the other half of the third
+  had failed an answer that the rule only leaves to a person, and whether such an
+  answer is wrong is what the fourth criterion asks. The comparison of that day stays
+  as it was written, by the first set. An answer that is handed in after the loop
+  asked is an answer; the text of the comparison names the runs in which the loop
+  asked and how each of them ended.
+- **The two ends of dev-02, sent again.** A turn ends this way in about one run in a
+  hundred (3 of the 256 runs in this repository that count and hand in with the tool),
+  so thirty new runs will most likely not meet the message at all. `eval.replay` builds the
+  conversation of each of the two runs again from its private record, puts the reply
+  and the message at its end as the loop now would, and sends that request ten times.
+  When eighteen or more of the twenty responses hand in an answer by the call, the
+  message is said to have got the answer handed in at these two ends. With fewer it is
+  said not to have, and another way to get such an answer is tried. A response that
+  asks for other tools instead counts against the message, although a run of the loop
+  might have ended with an answer after it. Eighteen is nine in ten, a choice made
+  before the requests.
+
+Either way this stays small: two conversations of one question sent again, and thirty
+runs that may never meet the case. It says nothing of how often a run ends this way.
+The run of the evaluation that ended so is not sent again, and the twenty questions of
+the evaluation are not run with the new prompt.
 
 ## Checking a question file
 
@@ -437,8 +494,8 @@ of one question in a process of its own, started as a run of the evaluation is s
 (`--cache --show-thinking`, the layout and the repetition), and its record is held
 against the conditions as soon as it is written: the ones that name the texts the code
 has, which the command says at its start. The code as it is now has the tool texts
-`staged-6` and `flat-5`, so runs of the evaluation as it was are made with the code as
-it was (`70c7384`). The repetition is the outer loop, and
+`staged-6` and `flat-5` and the prompt `p3-tool`, so runs of the evaluation as it was
+are made with the code as it was (`70c7384`). The repetition is the outer loop, and
 within it the questions come in the order of the file; which layout of a question runs
 first alternates from question to question and from repetition to repetition.
 
@@ -527,7 +584,9 @@ writes tables in Markdown:
 - By layout: the search, access and citation of the runs, the answers right by hand,
   the characters of tool results, the input tokens (written to the cache and read from
   it included), the paper text a run was given with each character counted once, calls,
-  turns, calls that gave nothing new, and the cost worked out from the usage.
+  turns, calls that gave nothing new, and the cost worked out from the usage. For
+  records that say whether the loop asked again for the call ("Asking one question"),
+  also how many answers came only after it had.
 - H1, question by question: the median characters of the staged runs against those of
   the flat runs, and a one-sided sign test of the questions in which staged is lower.
 - H2, question by question: a layout answers a question right when more than half of

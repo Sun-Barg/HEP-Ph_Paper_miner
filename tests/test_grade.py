@@ -594,9 +594,28 @@ async def test_a_run_is_graded_the_same_whichever_way_its_answer_came_in(tmp_pat
             0,
         )
         assert result.answer.rule == RIGHT and result.problems == ()
-    # A run that was to call the tool and ended with text has no answer, and is wrong.
+    # A run that was to call the tool and ended its turn with text is asked for the call.
+    # When it hands in then, it is graded like the others, with the response it took.
+    asked = await play(
+        tmp_path,
+        "staged",
+        asks(section("2")),
+        says(json.dumps(given)),
+        asks(("submit_answer", given)),
+        channel="tool",
+    )
+    result = grade(asked, question(), papers())
+    assert (result.reason, result.turns, result.answer.rule) == ("answered", 3, RIGHT)
+    assert (result.access.met, result.access.turn, result.access.turns_after) == (True, 1, 2)
+    assert asked.end["asked_again"] == 2
+    # When it ends its turn with text again, it has no answer, and is wrong.
     without = await play(
-        tmp_path, "staged", asks(section("2")), says(json.dumps(given)), channel="tool"
+        tmp_path,
+        "staged",
+        asks(section("2")),
+        says(json.dumps(given)),
+        says("As above."),
+        channel="tool",
     )
     result = grade(without, question(), papers())
     assert (result.reason, result.citation, result.answer.rule) == ("no_answer", None, WRONG)

@@ -119,6 +119,33 @@ def test_text_beside_a_call_that_handed_in_the_answer_is_printed(tmp_path, capsy
     assert "   answer: Ten." in shown
 
 
+def test_a_turn_the_loop_asked_about_shows_its_text_and_that_it_was_asked(tmp_path, capsys):
+    # The text that ended the turn was no answer in this way. The loop asked for the
+    # call, and the answer that was handed in then stands with the end, as ever.
+    answer = {"answer": "Ten.", "found": True, "evidence": []}
+    trace = Trace("run-5", tmp_path / "public", tmp_path / "private")
+    start = {"question_id": "q1", "toolset_version": "staged-6", "answer_channel": "tool"}
+    trace.start({**start, "model": {}}, private={})
+    raw = {"content": [{"type": "text", "text": "It is ten."}]}
+    written = dataclasses.replace(says("It is ten."), raw=raw)
+    trace.turn(1, written, 0.5, [], asked_again="Call the tool.")
+    last = asks(("submit_answer", answer))
+    trace.turn(2, last, 0.5, [ToolRecord(last.tool_calls[0], ANSWER)])
+    trace.end("answered", "", answer, 2, 1.0, asked_again=1)
+
+    assert (
+        show_thinking.main([str(trace.public_path), "--private", str(trace.private_path.parent)])
+        == 0
+    )
+    shown = capsys.readouterr().out.splitlines()
+    asked = shown.index("   then: the loop asked again for the call of the answer tool")
+    assert shown[asked - 1] == "   text: It is ten." and shown[asked + 1].startswith("turn 2 | ")
+    assert shown.count("   then: the loop asked again for the call of the answer tool") == 1
+    assert "   answer: Ten." in shown
+    # The message itself is a text of the loop, named by the prompt, and is not printed.
+    assert not any("Call the tool." in line for line in shown)
+
+
 def test_a_pattern_is_opened_here_and_the_output_can_go_to_a_file(run, tmp_path, capsys):
     out = tmp_path / "thinking.txt"
     pattern = str(run.public_path.parent / "run-*.jsonl")

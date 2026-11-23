@@ -253,19 +253,39 @@ def test_a_run_without_an_answer_ends_with_a_code_that_says_so(monkeypatch, caps
     monkeypatch.setattr(
         command,
         "ClaudeModel",
-        lambda name, effort, cache, show_thinking, answer_format: ScriptedModel(says("")),
+        lambda name, effort, cache, show_thinking, answer_format: ScriptedModel(
+            says("It is ten."), says("Ten, as I said.")
+        ),
     )
     monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
     monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
     assert command.main(["--question-id", "dev-05", "--toolset", "flat", *folders]) == 1
     shown = capsys.readouterr().out
-    assert "ended     no_answer (the turn ended without a call of submit_answer)" in shown
+    # The loop asked for the call after the first response, and the second had none either.
+    assert (
+        "ended     no_answer (the turn ended without a call of submit_answer, "
+        "also after the loop had asked for it)"
+    ) in shown
+    assert "turns     2\nasked     again for the call, after response 1\n" in shown
+
+
+def test_a_run_that_was_not_asked_again_says_nothing_of_it(monkeypatch, capsys, folders):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "not-a-real-key")
+    monkeypatch.setattr(
+        command,
+        "ClaudeModel",
+        lambda name, effort, cache, show_thinking, answer_format: ScriptedModel(asks(SUBMIT)),
+    )
+    monkeypatch.setattr(command, "Fetcher", lambda *args, **kwargs: None)
+    monkeypatch.setattr(command, "ArxivSource", lambda fetcher: sample_source())
+    assert command.main(["--question-id", "dev-05", "--toolset", "flat", *folders]) == 0
+    assert "asked " not in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
     ("channel", "last", "prompt", "held"),
     [
-        ("tool", asks(SUBMIT), "p2-tool", None),
+        ("tool", asks(SUBMIT), "p3-tool", None),
         ("format", says(json.dumps(ANSWER)), "p1", ANSWER_SCHEMA),
         ("text", says(json.dumps(ANSWER)), "p2-text", None),
     ],
@@ -322,7 +342,7 @@ def test_without_the_option_the_answer_is_a_call_of_the_loops_tool(monkeypatch, 
     assert scripted.asked[0]["tools"][-1]["name"] == "submit_answer"
     (public,) = (tmp_path / "public").iterdir()
     first = json.loads(public.read_text(encoding="utf-8").splitlines()[0])
-    assert (first["answer_channel"], first["prompt_version"]) == ("tool", "p2-tool")
+    assert (first["answer_channel"], first["prompt_version"]) == ("tool", "p3-tool")
 
 
 @pytest.mark.parametrize(

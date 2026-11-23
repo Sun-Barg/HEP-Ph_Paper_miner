@@ -6,10 +6,11 @@ Three things are held together here.
                        them has to be made in two places, by somebody who means it.
     the code           The command, started the way a run of the evaluation is started,
                        has to write a record that names the conditions the code has now
-                       (REVISED: those of the evaluation with the tool texts as they
-                       were changed after it). That fails when a default of the command,
-                       of the loop or of the model moves, and when a text that a model
-                       reads gets a new name.
+                       (ASKING_AGAIN: those of the evaluation with the tool texts as they
+                       were changed after it, and the prompt that holds the message of
+                       the loop). That fails when a default of the command, of the loop
+                       or of the model moves, and when a text that a model reads gets a
+                       new name.
     the pilot          The conditions were chosen from thirty runs on the development
                        questions. Their records are in the repository, and name them too.
 
@@ -30,6 +31,7 @@ from hepph_paper_miner.agent.model import ClaudeModel, Reply
 from hepph_paper_miner.agent.prompt import PROMPT_VERSION
 from hepph_paper_miner.eval import conditions
 from hepph_paper_miner.eval.conditions import (
+    ASKING_AGAIN,
     CONDITIONS,
     EVALUATION,
     PARSER,
@@ -88,27 +90,45 @@ NOW = {"staged": "staged-6", "flat": "flat-5"}
 
 def test_the_revised_conditions_are_those_of_the_evaluation_with_other_tool_texts():
     assert REVISED == {**FIXED, "toolset_version": NOW}
-    assert CONDITIONS == {"evaluation": EVALUATION, "revised": REVISED}
     assert [name for name in EVALUATION if EVALUATION[name] != REVISED[name]] == ["toolset_version"]
 
 
-def test_the_revised_conditions_name_the_texts_that_the_code_has():
+def test_the_conditions_of_asking_again_are_the_revised_ones_with_another_prompt():
+    # The prompt p3-tool is p2-tool with the message of the loop for a turn that ends
+    # without the call (test_prompt.py). Runs were made under each of the three sets,
+    # so each keeps its name and its values.
+    assert ASKING_AGAIN == {**FIXED, "toolset_version": NOW, "prompt_version": "p3-tool"}
+    assert [name for name in REVISED if REVISED[name] != ASKING_AGAIN[name]] == ["prompt_version"]
+    assert CONDITIONS == {
+        "evaluation": EVALUATION,
+        "revised": REVISED,
+        "asking-again": ASKING_AGAIN,
+    }
+
+
+def test_the_last_conditions_name_the_texts_that_the_code_has():
     # A text cannot change under its name (test_toolset_pin.py, test_prompt.py). When a
     # name here differs, a text was changed and renamed, and no conditions name the code.
-    assert TOOLSET_VERSION == REVISED["toolset_version"]
-    assert PROMPT_VERSION[REVISED["answer_channel"]] == REVISED["prompt_version"]
+    assert TOOLSET_VERSION == ASKING_AGAIN["toolset_version"]
+    assert PROMPT_VERSION[ASKING_AGAIN["answer_channel"]] == ASKING_AGAIN["prompt_version"]
     assert PARSER_VERSION == PARSER
-    assert of_the_code() == "revised"
+    assert of_the_code() == "asking-again"
 
 
 def test_code_with_texts_that_no_conditions_name_is_code_of_no_conditions(monkeypatch):
+    import hepph_paper_miner.agent.prompt as prompt
     import hepph_paper_miner.server as server
 
     monkeypatch.setattr(server, "TOOLSET_VERSION", {"staged": "staged-7", "flat": "flat-5"})
     assert of_the_code() is None
-    # And the code of the evaluation, were it here again, would be named by its own.
+    # The tool texts of the evaluation with the prompt of now: no run was made so.
     monkeypatch.setattr(server, "TOOLSET_VERSION", dict(EVALUATION["toolset_version"]))
+    assert of_the_code() is None
+    # And the code of each earlier set, were it here again, would be named by its own.
+    monkeypatch.setitem(prompt.PROMPT_VERSION, "tool", "p2-tool")
     assert of_the_code() == "evaluation"
+    monkeypatch.setattr(server, "TOOLSET_VERSION", dict(REVISED["toolset_version"]))
+    assert of_the_code() == "revised"
     monkeypatch.setattr(conditions, "PARSER", "5")
     assert of_the_code() is None
 
@@ -153,17 +173,20 @@ def test_the_command_started_as_for_the_evaluation_runs_under_the_conditions(
     record = started(monkeypatch, tmp_path, *options, replies=[READ[toolset], SUBMIT])
 
     assert record.end["parser_versions"] == ["4"]  # so the parser was looked at below
-    assert differences(record.run, record.end, REVISED) == []
-    # Against the conditions of the evaluation it differs in the one thing that was changed.
+    assert differences(record.run, record.end, ASKING_AGAIN) == []
+    # Against the earlier conditions it differs in what was changed since, and no more.
+    prompt = "prompt_version is 'p3-tool', not 'p2-tool'"
+    assert differences(record.run, record.end, REVISED) == [prompt]
     was = EVALUATION["toolset_version"][toolset]
     assert differences(record.run, record.end) == [
-        f"toolset_version is {NOW[toolset]!r}, not {was!r}"
+        f"toolset_version is {NOW[toolset]!r}, not {was!r}",
+        prompt,
     ]
 
 
 def test_the_cache_is_the_one_condition_that_the_command_has_to_be_asked_for(monkeypatch, tmp_path):
     record = started(monkeypatch, tmp_path, replies=[READ["staged"], SUBMIT])
-    assert differences(record.run, record.end, REVISED) == [
+    assert differences(record.run, record.end, ASKING_AGAIN) == [
         "model.cache_control is None, not {'type': 'ephemeral'}"
     ]
 
@@ -183,14 +206,14 @@ def test_the_cache_is_the_one_condition_that_the_command_has_to_be_asked_for(mon
             says(json.dumps(ANSWER)),
             [
                 "answer_channel is 'format', not 'tool'",
-                "prompt_version is 'p1', not 'p2-tool'",
+                "prompt_version is 'p1', not 'p3-tool'",
                 "model.answer_format is 'json_schema', not None",
             ],
         ),
         (
             ["--answer-channel", "text"],
             says(json.dumps(ANSWER)),
-            ["answer_channel is 'text', not 'tool'", "prompt_version is 'p2-text', not 'p2-tool'"],
+            ["answer_channel is 'text', not 'tool'", "prompt_version is 'p2-text', not 'p3-tool'"],
         ),
     ],
 )
@@ -198,7 +221,7 @@ def test_a_run_started_with_another_option_says_so_in_its_record(
     monkeypatch, tmp_path, options, last, said
 ):
     record = started(monkeypatch, tmp_path, "--cache", *options, replies=[READ["staged"], last])
-    assert differences(record.run, record.end, REVISED) == said
+    assert differences(record.run, record.end, ASKING_AGAIN) == said
 
 
 # --- holding a record against the conditions ---------------------------------------------
@@ -320,6 +343,10 @@ def test_a_record_is_held_against_the_conditions_that_are_given():
     # Everything else is held as before.
     slower = line(toolset_version="staged-6", limits={**LIMITS, "max_turns": 20})
     assert differences(slower, None, REVISED) == ["limits.max_turns is 20, not 12"]
+    # A run made before the loop asked again is no run of the conditions of now.
+    assert differences(now, None, ASKING_AGAIN) == ["prompt_version is 'p2-tool', not 'p3-tool'"]
+    asking = line(toolset_version="staged-6", prompt_version="p3-tool")
+    assert differences(asking, None, ASKING_AGAIN) == []
 
 
 def test_a_result_of_another_parser_is_named_from_the_last_line():
