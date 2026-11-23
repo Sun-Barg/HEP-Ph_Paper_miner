@@ -298,3 +298,7 @@ reads the records, the sheet and the key.
   what is shown of the message is the twenty requests: two conversations of one
   question. The records, and what can and cannot be said of them, are in
   `results/runs/asking-again/`.
+- The same day, after that count, the maintainer graded the twenty answers by hand: all
+  twenty right. No reading of this was fixed before the requests, and the grader had
+  been told beforehand what the rule finds in the answers; the sheet and its key are in
+  that folder.

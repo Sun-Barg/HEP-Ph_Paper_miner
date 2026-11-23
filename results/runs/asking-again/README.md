@@ -24,9 +24,11 @@ those of the runs of 2026-11-20 with the new prompt (`ASKING_AGAIN` in
 | `regress-dev.md` | what `eval.regress --criteria 2` wrote of `dev-after/` held against `../regress/dev-after/` |
 | `dev-sheet.csv`, `dev-key.csv` | the sheet of the 30 answers of `dev-after/` and its key, as `eval.sheet` wrote them. Nobody graded it |
 | `dev-j2.jsonl` | the record of the judge `j2` on that sheet: 90 requests, each of which said `right` ($0.33) |
+| `replay-dev-02-sheet.csv`, `replay-dev-02-key.csv` | the twenty answers of `replay-dev-02.jsonl` on a sheet, graded by hand after the requests, and its key (below, "The twenty answers") |
 
-The two CSV files are kept byte for byte (`.gitattributes`), because the record of the
-judge names the sheet by its SHA-256. `tests/test_asking_again_results.py` holds the
+The CSV files are kept byte for byte (`.gitattributes`): the record of the judge names
+`dev-sheet.csv` by its SHA-256, and the graded sheet is the file as the maintainer saved
+it. `tests/test_asking_again_results.py` holds the
 files against each other, and holds what is said below against the records.
 
 ## The two ends of dev-02, sent again: the answer was handed in
@@ -110,7 +112,19 @@ not by a run.
 None of this decides anything.
 
 - **The twenty answers.** The count asks for a call with an answer of the expected
-  form, and no more. Nobody graded the twenty answers, and the judge did not read them.
+  form, and no more. After the requests, on 2026-11-23, the maintainer graded the
+  twenty answers by hand, by the `accept_note` of dev-02: all twenty right
+  (`replay-dev-02-sheet.csv`). This is no part of the reading that was fixed before the
+  requests; it was added when the count was known. And the grading was not blind to
+  what was known of the answers, as the grading of the evaluation was: before the sheet
+  was made, the Claude session had told the maintainer what the rule finds in them (the
+  next sentences), and the README of the commit before this one said so too. The sheet has
+  the form that `eval.sheet` writes and was written by a short script outside this
+  repository, the rows in a drawn order; the key names the conversation and the request
+  of each row. Five of the answers call the threshold of 3.84 two-sided, a word the
+  paper does not use. The grader's note on those five rows says that the word is
+  right for an interval of one parameter and takes nothing from the answer. The judge
+  did not read the twenty answers.
   The rule of `eval/grade.py` finds in each of them the two numbers and the two phrases
   that the key of dev-02 asks for, and `found` as expected. It leaves each to a person,
   as it does every answer to dev-02, whose key names two things for a person to look

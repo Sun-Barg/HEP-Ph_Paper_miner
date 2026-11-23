@@ -22,7 +22,7 @@ from collections import Counter
 from pathlib import Path
 
 from test_regress_results import asked, reads_with_end
-from test_results import OWN, cost, own_paper, read_from_cache
+from test_results import OWN, cost, own_paper, read_csv, read_from_cache
 
 from hepph_paper_miner.agent.origin import file_digest
 from hepph_paper_miner.agent.prompt import ASK_AGAIN_TEXT
@@ -32,7 +32,16 @@ from hepph_paper_miner.eval.grade import BY_HAND, RIGHT, Record, grade_answer
 from hepph_paper_miner.eval.questions import load_questions
 from hepph_paper_miner.eval.replay import HANDED_IN, ended_without_the_call
 from hepph_paper_miner.eval.run import Attempt, Cell, attempts_in, counted, plan
-from hepph_paper_miner.eval.sheet import Row, read_key, write_key, write_sheet
+from hepph_paper_miner.eval.sheet import (
+    KEY_COLUMNS,
+    SHEET_COLUMNS,
+    Row,
+    _cell,
+    read_grades,
+    read_key,
+    write_key,
+    write_sheet,
+)
 from hepph_paper_miner.sources.fixture import FixtureSource
 
 ROOT = Path(__file__).parent.parent
@@ -45,6 +54,8 @@ SHEET, KEY = HERE / "dev-sheet.csv", HERE / "dev-key.csv"
 JUDGED = HERE / "dev-j2.jsonl"
 COMPARED = HERE / "regress-dev.md"
 SENT_AGAIN = HERE / "replay-dev-02.jsonl"
+GRADED = HERE / "replay-dev-02-sheet.csv"  # the twenty answers, graded by hand afterwards
+GRADED_KEY = HERE / "replay-dev-02-key.csv"
 
 CHANGE, BEFORE_IT = (
     "0af1c02",
@@ -411,7 +422,8 @@ def test_all_twenty_responses_handed_in_an_answer_by_the_call():
 
 
 def test_the_rule_finds_nothing_missing_in_the_twenty_answers_and_leaves_each_to_a_person():
-    # Read after the count, which asks for the call and no more. Nobody graded these.
+    # Read after the count, which asks for the call and no more. The grades by hand came
+    # later still, and the grader had been told this (the test below).
     (question,) = [question for question in load_questions(DEV) if question.id == "dev-02"]
     assert len(question.answer_key["by_hand"]) == 2
     head, requests, _ = replay.read_record(SENT_AGAIN)
@@ -443,6 +455,60 @@ def test_the_rule_finds_nothing_missing_in_the_twenty_answers_and_leaves_each_to
             if c.question_id == "dev-02" and a.end["answer"]
         }
         assert rules == {BY_HAND}
+
+
+def test_the_twenty_answers_were_graded_by_hand_afterwards_and_all_twenty_are_right():
+    (question,) = [question for question in load_questions(DEV) if question.id == "dev-02"]
+    head, requests, _ = replay.read_record(SENT_AGAIN)
+    layout = {run["run_id"]: run["toolset"] for run in head["runs"]}
+    sent = {(request["run_id"], request["repeat"]): request["answer"] for request in requests}
+    assert len(sent) == 20
+
+    # The key names each request once, and the rows are not in the order of the record.
+    key = read_key(GRADED_KEY)
+    assert sorted(key) == list(range(1, 21))
+    assert all(list(line) == list(KEY_COLUMNS) for line in key.values())
+    named = [(line["run_id"], int(line["repeat"])) for _, line in sorted(key.items())]
+    assert sorted(named) == sorted(sent) and named != sorted(named)
+    for line in key.values():
+        assert (line["question_id"], line["record"]) == ("dev-02", SENT_AGAIN.name)
+        assert line["toolset"] == layout[line["run_id"]]
+
+    # The sheet has the form eval.sheet writes, and each row holds the answer of the
+    # request that the key names: nothing of an answer was changed on the way.
+    rows = read_csv(GRADED)
+    assert all(list(row) == list(SHEET_COLUMNS) for row in rows)
+    data = GRADED.read_bytes()
+    assert data.startswith(b"\xef\xbb\xbf") and data.endswith(b"\r\n")
+    for row, request in zip(rows, named, strict=True):
+        assert row["question_id"] == "dev-02" and row["found"] == "true" and sent[request]["found"]
+        assert row["answer"] == _cell(sent[request]["answer"])
+    first, *others = rows
+    assert (first["question"], first["reference_answer"], first["accept_note"]) == (
+        question.question,
+        question.reference_answer,
+        question.accept_note,
+    )
+    assert all(
+        not (row["question"] or row["reference_answer"] or row["accept_note"]) for row in others
+    )
+
+    # Every row is graded, and every grade is right.
+    grades = read_grades(GRADED, GRADED_KEY)
+    assert [grade.number for grade in grades] == list(range(1, 21))
+    assert [(grade.run_id, grade.repeat) for grade in grades] == named
+    assert Counter(grade.grade for grade in grades) == {"right": 20}
+    assert not any(grade.why_wrong for grade in grades)
+    assert Counter(grade.toolset for grade in grades) == {"flat": 10, "staged": 10}
+
+    # The grader wrote a note on five rows and on no other: the answers that call the
+    # threshold of 3.84 two-sided. The paper does not use the word.
+    noted = [grade.number for grade in grades if grade.note]
+    assert noted == [int(row["number"]) for row in rows if "two-sided" in row["answer"]]
+    assert noted == [6, 8, 10, 11, 12]
+    assert all("two-sided" in grade.note for grade in grades if grade.note)
+    text = " ".join(section.text for section in own_paper().sections)
+    assert "3.84" in text and "two-sided" not in text and "two sided" not in text
 
 
 # --- the cost -----------------------------------------------------------------------------
