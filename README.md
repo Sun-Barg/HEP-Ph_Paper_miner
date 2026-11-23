@@ -4,7 +4,8 @@ An MCP server that lets a model search arXiv and read papers, a minimal tool-cal
 loop that drives it, and a small evaluation set that compares two tool layouts: reading
 a whole paper at once, or reading an outline first and then single sections.
 
-Everything listed under Status is done, and the results of the evaluation are below.
+Everything ticked under Status is done, and the results of the evaluation are below. The
+last item has its rule and its commands, and has not been run.
 
 ## Status
 
@@ -16,6 +17,7 @@ Everything listed under Status is done, and the results of the evaluation are be
 - [x] A model as a second grader, held against the grades by hand
 - [x] Tool texts changed for what the evaluation showed, and held against the runs before
 - [x] The loop asks for an answer that was written and not handed in, tried on two such ends
+- [ ] A survey of which papers the server can read, in thirteen archives: the rule is fixed, the sample is not drawn yet
 
 ## The two tool layouts
 
@@ -159,7 +161,7 @@ uv sync
 uv run pytest
 ```
 
-The default test run sends no requests. Four further tests and one script talk to arXiv,
+The default test run sends no requests. Six further tests and one script talk to arXiv,
 three seconds apart:
 
 ```
@@ -665,13 +667,159 @@ made once from the commit that added that entry (`9711ca5`), and its report is
 `results/judge/report.md`. `tests/test_agree.py` holds the two against the sheet, the key,
 the controls and the commit, as `tests/test_results.py` does for the runs.
 
+## A survey of which papers can be read
+
+The evaluation asks its questions of papers that one person had read, most of them from
+one archive. It says nothing of the papers the reading tools turn away: a paper that
+arXiv has only as a PDF, a source the section parser cannot split. The survey counts
+them. It draws papers from the thirteen archives of arXiv's physics group by a rule that
+was fixed beforehand, gives each to the source the tools use, and writes down whether
+it came back split into sections, and if not, why not. No model is asked anything, and
+nothing is graded.
+
+It is a measurement that is made once. It does not make the server one "for all of
+physics": the questions of the evaluation are still about one corner of it.
+
+**It has not been run.** The repository holds the rule and the commands. The sample, the
+outcomes and a table of them come in later commits, each after the one before: the plan
+is in the history before the papers are drawn, and nothing but that order shows that
+the papers were not picked.
+
+### The plan
+
+`eval_data/survey_plan.json` names what the survey is about, in a form the commands read.
+
+| | |
+|---|---|
+| Population | the papers whose primary category is one of the 51 categories of the physics group (13 archives: astro-ph, cond-mat, gr-qc, hep-ex, hep-lat, hep-ph, hep-th, math-ph, nlin, nucl-ex, nucl-th, physics, quant-ph; arXiv's taxonomy as read on 2026-11-24), and that arXiv's API returns for `submittedDate` from 2026-08-01 00:00 to 2026-10-31 23:59 GMT, asked month by month |
+| Sample | 40 papers of every archive, 520 in all |
+| Order | every paper gets the SHA-256 of `<seed>:<its identifier without the version>`, and the papers of an archive are taken from the smallest value up. The seed is 20261124, the day the plan was written |
+| Check by hand | of the papers of every archive that were split, the first 5 of the same order: 65 outlines held against the papers |
+
+The order uses no random number generator, so it does not rest on how a library is
+written: with the list and the seed, anyone can work it out again. A larger sample
+drawn later holds the smaller one. The categories are asked for one by one, because the
+API returns nothing of an archive's categories for the name of the archive alone (on
+2026-11-23 a search limited to `cat:astro-ph` found no paper, and the same search
+limited to `cat:astro-ph.GA` found papers). The answer to `cat:` holds cross-listed
+papers too; a paper is kept under its primary category only, so it is in the
+population once.
+
+A plan is fixed once a sample has been drawn under it. Another window, seed or number
+of papers is another plan, in a file of its own.
+
+### Drawing the sample
+
+```
+uv run python -m hepph_paper_miner.survey.sample --plan eval_data/survey_plan.json --population results/survey/population.jsonl --sample results/survey/sample.jsonl
+```
+
+asks arXiv for every category in every month (153 requests at the least, three seconds
+apart) and writes two files: every paper of the population, and the papers drawn from
+it. It does not start unless the plan is a file of a commit and no file the repository
+keeps has been changed, and it does not write over a file.
+
+A sample is as good as the list it is drawn from, and the API can answer with status 200
+and less than it was asked for. So a list counts only when it is whole: every page says
+the same total and begins where it was asked to, the pages together hold that many
+papers and none twice, every paper carries a version, a primary category and the time
+of its first version, and a category that is said to hold nothing in a month says so a
+second time. A piece that fails is thrown away and asked for again, three times at
+most; then the command stops and writes nothing. It also stops when a paper says that
+its first version was submitted outside the month it was returned for: the manual of
+the API does not say which version `submittedDate` is about, and the plan takes it to
+be the first.
+
+`--only hep-lat,nucl-ex` is for a first try: it asks for these categories, says what
+came back, under which primary categories and after how long, and writes nothing.
+`--page-size` sets how many papers one request asks for (1,000 unless told otherwise,
+2,000 at the most).
+
+### Running it
+
+```
+uv run python -m hepph_paper_miner.survey.run --sample results/survey/sample.jsonl --out results/survey/outcomes.jsonl
+```
+
+fetches and splits every paper of the sample as `get_outline` would (two requests for a
+paper the first time, so 52 minutes at the least for 520 papers), in the version the
+sample names, and writes a line for each:
+
+| Outcome | Meaning |
+|---|---|
+| `ok` | split into sections. The line holds the numbers of sections and subsections, the characters, the size of the largest piece one call can be asked for, and whether the paper has a section heading at all |
+| `no_full_text` | arXiv has no TeX source of the paper: a PDF (`not_tex`), or nothing to download (`no_source`) |
+| `parse_error` | there is a source and the parser turned it away. The sentence of the parser is kept, and sorted into kinds: `no_document` (no `\begin{document}`: plain TeX, or the notice of a withdrawn paper), `missing_file`, `unfollowed_command` (`\import` and its relatives), `too_short`, and a few more |
+| `not_found`, `unexpected` | arXiv lists no such paper; or the code raised an error of its own. Neither is expected, and each is counted |
+| `unanswered` | arXiv was busy, took too long, or sent something that was not the paper's files. This says nothing of the paper, and **it is not an outcome** |
+
+The survey is done when no paper is left `unanswered`: the command ends with code 1
+while one is, and run again, it asks again. What arXiv answered is on disk, so only the
+papers without an answer cost requests. Every run goes through the whole sample and
+writes the whole file anew, so every line of a file was made by one version of the
+code, and the first line names it (the commit, the version of the parser). A paper that
+stays unanswered however often it is asked is reported as that, with the sentence it
+came back with; a paper that was submitted as HTML is one, today.
+
+A paper that was split is not thereby a paper that is easy to read. Two shapes are
+counted beside the outcomes: a paper without any section heading comes back as one
+piece, and a piece of more than 20,000 characters takes more than one call of
+`read_section`.
+
+`--limit 52` is for a first try: the first four papers of every archive, what came
+back, and how much the folder of downloads grew. It writes nothing. While the survey
+runs, nothing else on the machine should ask arXiv: the three seconds between requests
+are kept inside one process, and a server that a desktop app started is another one.
+
+### Holding outlines against the papers
+
+"Split into sections" says that the parser returned sections, not that they are the
+sections of the paper. So some outlines are looked at by a person:
+
+```
+uv run python -m hepph_paper_miner.survey.sheet --plan eval_data/survey_plan.json --sample results/survey/sample.jsonl --outcomes results/survey/outcomes.jsonl --sheet runs_private/outline-sheet.csv
+```
+
+writes a sheet with the papers the plan fixes (of every archive, the first 5 of the
+order that were split) and under each its outline as the server gives it. The person
+opens the paper and writes two verdicts on its row. `sections` is `same` when the
+headings the paper has at the level of a section are the rows that are not indented:
+as many, in the same order, each the same heading. `subsections` is the same one level
+down. A title that only looks different because the sheet shows TeX as it was typed is
+no difference, and neither are the numbers in front of a heading, the list of
+references (which the parser leaves out on purpose) or anything below a subsection
+(where it does not cut). A heading of the paper without a row is a difference, as is a
+row that is no heading of the paper, another order or another title. The rules stand in
+full at the top of `src/hepph_paper_miner/survey/sheet.py`, and they were written
+before any outline of the sample had been seen.
+
+The sheet holds section titles, which are text of the papers, so it stays in
+`runs_private/`. With `--checks results/survey/outline-check.jsonl` added, the command
+reads the filled sheet and writes what the repository keeps: for every paper its
+identifier, the two verdicts and the note of the person who checked.
+
+### What it will say, and what it will not
+
+It will say: of the papers drawn by this rule, so many of each archive were split into
+sections, and the rest failed for these reasons; and of the outlines a person looked
+at, so many were the outline of the paper.
+
+It will not say that the server answers questions about such papers: that takes
+questions, and is another evaluation. It says nothing of papers from other years. The
+sources of the 1990s are written differently (plain TeX), and none of them is in three
+months of 2026. And 40 papers of an archive leave a share uncertain by about 15
+percentage points either way where it is widest (the 95% interval of a share near one
+half).
+
 ## Paper text and the cache
 
 Downloads from arXiv are kept in `~/.cache/hepph-paper-miner` (set
 `HEPPH_PAPER_MINER_CACHE` to use another folder), outside this repository. Paper text
 is never committed, and neither is a run record that contains it. The one exception is
 `tests/fixtures/arxiv-2610.26648v1/`: a paper under CC0 by the maintainer of this
-repository, used to test the section parser.
+repository, used to test the section parser. The files of the survey under
+`results/survey/` hold identifiers, categories, dates, counts and the sentences of the
+parser, and no title, abstract or text of a paper.
 
 The folder has no expiry. An answer of arXiv that could be used is kept for good, and
 the same request is not sent again. That holds for a search too: a search that listed

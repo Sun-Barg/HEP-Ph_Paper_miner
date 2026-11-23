@@ -65,6 +65,21 @@ works here follows the rules below.
   what comes after, so the development questions are run again and held against the runs
   before (`eval/regress.py`).
 
+## The survey
+
+- `eval_data/survey_plan.json` says which papers the survey is about and how its sample is
+  drawn. It is committed before the sample is drawn, and once a sample has been drawn
+  under it, it is fixed like the conditions of the evaluation: another window, seed,
+  list of categories or number of papers is another plan, in a file of its own under
+  another name, and the sample of the first stays what it was.
+- `results/survey/` holds identifiers, categories, dates, counts, the sentences of the
+  parser and the notes of the person who checked the outlines. The sheet of that check
+  (`survey/sheet.py`) holds section titles, which are paper text: it is written into
+  `runs_private/` and never committed.
+- `unanswered` is not an outcome of the survey. A number about the papers that were read
+  is given with the papers that are still unanswered beside it, never with them counted
+  as failures or left out without a word.
+
 ## Style
 
 - Format with `uvx ruff format` (line length 100).

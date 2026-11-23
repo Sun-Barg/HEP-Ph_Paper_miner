@@ -1,0 +1,33 @@
+{
+  "plan": "survey-1",
+  "about": "Which papers the server can split into sections: the population, the sample and the check by hand. Written before any paper was listed or drawn. README.md says how each part is read.",
+  "population": {
+    "archives": {
+      "astro-ph": ["astro-ph.CO", "astro-ph.EP", "astro-ph.GA", "astro-ph.HE", "astro-ph.IM", "astro-ph.SR"],
+      "cond-mat": ["cond-mat.dis-nn", "cond-mat.mes-hall", "cond-mat.mtrl-sci", "cond-mat.other", "cond-mat.quant-gas", "cond-mat.soft", "cond-mat.stat-mech", "cond-mat.str-el", "cond-mat.supr-con"],
+      "gr-qc": ["gr-qc"],
+      "hep-ex": ["hep-ex"],
+      "hep-lat": ["hep-lat"],
+      "hep-ph": ["hep-ph"],
+      "hep-th": ["hep-th"],
+      "math-ph": ["math-ph"],
+      "nlin": ["nlin.AO", "nlin.CD", "nlin.CG", "nlin.PS", "nlin.SI"],
+      "nucl-ex": ["nucl-ex"],
+      "nucl-th": ["nucl-th"],
+      "physics": ["physics.acc-ph", "physics.ao-ph", "physics.app-ph", "physics.atm-clus", "physics.atom-ph", "physics.bio-ph", "physics.chem-ph", "physics.class-ph", "physics.comp-ph", "physics.data-an", "physics.ed-ph", "physics.flu-dyn", "physics.gen-ph", "physics.geo-ph", "physics.hist-ph", "physics.ins-det", "physics.med-ph", "physics.optics", "physics.plasm-ph", "physics.pop-ph", "physics.soc-ph", "physics.space-ph"],
+      "quant-ph": ["quant-ph"]
+    },
+    "categories_checked": {"on": "2026-11-24", "at": "https://arxiv.org/category_taxonomy"},
+    "submitted": [
+      ["202608010000", "202608312359"],
+      ["202609010000", "202609302359"],
+      ["202610010000", "202610312359"]
+    ]
+  },
+  "sample": {
+    "per_archive": 40,
+    "seed": 20261124,
+    "order": "sha256 of '<seed>:<identifier without its version>', smallest first"
+  },
+  "outline_check": {"per_archive": 5}
+}
