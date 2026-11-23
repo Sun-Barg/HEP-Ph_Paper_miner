@@ -76,6 +76,10 @@ works here follows the rules below.
   parser and the notes of the person who checked the outlines. The sheet of that check
   (`survey/sheet.py`) holds section titles, which are paper text: it is written into
   `runs_private/` and never committed.
+- The sample was drawn on 2026-11-23 UTC, so the plan is fixed now.
+  `tests/test_survey_results.py` fails when the plan is no longer the file the sample
+  names, or when `results/survey/sample.jsonl` is not what the plan draws from
+  `results/survey/population.jsonl`. Editing one of the three until it passes is not a fix.
 - `unanswered` is not an outcome of the survey. A number about the papers that were read
   is given with the papers that are still unanswered beside it, never with them counted
   as failures or left out without a word.

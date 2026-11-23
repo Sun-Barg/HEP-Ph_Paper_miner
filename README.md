@@ -5,7 +5,7 @@ loop that drives it, and a small evaluation set that compares two tool layouts: 
 a whole paper at once, or reading an outline first and then single sections.
 
 Everything ticked under Status is done, and the results of the evaluation are below. The
-last item has its rule and its commands, and has not been run.
+last item has its rule, its commands and its sample, and has not been run.
 
 ## Status
 
@@ -17,7 +17,7 @@ last item has its rule and its commands, and has not been run.
 - [x] A model as a second grader, held against the grades by hand
 - [x] Tool texts changed for what the evaluation showed, and held against the runs before
 - [x] The loop asks for an answer that was written and not handed in, tried on two such ends
-- [ ] A survey of which papers the server can read, in thirteen archives: the rule is fixed, the sample is not drawn yet
+- [ ] A survey of which papers the server can read, in thirteen archives: the rule is fixed and the 520 papers are drawn, the survey has not been run yet
 
 ## The two tool layouts
 
@@ -680,10 +680,10 @@ nothing is graded.
 It is a measurement that is made once. It does not make the server one "for all of
 physics": the questions of the evaluation are still about one corner of it.
 
-**It has not been run.** The repository holds the rule and the commands. The sample, the
-outcomes and a table of them come in later commits, each after the one before: the plan
-is in the history before the papers are drawn, and nothing but that order shows that
-the papers were not picked.
+**It has not been run.** The repository holds the rule, the commands and the sample.
+The outcomes and a table of them come in later commits, each after the one before: the
+plan was in the history before the papers were drawn, and nothing but that order shows
+that the papers were not picked.
 
 ### The plan
 
@@ -735,6 +735,42 @@ came back, under which primary categories and after how long, and writes nothing
 `--page-size` sets how many papers one request asks for (1,000 unless told otherwise,
 2,000 at the most).
 
+**What was drawn.** The command was run on 2026-11-23 by `a3ddd0b`, the commit that
+brought the plan (made at 16:52 UTC that day), and arXiv gave the answers the list is
+made of from 17:59 to 18:10 UTC. It listed 49,627 entries in the 153 pieces, a
+cross-listed paper once for every category it is listed in. No entry carried a first
+version from outside the month it was returned for, or the command would have stopped.
+29,285 papers have one of the 51 categories as their primary category, and 520 of them
+were drawn.
+
+| Archive | Listed | Papers of the archive | Drawn |
+|---|---|---|---|
+| astro-ph | 9,161 | 5,762 | 40 |
+| cond-mat | 10,431 | 6,125 | 40 |
+| gr-qc | 2,514 | 1,544 | 40 |
+| hep-ex | 1,067 | 351 | 40 |
+| hep-lat | 357 | 142 | 40 |
+| hep-ph | 2,727 | 1,941 | 40 |
+| hep-th | 2,852 | 1,550 | 40 |
+| math-ph | 2,521 | 617 | 40 |
+| nlin | 845 | 339 | 40 |
+| nucl-ex | 422 | 131 | 40 |
+| nucl-th | 903 | 450 | 40 |
+| physics | 9,505 | 5,432 | 40 |
+| quant-ph | 6,322 | 4,901 | 40 |
+
+`results/survey/population.jsonl` is the list: what arXiv said each piece holds, and for
+every paper its identifier, its primary category and the time of its first version.
+`results/survey/sample.jsonl` holds the 520 papers in their order. A test draws the
+sample again from the list and holds it against that file
+(`tests/test_survey_results.py`), and it fails when the plan is no longer the file the
+sample was drawn under.
+
+Forty papers are almost a third of one archive (nucl-ex, 131 papers) and less than a
+hundredth of another (cond-mat, 6,125), so a count over all 520 is not a share of the
+physics group. And the papers are drawn by archive, not by category: 42 of the 51
+categories have a paper among them.
+
 ### Running it
 
 ```
@@ -770,6 +806,10 @@ piece, and a piece of more than 20,000 characters takes more than one call of
 back, and how much the folder of downloads grew. It writes nothing. While the survey
 runs, nothing else on the machine should ask arXiv: the three seconds between requests
 are kept inside one process, and a server that a desktop app started is another one.
+
+The first try was run on 2026-11-23 UTC, after the sample had been drawn and before it
+was committed. What it showed of 52 papers could not change the sample: the sample is
+what the rule draws from the list, and the test draws it again.
 
 ### Holding outlines against the papers
 
