@@ -4,9 +4,7 @@ An MCP server that lets a model search arXiv and read papers, a minimal tool-cal
 loop that drives it, and a small evaluation set that compares two tool layouts: reading
 a whole paper at once, or reading an outline first and then single sections.
 
-Everything ticked under Status is done, and the results of the evaluation are below. The
-last item has been run and counted, and the check of its outlines by hand is still to
-come.
+Everything ticked under Status is done, and the results of the evaluation are below.
 
 ## Status
 
@@ -18,7 +16,7 @@ come.
 - [x] A model as a second grader, held against the grades by hand
 - [x] Tool texts changed for what the evaluation showed, and held against the runs before
 - [x] The loop asks for an answer that was written and not handed in, tried on two such ends
-- [ ] A survey of which papers the server can read, in thirteen archives: the 520 papers have been fetched and counted, the 65 outlines have not been held against the papers yet
+- [x] A survey of which papers the server can read, in thirteen archives: 520 papers fetched and counted, and 65 of their outlines held against the papers, from a draft by a model that the maintainer checked paper by paper
 
 ## The two tool layouts
 
@@ -681,11 +679,13 @@ nothing is graded.
 It is a measurement that is made once. It does not make the server one "for all of
 physics": the questions of the evaluation are still about one corner of it.
 
-**It has been run, and its outlines have not been checked by hand yet.** The repository
-holds the rule, the commands, the sample and the outcomes, and the table is under "What
-came back". They came in commits one after the other: the plan was in the history before
-the papers were drawn, and the sample before the survey was run. Nothing but that order
-shows that the papers were not picked.
+**It has been run, and 65 of its outlines have been held against the papers.** The
+repository holds the rule, the commands, the sample, the outcomes and the verdicts of
+that check; the table is under "What came back", and the check under "What the check
+found". They came in commits one after the other: the plan was in the history before
+the papers were drawn, the sample before the survey was run, and the outcomes before
+the verdicts were written. Nothing but that order shows that the papers were not
+picked.
 
 ### The plan
 
@@ -860,7 +860,7 @@ How far these numbers go:
   weights were in the repository before the survey was run. That a weighted share is
   given was decided after the second run, when the outcomes of 517 papers had been seen.
 - "Split into sections" is what the parser returned. Whether those are the sections of
-  the paper is the question of the check by hand below, which has not been made yet.
+  the paper is the question of the check of the outlines below.
 
 `results/survey/README.md` says what the files are and how the three runs went, and
 gives the two shapes archive by archive.
@@ -892,12 +892,98 @@ The sheet holds section titles, which are text of the papers, so it stays in
 reads the filled sheet and writes what the repository keeps: for every paper its
 identifier, the two verdicts and the note of the person who checked.
 
+### What the check found
+
+The check was made on 2026-11-25, and it was not made by hand alone, as the plan has it.
+The maintainer of this repository had the command write the sheet. A Claude session
+filled in a draft of it from the PDF or HTML pages of the papers. The maintainer then
+opened each of the 65 papers and held the draft against it.
+`results/survey/outline-check.jsonl` is what the command wrote from the sheet in the end,
+by `2293bd3`, the commit that brought the outcomes, and it names the file of the outcomes
+by its SHA-256. All 65 papers have both verdicts.
+
+| Archive | Outlines | Sections the same | Subsections the same | Both |
+|---|---|---|---|---|
+| astro-ph | 5 | 4 | 5 | 4 |
+| cond-mat | 5 | 2 | 4 | 2 |
+| gr-qc | 5 | 4 | 5 | 4 |
+| hep-ex | 5 | 3 | 5 | 3 |
+| hep-lat | 5 | 2 | 5 | 2 |
+| hep-ph | 5 | 2 | 4 | 2 |
+| hep-th | 5 | 4 | 5 | 4 |
+| math-ph | 5 | 5 | 4 | 4 |
+| nlin | 5 | 5 | 5 | 5 |
+| nucl-ex | 5 | 3 | 5 | 3 |
+| nucl-th | 5 | 3 | 5 | 3 |
+| physics | 5 | 3 | 5 | 3 |
+| quant-ph | 5 | 3 | 5 | 3 |
+| all | 65 | 43 | 62 | 42 |
+
+In 42 of the 65 outlines nothing was counted as a difference. Each of the other 23 has a
+note of what differs, and the notes say four things:
+
+- In 15 papers a heading over the acknowledgements, on a line of its own, has no row. In
+  14 of them nothing else differs.
+- In 5 papers the main text is divided by titles that are run into the head of a
+  paragraph, and the outline has no rows for them (the first reading below).
+- In 4 papers the section headings of supplementary material, which the paper prints
+  after its list of references, have no rows. In 2 of the 4 its subsection headings have
+  none either.
+- In 1 paper subsections that the paper prints after its list of references are rows
+  under the last section before the list.
+
+The rules do not say what to make of a title that does not stand on a line of its own
+and is run into the head of a paragraph. Two readings were settled on the day of the
+check, with outlines already in sight:
+
+- A paper that divides its main text by such titles and has no heading on a line of its
+  own there: the titles are the top division of the paper, and they are taken as its
+  headings at the level of a section. The outline has no rows for them, so `sections` is
+  `differ`. These are the 5 papers above. The reading had been put forward before the
+  sheet was written, and it was settled only after the command had read the sheet once:
+  until then 4 of the 5 were `same`.
+- A paper that has section headings and gives its acknowledgements such a title: the
+  title stands below the section headings, as the title of a paragraph does, and it is
+  not counted. This is noted in 6 papers, and both their verdicts are `same`. Counted
+  as differences, they would leave `sections` the same in 37 papers and both verdicts
+  in 36.
+
+The command read the sheet twice that day. `results/survey/outline-check-first.jsonl` is
+what it wrote at 03:39 UTC, and the file above is what it wrote at 04:52 UTC. In
+between, the first reading turned `sections` from `same` to `differ` for 4 papers, and
+7 papers got a note or a longer one while their verdicts stayed: the 6 of the second
+reading, and 1 of the 5 that differed for another reason already. The lines of the
+other 54 papers are the same in both files.
+
+Five of the 65 are papers that came back as one piece without a section heading (1 of
+hep-ex, 2 of nucl-ex, 1 of nucl-th, 1 of physics). None of them has both verdicts
+`same`: 4 are among the papers divided by titles run into paragraphs, and 1 has a
+heading over its acknowledgements on a line of its own. The fifth paper divided by such
+titles came back as 2 sections.
+
+How far this goes:
+
+- A model wrote the draft, and one person held it against the papers. That person had
+  the draft in sight when opening a paper, and nobody has looked a second time. The
+  verdicts are in the file paper by paper, each under the identifier of its paper, so
+  that anyone can look again.
+- The two readings were made after outlines had been seen. The first lowers the number
+  of outlines without a difference, and for the second the number under the other
+  reading is given.
+- A row of the table is five outlines. It shows where the differences were found, and
+  it is no share of an archive.
+- Every difference that was noted is a heading without a row, or a row under another
+  section than in the paper. No note names a row that is no heading of the paper,
+  another order or another title.
+- What in the sources of these 23 papers makes the difference has not been looked
+  into, and neither has what a model that reads such a paper misses by it.
+
 ### What it says, and what it does not
 
 It says: of the papers drawn by this rule, so many of each archive were split into
-sections, and the rest failed for these reasons ("What came back"). It will say, once a
-person has looked: of the outlines that were looked at, so many were the outline of the
-paper.
+sections, and the rest failed for these reasons ("What came back"). And of the outlines
+that were held against the papers, so many were the outline of the paper, and the
+others differed in these ways ("What the check found").
 
 It does not say that the server answers questions about such papers: that takes
 questions, and is another evaluation. It says nothing of papers from other years. The
@@ -913,8 +999,9 @@ Downloads from arXiv are kept in `~/.cache/hepph-paper-miner` (set
 is never committed, and neither is a run record that contains it. The one exception is
 `tests/fixtures/arxiv-2610.26648v1/`: a paper under CC0 by the maintainer of this
 repository, used to test the section parser. The files of the survey under
-`results/survey/` hold identifiers, categories, dates, counts and the sentences of the
-parser, and no title, abstract or text of a paper.
+`results/survey/` hold identifiers, categories, dates, counts, the sentences of the
+parser and the notes of the check of the outlines, and no title, abstract or text of a
+paper.
 
 The folder has no expiry. An answer of arXiv that could be used is kept for good, and
 the same request is not sent again. That holds for a search too: a search that listed

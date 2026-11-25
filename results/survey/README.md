@@ -12,11 +12,14 @@ evaluation.
 | `sample.jsonl` | the 520 papers that the rule of the plan draws from that list, 40 of each of the 13 archives, in their order |
 | `outcomes.jsonl` | what came back for each of the 520 papers: the file that the third run of `survey.run` wrote on 2026-11-25 |
 | `outcomes-first-run.jsonl`, `outcomes-second-run.jsonl` | the files that the two runs before it wrote, with 67 papers and with 3 papers unanswered. They are kept to show what asking again changed, and they are not the result |
+| `outline-check.jsonl` | what was found when 65 outlines were held against the papers: for each paper two verdicts and a note. `survey.sheet` wrote it on 2026-11-25 from the sheet, which a Claude session had filled in as a draft and the maintainer had checked against each paper. The sheet is not here, because it holds section titles |
+| `outline-check-first.jsonl` | what the same command wrote when it first read the sheet, earlier that day. It is kept to show what was changed after it, and it is not the result |
 
 `tests/test_survey_results.py` holds the list and the sample against each other and
 against the plan. `tests/test_survey_outcomes.py` holds the three other files against
 the sample and against each other, and holds what is said here and in the README of the
-repository against them.
+repository against them. `tests/test_survey_checks.py` does the same for the two files
+of the check of the outlines.
 
 ## The three runs
 
@@ -67,6 +70,48 @@ split:
 | physics | 30 | 4 | 11 |
 | quant-ph | 40 | 2 | 9 |
 | all | 494 | 26 | 125 |
+
+## The check of the outlines
+
+Of the papers of each archive that were split, the first 5 in the order of the sample
+were on the sheet: 65 papers, each with its outline as the server gives it. A Claude
+session filled in a draft of the sheet from the PDF or HTML pages of the papers, and the
+maintainer opened each paper and held the draft against it. The first line of
+`outline-check.jsonl` names the outcomes, the sample and the plan it belongs to, and
+`2293bd3`, the commit whose code read the sheet. It was written at 04:52 UTC on
+2026-11-25, after the last run of the survey had ended (02:00 UTC).
+
+A line has the two verdicts and a note. For 42 papers both verdicts are `same`, and 36
+of them have no note. The notes of the other 29 papers are put together from six
+sentences, here with the number of papers whose note holds each:
+
+| The note says | Papers |
+|---|---|
+| an acknowledgements heading that stands on a line of its own has no row | 15 |
+| an acknowledgements title run into the head of a paragraph has no row (not counted: it stands below the section headings of the paper) | 6 |
+| titles run into the head of paragraphs are the top division of the paper and have no rows | 5 |
+| section headings of supplementary material after the reference list have no rows | 4 |
+| subsection headings of supplementary material after the reference list have no rows | 2 |
+| subsection headings that the paper prints after the reference list are rows under the last section before it | 1 |
+
+The first, the third and the fourth go with `differ` under `sections` (22 papers: two
+papers have two of them), the last two with `differ` under `subsections` (3 papers). The
+second goes with no `differ`: it is the whole note of 6 papers whose verdicts are both
+`same`, and the README of the repository says how such a title was read. The papers
+with the first sentence are of eleven archives: 3 of hep-ph, 2 of hep-lat and of
+quant-ph, and 1 of astro-ph, cond-mat, gr-qc, hep-ex, hep-th, nucl-ex, nucl-th and
+physics.
+
+`outline-check-first.jsonl` is what the command wrote when it first read the sheet, at
+03:39 UTC. Both files have the same 65 papers, and the lines of 54 of them are the same
+in both. For 4 papers `sections` went from `same` to `differ`, with the third sentence
+as their note. For 7 papers only the note changed: the third sentence was added to the
+note of 1 paper, and the second sentence became the note of 6. Those 6 notes were put
+on the sheet by a Claude session, in the words above, after the maintainer had settled
+how such a title is read; the maintainer then had the command read the sheet again.
+
+The draft was a model's, and the check of it one person's. Nobody has looked a second
+time.
 
 ## The weighted share
 

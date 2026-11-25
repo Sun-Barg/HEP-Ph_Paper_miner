@@ -1,0 +1,66 @@
+{"record": "outline_check", "outcomes": {"file": "outcomes.jsonl", "sha256": "95b8db1bf379ac688b6e825a221480c1914a1558f1494b0b28cc9d7527783b13"}, "sample": {"file": "sample.jsonl", "sha256": "9378ba085e235347c4347ad6ea23c56d645ecc5a38acfad318d0e3703d10c9e4"}, "plan": {"name": "survey-1", "sha256": "64cedd39dc4b2901cea3b4dc310a0eff264be2ccf151897e1b7af08ef751a95b", "commit": "a3ddd0b4b426cdd73e278e44a0194258b5b5c9eb"}, "code": {"commit": "2293bd3e5a859182f8cfe66462a97575ac28dcd4", "modified": false}, "per_archive": 5, "unanswered_passed_over": 0, "written": "2026-11-25T04:52:06+00:00", "papers": 65, "same": 42}
+{"record": "paper", "archive": "astro-ph", "rank": 1, "id": "2608.06461v1", "sections": "same", "subsections": "same", "note": "an acknowledgements title run into the head of a paragraph has no row (not counted: it stands below the section headings of the paper)"}
+{"record": "paper", "archive": "astro-ph", "rank": 2, "id": "2609.00116v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "astro-ph", "rank": 3, "id": "2608.04988v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "astro-ph", "rank": 4, "id": "2609.05393v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "astro-ph", "rank": 5, "id": "2608.28051v1", "sections": "same", "subsections": "same", "note": "an acknowledgements title run into the head of a paragraph has no row (not counted: it stands below the section headings of the paper)"}
+{"record": "paper", "archive": "cond-mat", "rank": 2, "id": "2608.24513v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "cond-mat", "rank": 3, "id": "2608.20571v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "cond-mat", "rank": 4, "id": "2609.38531v1", "sections": "differ", "subsections": "same", "note": "section headings of supplementary material after the reference list have no rows"}
+{"record": "paper", "archive": "cond-mat", "rank": 6, "id": "2610.38850v1", "sections": "differ", "subsections": "differ", "note": "section headings of supplementary material after the reference list have no rows; subsection headings of supplementary material after the reference list have no rows"}
+{"record": "paper", "archive": "cond-mat", "rank": 8, "id": "2611.00575v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "gr-qc", "rank": 1, "id": "2610.23522v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "gr-qc", "rank": 2, "id": "2610.30031v2", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "gr-qc", "rank": 3, "id": "2609.17077v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "gr-qc", "rank": 4, "id": "2610.06370v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "gr-qc", "rank": 5, "id": "2609.02615v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "hep-ex", "rank": 1, "id": "2610.15036v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "hep-ex", "rank": 2, "id": "2609.24950v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "hep-ex", "rank": 3, "id": "2608.29159v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "hep-ex", "rank": 4, "id": "2610.05980v1", "sections": "differ", "subsections": "same", "note": "titles run into the head of paragraphs are the top division of the paper and have no rows"}
+{"record": "paper", "archive": "hep-ex", "rank": 5, "id": "2609.30180v2", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "hep-lat", "rank": 1, "id": "2609.05989v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "hep-lat", "rank": 2, "id": "2610.33681v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "hep-lat", "rank": 3, "id": "2609.23379v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "hep-lat", "rank": 4, "id": "2609.37325v1", "sections": "differ", "subsections": "same", "note": "titles run into the head of paragraphs are the top division of the paper and have no rows"}
+{"record": "paper", "archive": "hep-lat", "rank": 5, "id": "2609.19930v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "hep-ph", "rank": 1, "id": "2610.19124v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "hep-ph", "rank": 2, "id": "2610.41208v1", "sections": "same", "subsections": "same", "note": "an acknowledgements title run into the head of a paragraph has no row (not counted: it stands below the section headings of the paper)"}
+{"record": "paper", "archive": "hep-ph", "rank": 3, "id": "2610.12525v3", "sections": "differ", "subsections": "differ", "note": "an acknowledgements heading that stands on a line of its own has no row; section headings of supplementary material after the reference list have no rows; subsection headings of supplementary material after the reference list have no rows"}
+{"record": "paper", "archive": "hep-ph", "rank": 4, "id": "2610.28744v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "hep-ph", "rank": 5, "id": "2608.14347v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "hep-th", "rank": 1, "id": "2610.21574v3", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "hep-th", "rank": 2, "id": "2609.11738v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "hep-th", "rank": 3, "id": "2608.23111v2", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "hep-th", "rank": 4, "id": "2609.03023v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "hep-th", "rank": 5, "id": "2610.26610v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "math-ph", "rank": 1, "id": "2609.20528v1", "sections": "same", "subsections": "same", "note": "an acknowledgements title run into the head of a paragraph has no row (not counted: it stands below the section headings of the paper)"}
+{"record": "paper", "archive": "math-ph", "rank": 2, "id": "2608.20665v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "math-ph", "rank": 3, "id": "2608.17263v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "math-ph", "rank": 4, "id": "2609.24506v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "math-ph", "rank": 5, "id": "2608.02028v1", "sections": "same", "subsections": "differ", "note": "subsection headings that the paper prints after the reference list are rows under the last section before it"}
+{"record": "paper", "archive": "nlin", "rank": 1, "id": "2610.34471v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "nlin", "rank": 2, "id": "2609.01159v2", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "nlin", "rank": 3, "id": "2610.21620v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "nlin", "rank": 4, "id": "2609.05855v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "nlin", "rank": 5, "id": "2608.09310v2", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "nucl-ex", "rank": 1, "id": "2609.03914v2", "sections": "differ", "subsections": "same", "note": "titles run into the head of paragraphs are the top division of the paper and have no rows"}
+{"record": "paper", "archive": "nucl-ex", "rank": 2, "id": "2609.27375v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "nucl-ex", "rank": 3, "id": "2609.34987v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "nucl-ex", "rank": 5, "id": "2609.03579v2", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "nucl-ex", "rank": 6, "id": "2609.07556v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "nucl-th", "rank": 1, "id": "2610.03910v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "nucl-th", "rank": 2, "id": "2609.01229v1", "sections": "same", "subsections": "same", "note": "an acknowledgements title run into the head of a paragraph has no row (not counted: it stands below the section headings of the paper)"}
+{"record": "paper", "archive": "nucl-th", "rank": 3, "id": "2609.14000v2", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "nucl-th", "rank": 4, "id": "2610.29799v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "nucl-th", "rank": 5, "id": "2608.02998v1", "sections": "differ", "subsections": "same", "note": "titles run into the head of paragraphs are the top division of the paper and have no rows; section headings of supplementary material after the reference list have no rows"}
+{"record": "paper", "archive": "physics", "rank": 1, "id": "2609.08748v1", "sections": "differ", "subsections": "same", "note": "titles run into the head of paragraphs are the top division of the paper and have no rows"}
+{"record": "paper", "archive": "physics", "rank": 2, "id": "2609.39041v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "physics", "rank": 3, "id": "2609.28516v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "physics", "rank": 5, "id": "2609.33341v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "physics", "rank": 7, "id": "2609.20885v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "quant-ph", "rank": 1, "id": "2610.07242v1", "sections": "same", "subsections": "same", "note": "an acknowledgements title run into the head of a paragraph has no row (not counted: it stands below the section headings of the paper)"}
+{"record": "paper", "archive": "quant-ph", "rank": 2, "id": "2608.08271v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "quant-ph", "rank": 3, "id": "2610.03241v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}
+{"record": "paper", "archive": "quant-ph", "rank": 4, "id": "2610.38645v1", "sections": "same", "subsections": "same", "note": ""}
+{"record": "paper", "archive": "quant-ph", "rank": 5, "id": "2610.05995v1", "sections": "differ", "subsections": "same", "note": "an acknowledgements heading that stands on a line of its own has no row"}

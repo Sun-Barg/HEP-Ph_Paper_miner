@@ -73,7 +73,7 @@ works here follows the rules below.
   list of categories or number of papers is another plan, in a file of its own under
   another name, and the sample of the first stays what it was.
 - `results/survey/` holds identifiers, categories, dates, counts, the sentences of the
-  parser and the notes of the person who checked the outlines. The sheet of that check
+  parser and the notes of the check of the outlines. The sheet of that check
   (`survey/sheet.py`) holds section titles, which are paper text: it is written into
   `runs_private/` and never committed.
 - The sample was drawn on 2026-11-23 UTC, so the plan is fixed now.
@@ -85,6 +85,13 @@ works here follows the rules below.
   outlines names it by that. `survey.run` writes the file anew whenever it runs, with other
   times and another commit in its first line, so it is not run over that file again unless the
   owner asks for exactly that.
+- The outlines of 65 papers were held against the papers on 2026-11-25: a Claude session
+  drafted the verdicts and notes, and the owner checked each against its paper.
+  `results/survey/outline-check.jsonl` is fixed as well: `tests/test_survey_checks.py`
+  holds it by its SHA-256. An agent does not change a verdict or a note in it. Where an
+  agent fills in such a sheet, it fills in a draft for the owner to check, and the README
+  says who did what. A paper that is looked at again gets its verdicts in a new file
+  under another name.
 - `unanswered` is not an outcome of the survey. A number about the papers that were read
   is given with the papers that are still unanswered beside it, never with them counted
   as failures or left out without a word.
