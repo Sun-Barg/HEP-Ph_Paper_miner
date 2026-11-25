@@ -3,6 +3,12 @@
 The expected outline below was read off the paper. If a change to the parser makes
 this test fail, section identifiers or sizes have moved: raise PARSER_VERSION, and
 check every evaluation question that names a section.
+
+Parser 5 begins a section in more places than parser 4 did (test_latex.py). This paper
+has none of them: its acknowledgements stand under a \\section* of their own, nothing
+follows its list of references, and no title is run into a paragraph under no heading.
+So the outline below is the one that parser 4 gave, row for row, and the places that the
+questions about this paper name are where they were.
 """
 
 from conftest import OWN_PAPER, tar_gz
@@ -55,7 +61,7 @@ def test_main_file_comes_from_the_list_arxiv_ships():
 
 
 def test_outline_of_the_real_paper_is_what_the_paper_shows():
-    assert PARSER_VERSION == "4"
+    assert PARSER_VERSION == "5"
     sections = parse_source(download())
     assert [(section.section_id, section.chars, section.title) for section in sections] == EXPECTED
 

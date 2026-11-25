@@ -650,7 +650,15 @@ def test_the_twelve_diagnosis_runs_were_all_given_their_passage_early():
     assert {(r.toolset, r.access.turn) for r in results} == {("staged", 3), ("flat", 1)}
     assert sorted(r.reason for r in results) == ["answered"] * 5 + ["turn_limit"] * 7
     assert all(r.access.turns_after >= 9 for r in results if r.reason == "turn_limit")
-    assert all(r.problems == () for r in results)
+    # The runs read the paper as parser 4 split it, and each grade says that the parser
+    # of now is another. It cannot know that this paper is split the same by both, which
+    # tests/test_own_paper.py holds: so the places have not moved, and nothing else makes
+    # a grade doubtful.
+    moved = (
+        f"the run read papers split by parser ['4'], and is graded against parser "
+        f"['{PARSER_VERSION}']: places may have moved"
+    )
+    assert all(r.problems == (moved,) for r in results)
     # No answer is a wrong answer. The five answers hold what the key lists, and each
     # leaves something to a person.
     assert sorted(r.answer.rule for r in results) == [BY_HAND] * 5 + [WRONG] * 7

@@ -443,7 +443,8 @@ def main(argv: Sequence[str] | None = None, launch: Launch | None = None) -> int
         named = conditions_of_the_code()
         texts = ", ".join(CONDITIONS[named]["toolset_version"].values())
         prompt = CONDITIONS[named]["prompt_version"]
-        print(f"conditions {named} | tool texts {texts} | prompt {prompt}")
+        parser_name = CONDITIONS[named]["parser"]
+        print(f"conditions {named} | tool texts {texts} | prompt {prompt} | parser {parser_name}")
         if not os.environ.get("ANTHROPIC_API_KEY"):
             raise Stop("ANTHROPIC_API_KEY is not set in this shell")
         check_folder(attempts, digest, code, arguments.allow_other_code)

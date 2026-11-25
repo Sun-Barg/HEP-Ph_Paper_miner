@@ -32,10 +32,19 @@ is asked for the call once, with a message that belongs to the prompt (agent/pro
 p3-tool). ASKING_AGAIN is REVISED with that prompt and nothing else. REVISED stays as
 well, because runs were made under it (results/runs/regress/).
 
+Then the parser was changed, for what the survey of the papers it can read had shown
+(results/survey/): it begins a section in more places (at the acknowledgements a class
+sets, behind a list of references that text follows, at the titles that are run into the
+paragraphs of text without headings), and it takes the first \\maketitle for the end of
+the title block, not the last. MORE_SECTIONS is ASKING_AGAIN with that parser and nothing
+else. ASKING_AGAIN stays as well, because runs were made under it
+(results/runs/asking-again/). While every set had the same parser, its name stood beside
+them; since they differ in it, each names its own.
+
 So every set of conditions that runs were made under keeps its name and its values, and
-a text that changes gets a new set. Runs made now are held against the conditions that
-name the texts of the code (`of_the_code`), so a run under earlier conditions has to be
-made with the code as it was.
+a text or a parser that changes gets a new set. Runs made now are held against the
+conditions that name what the code has (`of_the_code`), so a run under earlier conditions
+has to be made with the code as it was.
 """
 
 from __future__ import annotations
@@ -71,6 +80,9 @@ EVALUATION: dict[str, Any] = {
         "request_seconds": 600.0,
     },
     "limits": {"max_turns": 12, "tool_seconds": 700.0, "run_seconds": 900.0},
+    # The parser that splits a paper into sections. The server names it in a result, and
+    # a record keeps the names in its last line, not in its first.
+    "parser": "4",
 }
 
 # What the code had once the tool texts were changed: the same, but for their names.
@@ -83,15 +95,17 @@ REVISED: dict[str, Any] = {
 # the name of the prompt, which holds the message of the loop.
 ASKING_AGAIN: dict[str, Any] = {**REVISED, "prompt_version": "p3-tool"}
 
+# What the code has since the parser begins a section in more places: the same as
+# ASKING_AGAIN, but for the parser. A model reads other outlines and other sections of
+# the papers that are split differently, so these are other conditions.
+MORE_SECTIONS: dict[str, Any] = {**ASKING_AGAIN, "parser": "5"}
+
 CONDITIONS: dict[str, dict[str, Any]] = {
     "evaluation": EVALUATION,
     "revised": REVISED,
     "asking-again": ASKING_AGAIN,
+    "more-sections": MORE_SECTIONS,
 }
-
-# The parser that splits a paper into sections. The server names it in a result, and a
-# record keeps the names in its last line.
-PARSER = "4"
 
 # What a record says of its model beside the settings above: which SDK sent the
 # requests. That is no condition somebody chose. uv.lock fixes it, like the two
@@ -102,7 +116,7 @@ _ABSENT = object()
 
 
 def of_the_code() -> str | None:
-    """The name of the conditions whose texts are the ones the code has now, or None."""
+    """The name of the conditions whose texts and parser the code has now, or None."""
     from hepph_paper_miner.agent.prompt import PROMPT_VERSION
     from hepph_paper_miner.server import TOOLSET_VERSION
     from hepph_paper_miner.sources.arxiv_latex import PARSER_VERSION
@@ -111,7 +125,7 @@ def of_the_code() -> str | None:
         if (
             conditions["toolset_version"] == TOOLSET_VERSION
             and conditions["prompt_version"] == PROMPT_VERSION[conditions["answer_channel"]]
-            and PARSER == PARSER_VERSION
+            and conditions["parser"] == PARSER_VERSION
         ):
             return name
     return None
@@ -173,6 +187,6 @@ def differences(
 
     if end is not None:
         for name in end.get("parser_versions") or []:
-            if name != PARSER:
-                found.append(f"a result came from parser {name!r}, not {PARSER!r}")
+            if name != conditions["parser"]:
+                found.append(f"a result came from parser {name!r}, not {conditions['parser']!r}")
     return found

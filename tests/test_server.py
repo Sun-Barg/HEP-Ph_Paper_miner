@@ -167,7 +167,7 @@ async def test_outline_shows_abstract_and_every_section_with_its_size(client, so
     lines = text.splitlines()
     paper = source.paper_by_id("2501.00001v2")
 
-    assert lines[0] == f"outline | 2501.00001v2 | {paper.chars} chars | 8 sections | parser 4"
+    assert lines[0] == f"outline | 2501.00001v2 | {paper.chars} chars | 8 sections | parser 5"
     assert lines[1:5] == [
         "Title: A Sample Paper",
         "Authors: Ada Alpha, Ben Beta",

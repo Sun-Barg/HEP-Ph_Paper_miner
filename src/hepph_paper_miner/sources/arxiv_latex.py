@@ -8,6 +8,11 @@
 parse_source() runs the four in order. The parser reads LaTeX as text and never
 runs TeX, so it follows \\input but not macros that authors define for themselves.
 
+A section begins at \\section and \\subsection, and in three more places where a paper
+has a division and no such command: at the acknowledgements a class sets, behind a list
+of references that text follows, and at titles that are run into the paragraphs of text
+without headings (split() says how each is told).
+
 A split that lost text is worse than no split: the reader would take a part of the
 paper for the whole. So where the parser can see that text is missing (a file named
 by \\input that it could not find, a command that reads files in a way it does not
@@ -28,10 +33,25 @@ Known limits. tests/test_against_tex.py shows each of them by running TeX itself
       - text in files that are read through a macro of the author's own is left out.
       - a download that holds several documents and comes without arXiv's list of
         its files: the longest file is taken for the paper.
+      - a download in which arXiv's list names several files as "toplevel" (a paper
+        and its supplemental material, each a document of its own): arXiv typesets
+        them one after the other, and only the first is read here.
       - \\includeonly, \\endinput and \\if... are not obeyed, so text that TeX
         skips can end up in a section.
-      - a few words that stand under no heading (before the first \\section, or
-        between \\appendix and the next one) are taken for commands and left out.
+      - a few words that stand under no heading (in front of the first place where
+        a section begins, or between \\appendix and the next such place) are taken
+        for commands and left out.
+
+Where a section begins without a \\section, the parser goes by what is typed, and TeX
+is not asked. tests/test_latex.py shows these:
+
+      - the acknowledgements of a class get a section of their own whether the class
+        prints a heading over them (most do), runs the word into the paragraph or
+        prints none (REVTeX with the option prl).
+      - titles run into paragraphs are found where they are typed in italics and set
+        off by a dash, a colon or a full stop, three or more of them, in text that
+        stands under no heading. A paper that sets them in bold, numbers them by hand
+        or sets them off in another way stays one section, like a paper that has none.
 """
 
 from __future__ import annotations
@@ -46,7 +66,7 @@ import zlib
 from hepph_paper_miner.sources.base import ErrorKind, Section, SourceError
 
 # Part of every run record. Change it whenever the same source would split differently.
-PARSER_VERSION = "4"
+PARSER_VERSION = "5"
 
 _MAX_UNPACKED_BYTES = 200_000_000
 _MAX_MEMBER_BYTES = 5_000_000
@@ -232,8 +252,52 @@ _HEADING = re.compile(
     r"(?:\[(?:[^\]{}]|\{[^{}]*\})*\]|\[[^\]]*\])?\s*\{"
     r"|\\appendix(?![A-Za-z])|\\begin\{appendi(?:x|ces)\}"
 )
-_FRONT_END = re.compile(r"\\maketitle(?![A-Za-z])|\\end\{abstract\}")
+_MAKETITLE = re.compile(r"\\maketitle(?![A-Za-z])")
+_END_OF_ABSTRACT = re.compile(r"\\end\{abstract\}")
 _LABEL = re.compile(r"\\label\s*\{[^{}]*\}")
+# Of what _BIBLIOGRAPHY removes, the commands that print the list. \bibliographystyle
+# prints nothing, and stands wherever the author put it.
+_PRINTS_THE_LIST = re.compile(r"\\begin\{thebibliography\}|\\bibliography\s*\{|\\printbibliography")
+# The acknowledgements as a class sets them: \begin{acknowledgments} ... \end{...}, or the
+# command alone (\acknowledgments in REVTeX and JHEP, \ack in the IOP classes), in either
+# spelling. No heading is typed there, so _HEADING does not find them.
+_ACKNOWLEDGEMENTS = re.compile(
+    r"\\begin\{(acknowledge?ments?|acks?)\}|\\(acknowledge?ments?|acks?)(?![A-Za-z@])"
+)
+# What stands right in front of a command that is being defined, not used:
+# \def\ack, \renewcommand{\acknowledgments}
+_DEFINITION = re.compile(r"\\(?:def|let|(?:re)?newcommand|providecommand)\s*\*?\s*\{?\s*\Z")
+# A title that is run into the head of a paragraph, the way letters without section
+# headings divide their text:  \textit{Introduction.}---  \emph{Results:}  {\it Summary}.
+# It is typed in italics, and a mark sets it off from the sentence, last inside the
+# braces or right behind them: a dash anywhere, a colon or a full stop only where a
+# paragraph begins (inside one, "\textit{et al.}" can stand at the head of a line).
+_BLANK_LINE = re.compile(r"\n[ \t]*\n")
+_ITALICS = re.compile(
+    r"(?:\\(?:noindent|par|indent)(?![A-Za-z])\s*)*"
+    r"(?:\\(?:textit|emph)\s*(\{)|(\{)\s*\\(?:it|em|itshape)(?![A-Za-z]))"
+)
+_DASH = r"(?:---|\\textemdash(?![A-Za-z])|\u2014)"
+_DASH_INSIDE = re.compile(r"[.:]?\s*" + _DASH + r"\s*\Z")
+_DASH_BEHIND = re.compile(r"[.:]?[ \t~]*" + _DASH)
+_STOP_INSIDE = re.compile(r"[.:]\s*\Z")
+_STOP_BEHIND = re.compile(r"[.:](?=[\s~])")
+# LaTeX's own command for a title that is run into its paragraph.
+_PARAGRAPH = re.compile(r"\\paragraph(?![A-Za-z])\s*\*?\s*\{")
+_MAX_RUN_IN_TITLE = 80
+# One paragraph that begins with italics and a full stop can be a turn of phrase, and so
+# can two. Three are taken for the division of the text.
+_MIN_RUN_IN_TITLES = 3
+# What a section is called that has no heading: always in parentheses, which tell a
+# reader of the outline that this is not a title of the paper.
+_NO_HEADINGS = "(the paper has no section headings)"
+_BEFORE_FIRST = "(text before the first section)"
+_AFTER_APPENDIX = "(text after \\appendix, without a section heading)"
+_AFTER_REFERENCES = "(text after the list of references, without a section heading)"
+
+# (position, level, starred, title, where the text starts). Level 0 is a place where a
+# section can begin without a heading; its title is the one such a section would get.
+_Mark = tuple[int, int, bool, str, int]
 
 
 def strip_comments(text: str) -> str:
@@ -363,6 +427,21 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
     \\appendix and the next \\section gets the next "u" identifier. Like any section,
     each of the two holds the subsections that follow it. Short and without a
     subsection, such text is commands and makes no section (_MIN_UNHEADED_CHARS).
+
+    Three more places begin a section, and no \\section stands there:
+
+        the acknowledgements   \\begin{acknowledgments} or \\acknowledgments, as a class
+                               sets them. Titled with the word the source uses.
+        behind the references  text that follows the list of references under no
+                               heading: in the paper it stands below the list, not in
+                               the section above it. Treated like text after \\appendix,
+                               where a title stands in front of the list.
+        titles run in          \\paragraph{...}, or italics that a mark sets off at the
+                               head of a paragraph, in text that stands under no
+                               heading. Under a \\section they are a level that is not
+                               cut at, like anything below a subsection.
+
+    All three are unnumbered and get "u" identifiers.
     """
     # Read the other files in first, then cut. TeX begins the document at the first
     # \begin{document} it meets and ends it at the first \end{document} after that,
@@ -385,23 +464,30 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
             ErrorKind.PARSE_ERROR,
             f"text is missing, {len(unread)} file(s) could not be read: {listed}",
         )
-    body = _BIBLIOGRAPHY.sub("", body)
+    body, lists = _without_bibliography(body)
 
+    # Where a section begins. First the places that say so themselves: the headings,
+    # and the acknowledgements of a class.
     marks = _find_headings(body)
-    headings = [mark for mark in marks if mark[1] > 0]
+    marks = sorted(marks + _find_acknowledgements(body, marks))
     first = marks[0][0] if marks else len(body)
 
     # The text begins after the title block. Papers without an "Introduction" heading
     # start it right there.
-    front_end = 0
-    for match in _FRONT_END.finditer(body, 0, first):
-        front_end = match.end()
+    front_end = _front_end(body, first)
+
+    # What stands between the title block and the first of these places is under no
+    # heading. It can still be divided, by titles that are run into its paragraphs.
+    marks = _find_run_in_titles(body, front_end, first) + marks
+    # And a list of references ends the section it stands in when text follows it.
+    marks = _with_ends_of_lists(marks, body, lists)
+    headings = [mark for mark in marks if mark[1] > 0]
 
     if not headings:
         # All of it, also what follows an \appendix: with no heading there either, it
         # belongs to this one section.
         text = _tidy(body[front_end:])
-        return (Section("1", "(the paper has no section headings)", 1, text),)
+        return (Section("1", _NO_HEADINGS, 1, text),)
 
     sections: list[Section] = []
     in_appendix = False
@@ -413,7 +499,7 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
     first_section = next((mark[0] for mark in marks if mark[1] <= 1), len(body))
     front = _tidy(body[front_end:first_section])
     if _makes_a_section(front, followed_by=marks[0]):
-        sections.append(Section("0", "(text before the first section)", 1, front))
+        sections.append(Section("0", _BEFORE_FIRST, 1, front))
 
     for index, (position, level, starred, title, text_start) in enumerate(marks):
         # A section runs to the next section or to \appendix, and so does the text
@@ -426,14 +512,15 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
         text = _tidy(body[text_start:stop])
 
         if level == 0:
-            in_appendix = True
+            # \appendix, or the end of a list of references. Only the first changes how
+            # the sections that follow are numbered.
+            in_appendix = in_appendix or title == _AFTER_APPENDIX
             later = marks[index + 1] if index + 1 < len(marks) else None
             if _makes_a_section(text, followed_by=later):
                 # No heading, so no number: the next of the identifiers that say so.
                 unnumbered += 1
                 parent, sub_numbered, sub_unnumbered = f"u{unnumbered}", 0, 0
                 holder_start = text_start
-                title = "(text after \\appendix, without a section heading)"
                 sections.append(Section(parent, title, 1, text))
             continue
 
@@ -466,7 +553,7 @@ def split(files: dict[str, str], main: str) -> tuple[Section, ...]:
     return tuple(sections)
 
 
-def _makes_a_section(text: str, followed_by: tuple[int, int, bool, str, int] | None) -> bool:
+def _makes_a_section(text: str, followed_by: _Mark | None) -> bool:
     """Whether text under no heading of its own is kept as a section.
 
     When it is long enough to be text, and whatever its length when a subsection
@@ -477,12 +564,148 @@ def _makes_a_section(text: str, followed_by: tuple[int, int, bool, str, int] | N
     return len(re.sub(r"\s", "", text)) >= _MIN_UNHEADED_CHARS
 
 
-def _find_headings(body: str) -> list[tuple[int, int, bool, str, int]]:
-    """(position, level, starred, title, where the text starts). Level 0 marks \\appendix."""
-    marks = []
+def _front_end(body: str, stop: int) -> int:
+    """Where the title block ends: behind \\maketitle and behind the abstract, whichever is later.
+
+    The first of each. A second \\maketitle further down sets the title of something
+    else (supplemental material with a title of its own), and what stands in front of
+    it is the paper, not a title block.
+    """
+    ends = [
+        match.end()
+        for pattern in (_MAKETITLE, _END_OF_ABSTRACT)
+        if (match := pattern.search(body, 0, stop)) is not None
+    ]
+    return max(ends, default=0)
+
+
+def _without_bibliography(body: str) -> tuple[str, list[int]]:
+    """The body without its lists of references, and where each list stood in what is left."""
+    pieces: list[str] = []
+    places: list[int] = []
+    position = length = 0
+    for match in _BIBLIOGRAPHY.finditer(body):
+        pieces.append(body[position : match.start()])
+        length += match.start() - position
+        if _PRINTS_THE_LIST.match(match.group(0)):
+            places.append(length)
+        position = match.end()
+    pieces.append(body[position:])
+    return "".join(pieces), places
+
+
+def _find_acknowledgements(body: str, headings: list[_Mark]) -> list[_Mark]:
+    """The acknowledgements that a class sets, each as the mark of an unnumbered section.
+
+    Not where a heading for them stands right in front: that heading is their section
+    already. The title is the word as the source has it; "ack" and "acks" are short for it.
+    """
+    marks: list[_Mark] = []
+    for match in _ACKNOWLEDGEMENTS.finditer(body):
+        if _DEFINITION.search(body, max(0, match.start() - 30), match.start()):
+            continue
+        before = [mark for mark in headings if mark[1] > 0 and mark[0] < match.start()]
+        if before and "cknowledg" in before[-1][3]:
+            if not body[before[-1][4] : match.start()].strip():
+                continue  # \section*{Acknowledgments}\begin{acknowledgments}: one section
+        name = match.group(1) or match.group(2)
+        title = name.capitalize() if name.startswith("acknowledg") else "Acknowledgments"
+        marks.append((match.start(), 1, True, title, match.end()))
+    return marks
+
+
+def _with_ends_of_lists(marks: list[_Mark], body: str, lists: list[int]) -> list[_Mark]:
+    """The marks, and among them the ends of the lists of references that begin a section.
+
+    The end of a list is a place like \\appendix: what follows it under no heading stands
+    below the list in the paper, not in the section above it. It is taken for such a
+    place when a title stands in front of the list (a heading, the acknowledgements, a
+    title run into a paragraph) and what follows makes a section (_makes_a_section).
+
+    So no text is left out for it. What stands in front of the list belongs to the
+    section of that title, and a few commands behind the list stay where they were, at
+    the end of that section. A list in text that has no title, or in the text after
+    \\appendix, is no such place: there the text in front of it could be too short to
+    be kept by itself.
+    """
+    for place in lists:
+        before = [mark for mark in marks if mark[0] < place]
+        if not before or before[-1][1] == 0:
+            continue
+        later = [mark for mark in marks if mark[0] >= place]
+        stop = next((mark[0] for mark in later if mark[1] <= 1), len(body))
+        if _makes_a_section(_tidy(body[place:stop]), followed_by=later[0] if later else None):
+            end_of_list = (place, 0, False, _AFTER_REFERENCES, place)
+            # In front of a heading that begins at the same place.
+            marks = sorted([*marks, end_of_list], key=lambda mark: (mark[0], mark[1] != 0))
+    return marks
+
+
+def _find_run_in_titles(body: str, start: int, stop: int) -> list[_Mark]:
+    """The titles run into the head of a paragraph between two places, as unnumbered sections.
+
+    \\paragraph{...} is always one. A title typed by hand is taken for one when a line
+    begins with it in italics and a mark sets it off (_ITALICS), and when there are at
+    least _MIN_RUN_IN_TITLES of them: fewer are left alone.
+    """
+    marks: list[_Mark] = []
+    for match in _PARAGRAPH.finditer(body, start, stop):
+        close = _closing_brace(body, match.end() - 1)
+        if close < stop and body[close] == "}":
+            title = " ".join(_LABEL.sub("", body[match.end() : close]).split())
+            marks.append((match.start(), 1, True, title, close + 1))
+
+    typed: list[_Mark] = []
+    position = start
+    begins_paragraph = True  # the text begins here, and so does a paragraph
+    for line in body[start:stop].splitlines(keepends=True):
+        head = position + len(line) - len(line.lstrip())
+        position += len(line)
+        if not line.strip():
+            begins_paragraph = True
+            continue
+        found = _run_in_title(body, head, stop, begins_paragraph)
+        begins_paragraph = False
+        if found is not None:
+            typed.append(found)
+    if len(typed) >= _MIN_RUN_IN_TITLES:
+        marks += typed
+    return sorted(marks)
+
+
+def _run_in_title(body: str, head: int, stop: int, begins_paragraph: bool) -> _Mark | None:
+    """The mark of a title typed in italics at the head of a line, or None when it is none."""
+    match = _ITALICS.match(body, head, stop)
+    if match is None:
+        return None
+    # \textit{Title}: the brace ends the match. {\it Title}: it begins the group.
+    opening = match.end() - 1 if match.group(1) else match.start(2)
+    close = _closing_brace(body, opening)
+    if close >= stop or body[close] != "}" or _BLANK_LINE.search(body, opening, close):
+        return None
+    title = " ".join(body[match.end() : close].split())
+    inside = _DASH_INSIDE.search(title)
+    behind = _DASH_BEHIND.match(body, close + 1, stop)
+    if begins_paragraph:
+        inside = inside or _STOP_INSIDE.search(title)
+        behind = behind or _STOP_BEHIND.match(body, close + 1, stop)
+    if inside is None and behind is None:
+        return None  # italics at the head of a line, and no title
+    if inside is not None:
+        title = title[: inside.start()]
+    title = title.rstrip(" .:")
+    if not title or len(title) > _MAX_RUN_IN_TITLE:
+        return None
+    # The mark belongs to the title, as the braces of \section{...} do.
+    return (head, 1, True, title, behind.end() if behind is not None else close + 1)
+
+
+def _find_headings(body: str) -> list[_Mark]:
+    """The marks of \\section, \\subsection and \\appendix. Level 0 marks \\appendix."""
+    marks: list[_Mark] = []
     for match in _HEADING.finditer(body):
         if match.group(1) is None:
-            marks.append((match.start(), 0, False, "", match.end()))
+            marks.append((match.start(), 0, False, _AFTER_APPENDIX, match.end()))
             continue
         close = _closing_brace(body, match.end() - 1)
         title = _LABEL.sub("", body[match.end() : close])

@@ -8,7 +8,9 @@ Each case is a small invented paper in which every piece of text announces itsel
 \\typeout{SEEN-A} writes "SEEN-A" to the terminal when TeX reads that piece and
 does nothing in a piece that TeX skips. The pieces TeX announced are compared with
 the pieces found in what the parser returns, once with arXiv's list of the files in
-a download (00README.json) and once without it.
+a download (00README.json) and once without it. A case with several documents names
+them: arXiv typesets every one, so TeX is run on each, and the list marks each as it
+does ("toplevel").
 
 What a case expects of the parser:
 
@@ -47,8 +49,8 @@ _PLACE = re.compile(r"<([A-Z])>")  # <A> in a case stands for \typeout{SEEN-A}
 _SEEN = re.compile(r"SEEN-([A-Z])")
 
 
-def case(label, files, with_list, without_list, needs=()):
-    return pytest.param(files, with_list, without_list, needs, id=label)
+def case(label, files, with_list, without_list, needs=(), documents=("main.tex",)):
+    return pytest.param(files, with_list, without_list, needs, documents, id=label)
 
 
 CASES = [
@@ -290,6 +292,69 @@ CASES = [
         WRONG,  # short text under no heading is taken for commands and left out
         WRONG,
     ),
+    # --- a section that begins where no \section stands (parser 5) ---------------------------
+    case(
+        "a second maketitle further down",
+        {
+            "main.tex": PRE
+            + "\\title{T}\\author{A}\n"
+            + BEGIN
+            + f"\\maketitle\n<A> {FILL}\n\\title{{More}}\n\\maketitle\n"
+            + f"\\section{{One}}\n<B> {FILL}\n"
+            + END,
+        },
+        SAME,  # until parser 4, the last \maketitle ended the title block: <A> was left out
+        SAME,
+    ),
+    case(
+        "the acknowledgements of a class, and text behind the list of references",
+        {
+            "main.tex": PRE
+            + "\\newenvironment{acknowledgments}{\\section*{Acknowledgments}}{}\n"
+            + BEGIN
+            + f"\\section{{One}}\n<A> {FILL}\n"
+            + "\\begin{acknowledgments}\n<B> thanks\n\\end{acknowledgments}\n"
+            + "\\begin{thebibliography}{9}\n\\bibitem{a} Somebody.\n\\end{thebibliography}\n"
+            + f"<C> {FILL}\n"
+            + END,
+        },
+        SAME,
+        SAME,
+    ),
+    case(
+        "titles run into the paragraphs of a paper without headings",
+        {
+            "main.tex": PRE
+            + BEGIN
+            + f"\\textit{{First.}}---<A> {FILL}\n\n\\textit{{Second.}}---<B> more\n\n"
+            + "\\emph{Third}: <C> more\n\\textit{Fourth}---<D> and more\n"
+            + END,
+        },
+        SAME,
+        SAME,
+    ),
+    case(
+        "a few words in front of the first of such titles",
+        {
+            "main.tex": PRE
+            + BEGIN
+            + f"<A> a few words\n\n\\textit{{First.}}---<B> {FILL}\n\n"
+            + "\\textit{Second.}---<C> more\n\n\\textit{Third.}---<D> more\n"
+            + END,
+        },
+        WRONG,  # short text under no heading is taken for commands and left out
+        WRONG,
+    ),
+    case(
+        "a paper and its supplemental material as two documents",
+        {
+            "main.tex": PRE + BEGIN + f"\\section{{One}}\n<A> {FILL} {FILL}\n" + END,
+            "supplement.tex": PRE + BEGIN + f"\\section{{More}}\n<B> {FILL}\n" + END,
+        },
+        WRONG,  # only the first document is read
+        WRONG,
+        documents=("main.tex", "supplement.tex"),
+    ),
     # --- text that TeX skips ---------------------------------------------------------------
     case(
         "include with includeonly",
@@ -331,30 +396,33 @@ CASES = [
 ]
 
 
-def read_by_tex(files: dict[str, str], folder) -> set[str]:
-    """The pieces that TeX announces when it runs on main.tex."""
+def read_by_tex(files: dict[str, str], folder, documents=("main.tex",)) -> set[str]:
+    """The pieces that TeX announces when it runs on each document: on main.tex alone, as a rule."""
     for name, text in files.items():
         path = folder / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8", newline="\n")
-    run = subprocess.run(
-        ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", "-draftmode", "main.tex"],
-        cwd=folder,
-        capture_output=True,
-        text=True,
-        errors="replace",
-        timeout=300,
-        check=False,  # a failure is reported below, with what TeX said
-    )
-    assert run.returncode == 0, "TeX stopped on this case:\n" + run.stdout[-1500:]
-    return set(_SEEN.findall(run.stdout))
+    seen: set[str] = set()
+    for document in documents:
+        run = subprocess.run(
+            ["pdflatex", "-interaction=nonstopmode", "-halt-on-error", "-draftmode", document],
+            cwd=folder,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=300,
+            check=False,  # a failure is reported below, with what TeX said
+        )
+        assert run.returncode == 0, "TeX stopped on this case:\n" + run.stdout[-1500:]
+        seen |= set(_SEEN.findall(run.stdout))
+    return seen
 
 
-def found_by_parser(files: dict[str, str], with_list: bool) -> set[str]:
+def found_by_parser(files: dict[str, str], with_list: bool, documents=("main.tex",)) -> set[str]:
     """The pieces in the sections that the parser returns for the same files as a download."""
     members = {name: text.encode() for name, text in files.items()}
     if with_list:
-        listed = {"sources": [{"usage": "toplevel", "filename": "main.tex"}]}
+        listed = {"sources": [{"usage": "toplevel", "filename": name} for name in documents]}
         members["00README.json"] = json.dumps(listed).encode()
     sections = parse_source(tar_gz(members))
     return set(_SEEN.findall(" ".join(s.text for s in sections if s.level == 1)))
@@ -368,20 +436,20 @@ def installed(name: str) -> bool:
     return bool(found.stdout.strip())
 
 
-@pytest.mark.parametrize(("files", "with_list", "without_list", "needs"), CASES)
-def test_parser_returns_what_tex_reads(tmp_path, files, with_list, without_list, needs):
+@pytest.mark.parametrize(("files", "with_list", "without_list", "needs", "documents"), CASES)
+def test_parser_returns_what_tex_reads(tmp_path, files, with_list, without_list, needs, documents):
     missing = [name for name in needs if not installed(name)]
     if missing:
         pytest.skip(f"not in this TeX installation: {', '.join(missing)}")
     files = {name: _PLACE.sub(r"\\typeout{SEEN-\1}", text) for name, text in files.items()}
 
-    read = read_by_tex(files, tmp_path)
+    read = read_by_tex(files, tmp_path, documents)
     assert read, "TeX announced nothing: the case itself is broken"
 
     for listed, expected in ((True, with_list), (False, without_list)):
         where = "with the list" if listed else "without the list"
         try:
-            found = found_by_parser(files, listed)
+            found = found_by_parser(files, listed, documents)
         except SourceError as error:
             assert error.kind is ErrorKind.PARSE_ERROR
             assert expected == TURNED, f"{where}: turned away ({error.detail})"

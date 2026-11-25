@@ -221,6 +221,389 @@ def test_in_random_papers_every_piece_of_text_lies_in_a_section():
         assert [name for name in named if name not in found] == [], lines
 
 
+# --- where a section begins and no \section stands there (since parser 5) ------------------
+#
+# The survey of the papers the server can read showed three such places (results/survey/):
+# the acknowledgements a class sets, text behind the list of references, and the titles
+# that letters run into their paragraphs. In all three the text was returned before as
+# well, inside another section. Now it has a section of its own.
+
+
+@pytest.mark.parametrize(
+    ("typed", "title"),
+    [
+        ("\\begin{acknowledgments}\nThanks to all.\n\\end{acknowledgments}", "Acknowledgments"),
+        ("\\begin{acknowledgements}\nThanks to all.\n\\end{acknowledgements}", "Acknowledgements"),
+        ("\\begin{acknowledgement}\nThanks to all.\n\\end{acknowledgement}", "Acknowledgement"),
+        ("\\begin{acks}\nThanks to all.\n\\end{acks}", "Acknowledgments"),
+        ("\\acknowledgments\nThanks to all.", "Acknowledgments"),
+        ("\\acknowledgements{Thanks to all.}", "Acknowledgements"),
+        ("\\ack{Thanks to all.}", "Acknowledgments"),
+    ],
+)
+def test_the_acknowledgements_of_a_class_are_a_section_of_their_own(typed, title):
+    # No heading is typed, so they used to be the end of the section before them. The
+    # title is the word of the source, written out where the source shortens it.
+    body = "\\section{One}\nFirst.\n\\section{Conclusions}\nLast words.\n" + typed
+    _, last, thanks = sections_of(document(body))
+    assert (last.section_id, last.title, last.text) == ("2", "Conclusions", "Last words.")
+    assert (thanks.section_id, thanks.level, thanks.title) == ("u1", 1, title)
+    assert thanks.text.startswith(("Thanks to all.", "{Thanks to all.}"))
+
+
+def test_the_section_of_the_acknowledgements_runs_to_the_next_heading():
+    # Like any section: what a paper prints below them stands under their heading.
+    body = (
+        "\\section{One}\nFirst.\n\\begin{acknowledgments}\nThanks.\n\\end{acknowledgments}\n"
+        "A note added in proof.\n\\appendix\n\\section{Tables}\nTable text."
+    )
+    assert [(s.section_id, s.title, s.text) for s in sections_of(document(body))] == [
+        ("1", "One", "First."),
+        ("u1", "Acknowledgments", "Thanks.\n\\end{acknowledgments}\nA note added in proof."),
+        ("A", "Tables", "Table text."),
+    ]
+
+
+def test_acknowledgements_under_a_heading_of_their_own_stay_one_section():
+    body = (
+        "\\section{One}\nFirst.\n\\section*{Acknowledgments}\n"
+        "\\begin{acknowledgments}\nThanks.\n\\end{acknowledgments}"
+    )
+    assert [(s.section_id, s.title) for s in sections_of(document(body))] == [
+        ("1", "One"),
+        ("u1", "Acknowledgments"),
+    ]
+    # With text between the two, the environment begins a section as it does anywhere.
+    apart = body.replace("{Acknowledgments}\n", "{Acknowledgments}\nFunding.\n")
+    assert [s.section_id for s in sections_of(document(apart))] == ["1", "u1", "u2"]
+
+
+def test_a_command_that_is_defined_or_only_begins_like_one_is_no_acknowledgement():
+    body = (
+        "\\renewcommand{\\acknowledgments}{\\par}\n\\def\\ack{x}\n\\let\\acks\\relax\n"
+        "\\section{One}\nFirst. \\acknowledgmentsname\\ and \\acksfont are other commands."
+    )
+    assert [s.section_id for s in sections_of(document(body))] == ["1"]
+
+
+REFERENCES = "\\begin{thebibliography}{9}\n\\bibitem{a} Somebody.\n\\end{thebibliography}\n"
+AFTER_REFERENCES = "(text after the list of references, without a section heading)"
+
+
+def test_text_behind_the_list_of_references_is_a_section_of_its_own():
+    # It used to be the end of the section before the list, where no paper prints it:
+    # the authors of a collaboration, tables, material without a heading.
+    tail = "Authors. " + filler(60)
+    body = "\\section{One}\nFirst.\n\\section{Summary}\nLast.\n" + REFERENCES + tail
+    assert [(s.section_id, s.level, s.title, s.text) for s in sections_of(document(body))] == [
+        ("1", 1, "One", "First."),
+        ("2", 1, "Summary", "Last."),
+        ("u1", 1, AFTER_REFERENCES, tail),
+    ]
+    # The commands that have BibTeX or biblatex print the list are such a place too.
+    for command in (
+        "\\bibliography{refs}\n",
+        "\\bibliographystyle{plain}\n\\bibliography{refs}\n",
+        "\\printbibliography[heading=none]\n",
+    ):
+        swapped = body.replace(REFERENCES, command)
+        assert [s.section_id for s in sections_of(document(swapped))] == ["1", "2", "u1"]
+    # Unlike \appendix, the end of a list does not change how later sections are numbered.
+    later = sections_of(document(body + "\n\\section{Later}\nMore."))
+    assert [s.section_id for s in later] == ["1", "2", "u1", "3"]
+    # And \bibliographystyle prints no list, wherever it stands.
+    style = (
+        "\\section{One}\nFirst.\n\\bibliographystyle{plain}\n" + tail + "\n\\section{Two}\nLast."
+    )
+    assert [s.section_id for s in sections_of(document(style))] == ["1", "2"]
+
+
+def test_commands_behind_the_list_of_references_stay_where_they_were():
+    # Unlike a few words after \appendix, they are not left out: they end the section
+    # before the list, as they did.
+    body = (
+        "\\section{One}\nFirst.\n"
+        + REFERENCES
+        + "\\clearpage\nA line.\n\\appendix\n\\section{Tables}\nTable text."
+    )
+    assert [(s.section_id, s.text) for s in sections_of(document(body))] == [
+        ("1", "First.\n\n\\clearpage\nA line."),
+        ("A", "Table text."),
+    ]
+
+
+def test_subsections_behind_the_list_of_references_lie_in_a_section_of_their_own():
+    # In the paper they stand below the list. They used to be rows under the last
+    # section before it, numbered on from its subsections.
+    body = (
+        "\\section{One}\nFirst.\n\\subsection{Part}\nPart.\n"
+        + REFERENCES
+        + "\\subsection*{Appendix A}\nProof."
+    )
+    sections = sections_of(document(body))
+    assert [(s.section_id, s.level, s.title, s.text) for s in sections] == [
+        ("1", 1, "One", "First.\n\\subsection{Part}\nPart."),
+        ("1.1", 2, "Part", "Part."),
+        ("u1", 1, AFTER_REFERENCES, "\\subsection*{Appendix A}\nProof."),
+        ("u1.u1", 2, "Appendix A", "Proof."),
+    ]
+    # Where the heading of the subsection begins in the text of the section that holds it.
+    assert sections[3].heading_at == 0
+
+
+def test_a_list_of_references_under_no_title_is_no_place_where_a_section_begins():
+    # In front of such a list there may be a few words only, which would then be left
+    # out for standing under no heading by themselves. The text stays in one piece, as
+    # it was: in a paper without headings, and after \appendix.
+    tail = "More. " + filler(60)
+    (section,) = sections_of(document("\\maketitle\nA few words.\n" + REFERENCES + tail))
+    assert section.title == "(the paper has no section headings)"
+    assert section.text == "A few words.\n\n" + tail
+
+    body = "\\section{One}\nFirst.\n\\appendix\nA few words.\n" + REFERENCES + tail
+    assert [(s.section_id, s.title, s.text) for s in sections_of(document(body))] == [
+        ("1", "One", "First."),
+        ("u1", "(text after \\appendix, without a section heading)", "A few words.\n\n" + tail),
+    ]
+    # One title in front is enough, also when the list comes twice.
+    twice = "\\section{One}\nFirst.\n" + REFERENCES + "A line.\n" + REFERENCES + tail
+    assert [(s.section_id, s.text) for s in sections_of(document(twice))] == [
+        ("1", "First."),
+        ("u1", "A line.\n\n" + tail),
+    ]
+
+
+def test_a_list_of_references_between_appendices_does_not_end_their_lettering():
+    body = (
+        "\\section{One}\nFirst.\n\\appendix\n\\section{Tables}\nTable text.\n"
+        + REFERENCES
+        + "Added later. "
+        + filler(60)
+        + "\n\\section{Proofs}\nProof."
+    )
+    assert [s.section_id for s in sections_of(document(body))] == ["1", "A", "u1", "B"]
+
+
+# A letter as the journals of the APS print them: no heading, and titles in italics.
+LETTER = (
+    "\\maketitle\n"
+    "\\textit{Introduction.}---" + filler(40) + "\n\n"
+    "\\textit{Method.}---How it was done.\n\n"
+    "\\textit{Results.}---What came out.\n"
+)
+
+
+def test_titles_run_into_paragraphs_divide_a_paper_without_headings():
+    # Such a letter used to come back as one section.
+    assert [(s.section_id, s.level, s.title, s.text) for s in sections_of(document(LETTER))] == [
+        ("u1", 1, "Introduction", filler(40)),
+        ("u2", 1, "Method", "How it was done."),
+        ("u3", 1, "Results", "What came out."),
+    ]
+
+
+@pytest.mark.parametrize(
+    "typed",
+    [
+        "\\textit{TITLE.---}",
+        "\\textit{TITLE}---",
+        "\\textit{TITLE}.---",
+        "\\emph{TITLE}\\textemdash ",
+        "\\emph{TITLE\u2014}",
+        "{\\it TITLE}.---",
+        "{\\em TITLE.} ---",
+        "\\noindent\\textit{TITLE}: ",
+        "\\textit{TITLE}. ",
+        "\\textit{TITLE:} ",
+    ],
+)
+def test_the_ways_a_title_is_typed_and_set_off(typed):
+    # The mark belongs to the title: it is in neither the title of the section nor its text.
+    words = ("Setup", "Data and selection", "Summary")
+    paragraphs = [typed.replace("TITLE", word) + "Text of it." for word in words]
+    body = "\\maketitle\n" + "\n\n".join(paragraphs)
+    assert [(s.title, s.text) for s in sections_of(document(body))] == [
+        (word, "Text of it.") for word in words
+    ]
+
+
+def test_fewer_than_three_typed_titles_are_left_alone():
+    # Italics and a full stop at the head of a paragraph can be a turn of phrase.
+    two = "\\maketitle\n\\textit{Note.} A remark.\n\n\\textit{Remark.} Another.\n\n" + filler(40)
+    (section,) = sections_of(document(two))
+    assert section.title == "(the paper has no section headings)"
+    assert section.text.startswith("\\textit{Note.} A remark.")
+
+
+def test_italics_without_a_mark_are_no_title():
+    emphasis = "\n\n".join(f"\\textit{{Very}} important, point {n}." for n in range(4))
+    (section,) = sections_of(document("\\maketitle\n" + emphasis))
+    assert section.title == "(the paper has no section headings)"
+
+
+def test_a_long_passage_in_italics_is_no_title():
+    # A sentence set in italics ends with a full stop as well. A title is short.
+    passage = "\\textit{" + filler(20) + ".} And on.\n\n"
+    (section,) = sections_of(document("\\maketitle\n" + passage * 4))
+    assert section.title == "(the paper has no section headings)"
+
+
+def test_inside_a_paragraph_only_a_dash_sets_a_title_off():
+    # A line of the source can begin in italics in the middle of a sentence. A title at
+    # the head of such a line, behind a figure for one, is told by its dash.
+    body = (
+        LETTER
+        + "It was shown by Somebody\n\\textit{et al.} in another way.\n"
+        + "\\textit{Discussion}---What it means.\n"
+    )
+    sections = sections_of(document(body))
+    assert [s.title for s in sections] == ["Introduction", "Method", "Results", "Discussion"]
+    assert sections[2].text == (
+        "What came out.\nIt was shown by Somebody\n\\textit{et al.} in another way."
+    )
+
+
+def test_titles_run_into_paragraphs_under_a_section_are_not_cut_at():
+    # There they are a level below the heading, like anything below a subsection.
+    body = "\\section{One}\n" + LETTER.removeprefix("\\maketitle\n") + "\\paragraph{More} So on."
+    (section,) = sections_of(document(body))
+    assert section.section_id == "1"
+    assert "\\textit{Method.}---" in section.text and "\\paragraph{More}" in section.text
+
+
+def test_text_in_front_of_the_first_title_is_section_zero():
+    lead = "An opening without a title. " + filler(60)
+    sections = sections_of(
+        document(LETTER.replace("\\maketitle\n", "\\maketitle\n" + lead + "\n\n"))
+    )
+    assert [(s.section_id, s.title) for s in sections[:2]] == [
+        ("0", "(text before the first section)"),
+        ("u1", "Introduction"),
+    ]
+    assert sections[0].text == lead
+    # A known limit of text under no heading: a few words are taken for commands. Before
+    # parser 5 such a letter was one section, and they were in it.
+    few = sections_of(document(LETTER.replace("\\maketitle\n", "\\maketitle\nA few words.\n\n")))
+    assert [s.section_id for s in few] == ["u1", "u2", "u3"]
+    assert "A few words." not in " ".join(s.text for s in few)
+
+
+def test_the_paragraph_command_divides_text_without_headings_too():
+    # LaTeX's own command for a title that is run in. One is enough, and its title stays
+    # as typed, like the title of a \section.
+    body = (
+        "\\maketitle\n\\paragraph{Introduction.} Why.\n\\paragraph*{Model} What.\n"
+        "\\begin{acknowledgments}\nThanks.\n\\end{acknowledgments}\n"
+        "\\paragraph{Late} Behind another mark, and so under it."
+    )
+    assert [(s.section_id, s.title, s.text) for s in sections_of(document(body))] == [
+        ("u1", "Introduction.", "Why."),
+        ("u2", "Model", "What."),
+        (
+            "u3",
+            "Acknowledgments",
+            "Thanks.\n\\end{acknowledgments}\n\\paragraph{Late} Behind another mark, and so under it.",
+        ),
+    ]
+
+
+def test_a_letter_with_headings_in_its_end_matter_only_is_divided_in_front_of_them():
+    # It used to come back as "text before the first section" and the sections behind it.
+    body = (
+        LETTER
+        + "\\begin{acknowledgments}\nThanks.\n\\end{acknowledgments}\n"
+        + REFERENCES
+        + "\\appendix\n\\section{Details}\nMore."
+    )
+    assert [(s.section_id, s.title) for s in sections_of(document(body))] == [
+        ("u1", "Introduction"),
+        ("u2", "Method"),
+        ("u3", "Results"),
+        ("u4", "Acknowledgments"),
+        ("A", "Details"),
+    ]
+
+
+def test_a_second_maketitle_does_not_make_the_paper_a_title_block():
+    # Supplemental material with a title of its own, in the file of the paper. The last
+    # \maketitle before the first heading used to end the title block, and so the letter
+    # in front of it was left out without a word.
+    letter = "The letter. " + filler(60)
+    body = (
+        "\\title{T}\n\\begin{abstract}\nShort.\n\\end{abstract}\n\\maketitle\n"
+        + letter
+        + "\n\\clearpage\n\\title{Supplemental material}\n\\maketitle\n\\section{Details}\nMore."
+    )
+    first, second = sections_of(document(body))
+    assert (first.section_id, first.title) == ("0", "(text before the first section)")
+    assert first.text.startswith(letter)
+    assert (second.section_id, second.text) == ("1", "More.")
+    # An abstract can stand behind \maketitle as well: the later of the two ends the block.
+    other = "\\maketitle\n\\begin{abstract}\nShort.\n\\end{abstract}\n" + letter
+    assert sections_of(document(other + "\n\\section{One}\nMore."))[0].text == letter
+
+
+def test_in_random_papers_with_these_places_every_piece_of_text_lies_in_a_section():
+    # The test of random papers above, with the places of parser 5 among the commands.
+    # The first piece after \appendix is long, as it is there: what stands under no
+    # heading has to be text enough to be kept. Behind a list of references that does
+    # not hold: a short piece there stays in the section in front of the list.
+    rng = random.Random(5)
+    commands = [
+        "\\section{S}",
+        "\\subsection{S}",
+        "\\appendix",
+        "\\begin{acknowledgments}",
+        "\\acknowledgements",
+        REFERENCES.strip(),
+        "\\bibliography{refs}",
+        "\\paragraph{P}",
+        "\n\\textit{Title.}---",
+        "\n\\emph{Title}: ",
+    ]
+    cut_at_titles = behind_lists = 0
+    for _ in range(400):
+        lines, named = ["\\maketitle", "PIECE0 " + filler(200)], ["PIECE0"]
+        under_appendix = False  # no piece has followed the last \appendix yet
+        # Every third paper is a letter: it begins with paragraphs under titles in italics.
+        titled = rng.randint(3, 5) if rng.random() < 0.33 else 0
+        for number in range(1, rng.randint(2, 12) + titled):
+            command = commands[-rng.randint(1, 2)] if number <= titled else rng.choice(commands)
+            lines.append(command)
+            under_appendix = under_appendix or command == "\\appendix"
+            if rng.random() < 0.8:
+                long = under_appendix or rng.random() < 0.5
+                lines.append(f"PIECE{number} " + filler(60 if long else 3))
+                named.append(f"PIECE{number}")
+                under_appendix = False
+        sections = sections_of(document("\n".join(lines)))
+        assert check(sections)[0] is True, lines
+        found = " ".join(section.text for section in sections if section.level == 1).split()
+        assert [name for name in named if name not in found] == [], lines
+        cut_at_titles += any(section.title == "Title" for section in sections)
+        behind_lists += any(section.title == AFTER_REFERENCES for section in sections)
+    # Both kinds of places came up in papers enough for the test to say something.
+    assert cut_at_titles > 50 and behind_lists > 50
+
+
+def test_only_the_first_document_of_a_download_is_read():
+    # A known limit (the head of arxiv_latex.py). arXiv typesets every file that its
+    # list names as "toplevel", one after the other: a paper and its supplemental
+    # material. The second is not read, and nothing in the result shows it.
+    listed = (
+        '{"sources": [{"usage": "toplevel", "filename": "paper.tex"},'
+        ' {"usage": "toplevel", "filename": "supplement.tex"}]}'
+    )
+    files = {
+        "paper.tex": document("\\section{One}\nPAPER " + filler(300)),
+        "supplement.tex": document("\\section{More}\nSUPPLEMENT " + filler(300)),
+        "00README.json": listed,
+    }
+    sections = parse_source(tar_gz({name: text.encode() for name, text in files.items()}))
+    assert [section.title for section in sections] == ["One"]
+    assert "SUPPLEMENT" not in sections[0].text
+
+
 def test_title_with_an_unclosed_brace_ends_at_the_line_end():
     body = "\\section{Broken title\nText after.\n\\section{Fine}\nMore."
     titles = [section.title for section in sections_of(document(body))]

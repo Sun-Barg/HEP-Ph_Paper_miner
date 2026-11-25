@@ -522,7 +522,7 @@ def test_the_command_names_the_conditions_and_holds_its_runs_against_them(world,
     questions = file_of(folder, "ok")
     out = ["--questions", str(questions), "--out", str(folder / "public")]
     assert run.main([*out, "--repeats", "1"], launch=launch) == 0
-    said = "conditions asking-again | tool texts staged-6, flat-5 | prompt p3-tool"
+    said = "conditions more-sections | tool texts staged-6, flat-5 | prompt p3-tool | parser 5"
     assert said in capsys.readouterr().out
     assert len(launched) == 2
 

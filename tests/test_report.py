@@ -118,8 +118,8 @@ def make_sheet(folder: Path, questions: Path, runs: Path, grade_of) -> tuple[Pat
 
 
 # The records of these tests are made by the code as it is, so they are held against the
-# conditions that name its texts, not against those of the evaluation.
-NOW = ["--conditions", "asking-again"]
+# conditions that name its texts and its parser, not against those of the evaluation.
+NOW = ["--conditions", "more-sections"]
 
 
 def reported(questions: Path, runs: Path, *more: str, capsys) -> str:
@@ -398,4 +398,4 @@ def test_the_report_holds_records_against_the_conditions_of_the_evaluation_unles
         "toolset_version is 'flat-5', not 'flat-4'" in text
     )
     text = reported(questions, runs, capsys=capsys)
-    assert "Held against the conditions 'asking-again' (conditions.py): no record differs" in text
+    assert "Held against the conditions 'more-sections' (conditions.py): no record differs" in text

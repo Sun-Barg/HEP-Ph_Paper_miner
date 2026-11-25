@@ -87,7 +87,7 @@ def test_paper_is_looked_up_then_downloaded_then_split(tmp_path):
     assert paper.meta.arxiv_id == "2610.26648v1"
     assert paper.meta.authors[1] == "Hae Barg Kang"
     assert [section.section_id for section in paper.sections][:3] == ["1", "2", "2.1"]
-    assert paper.parser_version == "4"
+    assert paper.parser_version == "5"
     lookup, download = arxiv.requests
     assert lookup.params["id_list"] == "2610.26648v1"
     assert str(download) == SOURCE_URL.format(arxiv_id="2610.26648v1")

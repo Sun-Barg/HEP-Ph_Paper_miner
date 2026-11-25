@@ -17,6 +17,7 @@ Everything ticked under Status is done, and the results of the evaluation are be
 - [x] Tool texts changed for what the evaluation showed, and held against the runs before
 - [x] The loop asks for an answer that was written and not handed in, tried on two such ends
 - [x] A survey of which papers the server can read, in thirteen archives: 520 papers fetched and counted, and 65 of their outlines held against the papers, from a draft by a model that the maintainer checked paper by paper
+- [x] The parser begins a section in three more places, for what that check noted, and no longer loses a letter in front of a second `\maketitle` (parser `5`)
 
 ## The two tool layouts
 
@@ -315,7 +316,7 @@ it, and is written down in `src/hepph_paper_miner/eval/conditions.py`:
 
 These were the defaults of the command when the evaluation was run, with one exception:
 the cache is off unless asked for, so a run of the evaluation is started with `--cache`.
-The tool texts have been changed since (see
+The tool texts, the prompt and the parser have been changed since (see
 [What was changed after the evaluation](#what-was-changed-after-the-evaluation)); the
 rest are its defaults still.
 
@@ -372,7 +373,7 @@ The new texts have the names `staged-6` and `flat-5`. `conditions.py` keeps the
 conditions of the evaluation as they were (`EVALUATION`) and names beside them what the
 code had then (`REVISED`: the same, but for the tool texts). The records of the
 evaluation stay held against the first, and the runs of 2026-11-20 against the second.
-`eval.run` holds its runs against the conditions that name the code, which are a third
+`eval.run` holds its runs against the conditions that name the code, which are a fourth
 set by now (below).
 
 The twenty questions of the evaluation were not run again with the new texts: that
@@ -445,6 +446,70 @@ never met the case. It says nothing of how often a run ends this way. The run of
 evaluation that ended so is not sent again and stays a run without an answer, and the
 twenty questions of the evaluation are not run with the new prompt.
 
+### A parser that begins a section in more places
+
+The check of the survey's outlines noted headings of papers that have no row in an
+outline (below, "What the check found"): over the acknowledgements, where a paper
+divides its text by titles that are run into paragraphs, and behind the list of
+references. Afterwards a Claude session read the sources of the survey's papers, which
+the survey had left in the folder of downloads, with scripts that are not in this
+repository, to see what is typed in those places. What it counted is not given here as
+a result. The parser was changed for what it saw, and is `5` now:
+
+- **The acknowledgements of a class.** `\begin{acknowledgments}` and `\acknowledgments`
+  (in either spelling, and `\ack`) type no heading, so the acknowledgements were the end
+  of the section before them. They are a section of their own now, under the word the
+  source uses (`\ack` written out). Whether the class prints a heading over them cannot
+  be told without running TeX: most do, some run the word into the paragraph, and REVTeX
+  with the option `prl` prints none. Such a paper gets the row all the same.
+- **Text behind the list of references.** It was the end of the section before the
+  list, where no paper prints it. Where a title stands in front of the list and enough
+  text follows under no heading, that text is a section now, as text after `\appendix`
+  is: `(text after the list of references, without a section heading)`. A few commands
+  behind a list stay where they were.
+- **Titles that are run into paragraphs.** Text that stands under no heading (a letter
+  without section headings, or the main text of one whose only headings are in its end
+  matter) is cut at `\paragraph{...}`, and at titles typed in italics that a dash sets
+  off, or a colon or a full stop where a paragraph begins, when there are three or more
+  of them. Under a `\section` such titles are a level that the parser does not cut at,
+  as before. These are the two readings of the check, made into the rule of the parser.
+- **The end of the title block.** The text of a paper begins behind `\maketitle` and
+  the abstract. The parser took the last `\maketitle` in front of the first heading
+  for that place. So where supplemental material follows a letter in the same file,
+  with a `\maketitle` of its own, the letter was taken for a part of the title block
+  and left out, and nothing showed it. The first `\maketitle` is taken now.
+
+In the first three the text was returned before as well, inside another section; only
+the last brings back text that was missing. One thing goes the other way: a few words in
+front of the first title of a letter are now left out, as a few words in front of a
+first `\section` always were (they are taken for commands). `tests/test_latex.py` holds
+each of these, and holds that in random papers built from these commands every piece of
+text that is long enough to be text lies in a section. `tests/test_against_tex.py` has
+TeX read five more small papers.
+
+Two things it does not do. A download in which arXiv's list names a second file as a
+document of its own (supplemental material, as a rule) has only its first document
+read, although arXiv typesets both into the one PDF; nothing in an outline shows that
+there is more. This is new among the limits listed at the top of
+`sources/arxiv_latex.py`, and how many papers of the sample have such a file is not
+counted in this repository. And a paper that sets its titles in bold, numbers them by
+hand or sets them off in another way stays one section, like a paper that has none.
+
+The outline of the maintainer's own paper is the same under both parsers
+(`tests/test_own_paper.py`). Of the other twelve papers of the evaluation, the tests
+cannot say that: their sources are not kept here. So `conditions.py` names a fourth set
+of conditions (`MORE_SECTIONS`: `ASKING_AGAIN` with the parser `5` and nothing else),
+and every set now names its parser, which is `4` for the three sets that runs were made
+under. A record made by this code is held against the fourth set; held against an
+earlier one, it differs in the parser its results name. And a kept record that this code
+grades again is told so run by run: it read papers split by parser `4`, so the places
+its question names may have moved (`eval/grade.py`).
+
+Not done yet: the sample of the survey has not been split again by parser `5`, the
+outlines it gives have not been held against any paper, and the development questions
+have not been run again with it. The survey and its check, as they stand below, are of
+parser `4`. The twenty questions of the evaluation are not run again with it.
+
 ## Checking a question file
 
 A question names the sections its answer stands in, and for each a short piece of the
@@ -506,8 +571,8 @@ of one question in a process of its own, started as a run of the evaluation is s
 (`--cache --show-thinking`, the layout and the repetition), and its record is held
 against the conditions as soon as it is written: the ones that name the texts the code
 has, which the command says at its start. The code as it is now has the tool texts
-`staged-6` and `flat-5` and the prompt `p3-tool`, so runs of the evaluation as it was
-are made with the code as it was (`70c7384`). The repetition is the outer loop, and
+`staged-6` and `flat-5`, the prompt `p3-tool` and the parser `5`, so runs of the
+evaluation as it was are made with the code as it was (`70c7384`). The repetition is the outer loop, and
 within it the questions come in the order of the file; which layout of a question runs
 first alternates from question to question and from repetition to repetition.
 
@@ -686,6 +751,14 @@ found". They came in commits one after the other: the plan was in the history be
 the papers were drawn, the sample before the survey was run, and the outcomes before
 the verdicts were written. Nothing but that order shows that the papers were not
 picked.
+
+The survey and the check are of parser `4`: the first line of the outcomes names it, and
+every number below is a number of that parser. The parser has been changed since, for
+what the check noted (see
+[A parser that begins a section in more places](#a-parser-that-begins-a-section-in-more-places)),
+and the sample has not been split again by the new one. The command that writes the
+sheet refuses outcomes that another parser made, so the code as it is now writes no
+sheet for these.
 
 ### The plan
 
@@ -975,8 +1048,14 @@ How far this goes:
 - Every difference that was noted is a heading without a row, or a row under another
   section than in the paper. No note names a row that is no heading of the paper,
   another order or another title.
-- What in the sources of these 23 papers makes the difference has not been looked
-  into, and neither has what a model that reads such a paper misses by it.
+- What in the sources of these 23 papers makes the difference had not been looked
+  into when the check was made, and what a model that reads such a paper misses by it
+  has not been looked into at all. The parser was changed afterwards for the headings
+  over acknowledgements, the titles run into paragraphs and the text behind a list of
+  references (see
+  [A parser that begins a section in more places](#a-parser-that-begins-a-section-in-more-places)).
+  What that changes in these 65 outlines has not been counted here, and no outline of
+  the new parser has been held against a paper.
 
 ### What it says, and what it does not
 

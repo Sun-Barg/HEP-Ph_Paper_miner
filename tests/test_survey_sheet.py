@@ -254,7 +254,7 @@ def changed(path: Path, change) -> None:
             lambda survey: changed(
                 survey.outcomes, lambda lines: lines[0].update(parser_version="3")
             ),
-            "the outcomes were made by parser 3, and this code has parser 4",
+            "the outcomes were made by parser 3, and this code has parser 5",
         ),
     ],
 )
