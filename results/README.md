@@ -13,7 +13,7 @@ runs that went wrong.
 | `runs/dev/` | the records of the runs on the development questions, with a README of their own. Nothing there is a result of the evaluation |
 | `runs/regress/` | the records of the runs made on 2026-11-20, after the tool texts were changed, and what was made from them, with a README of their own. Nothing there is a result of the evaluation |
 | `runs/asking-again/` | what was run on 2026-11-23, after the loop began to ask for the call when a turn ends without it: twenty requests that sent the end of two such runs again, the records of the development questions run once more, and what was made from them, with a README of their own. Nothing there is a result of the evaluation |
-| `survey/` | the list of papers and the sample of the survey of which papers can be read; the README of the repository says how they were made. Nothing there is a result of the evaluation |
+| `survey/` | the survey of which papers can be read: the list of papers, the sample drawn from it, and what came back for its 520 papers on 2026-11-24 and 2026-11-25, with a README of their own. The README of the repository says how they were made and gives the table. Nothing there is a result of the evaluation |
 | `judge/` | a model as a second grader: its one run on the 118 answers and on 91 controls made to be wrong (`eval-j2.jsonl`, 2026-11-19, by `9711ca5`), the report that `eval.agree` wrote from it (`report.md`), and its two runs on the development answers. The grades by hand stay the verdicts; the README of the repository says what this shows and what it does not, and `tests/test_agree.py` holds the files against each other |
 
 `eval_data/PREREGISTRATION.md` says what was measured and how each hypothesis is read,

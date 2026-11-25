@@ -5,7 +5,8 @@ loop that drives it, and a small evaluation set that compares two tool layouts: 
 a whole paper at once, or reading an outline first and then single sections.
 
 Everything ticked under Status is done, and the results of the evaluation are below. The
-last item has its rule, its commands and its sample, and has not been run.
+last item has been run and counted, and the check of its outlines by hand is still to
+come.
 
 ## Status
 
@@ -17,7 +18,7 @@ last item has its rule, its commands and its sample, and has not been run.
 - [x] A model as a second grader, held against the grades by hand
 - [x] Tool texts changed for what the evaluation showed, and held against the runs before
 - [x] The loop asks for an answer that was written and not handed in, tried on two such ends
-- [ ] A survey of which papers the server can read, in thirteen archives: the rule is fixed and the 520 papers are drawn, the survey has not been run yet
+- [ ] A survey of which papers the server can read, in thirteen archives: the 520 papers have been fetched and counted, the 65 outlines have not been held against the papers yet
 
 ## The two tool layouts
 
@@ -680,10 +681,11 @@ nothing is graded.
 It is a measurement that is made once. It does not make the server one "for all of
 physics": the questions of the evaluation are still about one corner of it.
 
-**It has not been run.** The repository holds the rule, the commands and the sample.
-The outcomes and a table of them come in later commits, each after the one before: the
-plan was in the history before the papers were drawn, and nothing but that order shows
-that the papers were not picked.
+**It has been run, and its outlines have not been checked by hand yet.** The repository
+holds the rule, the commands, the sample and the outcomes, and the table is under "What
+came back". They came in commits one after the other: the plan was in the history before
+the papers were drawn, and the sample before the survey was run. Nothing but that order
+shows that the papers were not picked.
 
 ### The plan
 
@@ -811,6 +813,58 @@ The first try was run on 2026-11-23 UTC, after the sample had been drawn and bef
 was committed. What it showed of 52 papers could not change the sample: the sample is
 what the rule draws from the list, and the test draws it again.
 
+### What came back
+
+The command was run three times by `ceea850`, the commit that brought the sample: twice
+on 2026-11-24 and once on 2026-11-25 (UTC). The first run, from 13:45 to 16:10 UTC, left
+67 of the 520 papers unanswered (`upstream_busy` 63, `timeout` 4). The second, from
+17:25 to 17:40 UTC, got an outcome for 64 of them and left 3 (`timeout`). The third,
+from 01:59 to 02:00 UTC the next day, got an outcome for those 3, so no paper is left
+unanswered. A line that a run had filled is the same line in the file of every run after
+it.
+
+| Archive | Papers | Split into sections | No TeX source |
+|---|---|---|---|
+| astro-ph | 40 | 39 | 1 |
+| cond-mat | 40 | 30 | 10 |
+| gr-qc | 40 | 40 | 0 |
+| hep-ex | 40 | 40 | 0 |
+| hep-lat | 40 | 40 | 0 |
+| hep-ph | 40 | 40 | 0 |
+| hep-th | 40 | 40 | 0 |
+| math-ph | 40 | 40 | 0 |
+| nlin | 40 | 39 | 1 |
+| nucl-ex | 40 | 37 | 3 |
+| nucl-th | 40 | 39 | 1 |
+| physics | 40 | 30 | 10 |
+| quant-ph | 40 | 40 | 0 |
+| all | 520 | 494 | 26 |
+
+No paper was turned away by the parser (`parse_error`), none was missing from arXiv
+(`not_found`), and none came back in a way nobody foresaw (`unexpected`). Of the 26
+papers without a TeX source, arXiv has 24 as a PDF, PostScript or DVI file (`not_tex`)
+and nothing to download for 2 (`no_source`).
+
+Of the 494 papers that were split, 26 have no section heading and come back as one
+piece, and 125 have a piece of more than 20,000 characters, which takes more than one
+call of `read_section`; 22 papers are both.
+
+How far these numbers go:
+
+- A row is 40 papers. Forty of forty does not say that every paper of the archive can be
+  split: an archive of which 93% can be gives forty of forty about one time in twenty.
+- The last row counts the sample. It is not a share of the physics group, because the
+  archives were not drawn at one rate (forty papers of 131 and forty of 6,125). Weighted
+  by the number of papers each archive has in the list, the share that was split is 90%,
+  with a standard error of about 2 points; unweighted it is 95% (494 of 520). The
+  weights were in the repository before the survey was run. That a weighted share is
+  given was decided after the second run, when the outcomes of 517 papers had been seen.
+- "Split into sections" is what the parser returned. Whether those are the sections of
+  the paper is the question of the check by hand below, which has not been made yet.
+
+`results/survey/README.md` says what the files are and how the three runs went, and
+gives the two shapes archive by archive.
+
 ### Holding outlines against the papers
 
 "Split into sections" says that the parser returned sections, not that they are the
@@ -838,13 +892,14 @@ The sheet holds section titles, which are text of the papers, so it stays in
 reads the filled sheet and writes what the repository keeps: for every paper its
 identifier, the two verdicts and the note of the person who checked.
 
-### What it will say, and what it will not
+### What it says, and what it does not
 
-It will say: of the papers drawn by this rule, so many of each archive were split into
-sections, and the rest failed for these reasons; and of the outlines a person looked
-at, so many were the outline of the paper.
+It says: of the papers drawn by this rule, so many of each archive were split into
+sections, and the rest failed for these reasons ("What came back"). It will say, once a
+person has looked: of the outlines that were looked at, so many were the outline of the
+paper.
 
-It will not say that the server answers questions about such papers: that takes
+It does not say that the server answers questions about such papers: that takes
 questions, and is another evaluation. It says nothing of papers from other years. The
 sources of the 1990s are written differently (plain TeX), and none of them is in three
 months of 2026. And 40 papers of an archive leave a share uncertain by about 15

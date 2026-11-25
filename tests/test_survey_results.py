@@ -184,11 +184,7 @@ def test_what_the_readme_says_of_the_sample_is_what_the_files_say():
     head, pieces, papers, _ = the_list()
     readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
 
-    assert (
-        "the rule is fixed and the 520 papers are drawn, the survey has not been run yet" in readme
-    )
-    # The outcomes come in a later commit, and then this sentence has to go.
-    assert ("**It has not been run.**" in readme) == (not (HERE / "outcomes.jsonl").exists())
+    # Where the survey stands now is held against its outcomes (test_survey_outcomes.py).
 
     # When the commit was made is in the history, not in a file: the README's "16:52 UTC"
     # is not held against anything here.

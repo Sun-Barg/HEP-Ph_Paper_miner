@@ -80,6 +80,11 @@ works here follows the rules below.
   `tests/test_survey_results.py` fails when the plan is no longer the file the sample
   names, or when `results/survey/sample.jsonl` is not what the plan draws from
   `results/survey/population.jsonl`. Editing one of the three until it passes is not a fix.
+- The survey was run on 2026-11-24 and 2026-11-25 UTC, and `results/survey/outcomes.jsonl` is
+  fixed as well: `tests/test_survey_outcomes.py` holds it by its SHA-256, and the check of the
+  outlines names it by that. `survey.run` writes the file anew whenever it runs, with other
+  times and another commit in its first line, so it is not run over that file again unless the
+  owner asks for exactly that.
 - `unanswered` is not an outcome of the survey. A number about the papers that were read
   is given with the papers that are still unanswered beside it, never with them counted
   as failures or left out without a word.
