@@ -508,7 +508,12 @@ its question names may have moved (`eval/grade.py`).
 Not done yet: the sample of the survey has not been split again by parser `5`, the
 outlines it gives have not been held against any paper, and the development questions
 have not been run again with it. The survey and its check, as they stand below, are of
-parser `4`. The twenty questions of the evaluation are not run again with it.
+parser `4`. The twenty questions of the evaluation are not run again with it. What will
+be run with it, and how each thing will be read, is written down before any of it in
+`results/runs/more-sections/README.md`: six questions about papers that the two parsers
+split differently (`eval_data/questions_sections_parser4.jsonl` and
+`eval_data/questions_sections_parser5.jsonl`, the same questions with the section
+identifiers of each parser), the development questions, and the sample of the survey.
 
 ## Checking a question file
 

@@ -8,3 +8,4 @@
 # row with CRLF: turned into LF, the sheet would no longer be the file the judge read.
 results/runs/regress/*.csv -text
 results/runs/asking-again/*.csv -text
+results/runs/more-sections/*.csv -text
