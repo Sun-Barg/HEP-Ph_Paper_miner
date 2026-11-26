@@ -48,7 +48,9 @@ from hepph_paper_miner.drafting.draft import (
     read_draft,
     texts_digest,
 )
+from hepph_paper_miner.drafting.checks import LEAST_DIGITS
 from hepph_paper_miner.drafting.places import KINDS, SEARCH_FIRST
+from hepph_paper_miner.eval.grade import agrees, numbers_in
 from hepph_paper_miner.eval.judge import JUDGE
 from hepph_paper_miner.eval.judge import SYSTEM_PROMPT as JUDGE_PROMPT
 from hepph_paper_miner.eval.questions import _question
@@ -56,7 +58,7 @@ from hepph_paper_miner.server import full_text
 
 ROOT = Path(__file__).parent.parent
 # The name of the texts the generator reads, and the digest of those texts.
-PINNED = ("d2", "525e9c906a59ebc49d1079bcf4d59726db02cd38bada1f3d3058d8ee78ccf387")
+PINNED = ("d3", "2bfcb708c891ff4f07c5ea678aa5cc3d14d2893533768e0b27d80a7249e4adcd")
 
 
 # --- the texts the generator reads ---------------------------------------------------------
@@ -152,6 +154,23 @@ def test_the_prompt_asks_for_up_to_as_many_drafts_as_are_read():
         SYSTEM_PROMPT
     )
     assert 'leave "drafts" empty' in SYSTEM_PROMPT
+
+
+def test_the_prompt_asks_for_the_digits_that_the_check_holds():
+    # checks.py drops a draft whose key has a number of fewer digits (two_digits), and the
+    # prompt says so, so that a draft is not made only to be dropped.
+    assert LEAST_DIGITS == 2
+    assert "two or more significant digits" in SYSTEM_PROMPT
+    assert "with a power of ten" in SYSTEM_PROMPT
+
+
+def test_the_prompt_says_that_the_grader_reads_no_units():
+    # The rule of eval/grade.py holds the numbers of an answer to the key and reads no unit:
+    # "0.005 kpc" holds no 5 for a key of 5 pc. A note that called such an answer right
+    # would set the judge against the rule, as one did in the second round of the tuning.
+    (written,) = numbers_in("0.005 kpc")
+    assert not agrees(written, 5, 1)
+    assert "reads the numbers of an answer and not their units" in SYSTEM_PROMPT
 
 
 # --- what a request holds -------------------------------------------------------------------

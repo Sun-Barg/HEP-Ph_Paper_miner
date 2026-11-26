@@ -669,9 +669,10 @@ def test_the_places_of_the_evaluation_make_no_rehearsal_and_the_tuning_no_evalua
 def test_records_of_other_texts_make_no_questions(evaluation, monkeypatch, capsys):
     out, summary = evaluation["folder"] / "q.jsonl", evaluation["folder"] / "sum.jsonl"
     argv = argv_of(evaluation, questions=out, summary=summary)
+    made = drafting.DRAFTER_VERSION  # the name the records were made under
     monkeypatch.setattr(drafting, "DRAFTER_VERSION", "d0")
     assert assemble.main(argv, origin=committed) == 1
-    assert "made by the generator d2, and this code holds d0" in capsys.readouterr().err
+    assert f"made by the generator {made}, and this code holds d0" in capsys.readouterr().err
     monkeypatch.undo()
     monkeypatch.setattr(ask, "code_version", lambda: {"commit": "c0ffee", "modified": False})
     monkeypatch.setattr(sift, "SIFT_VERSION", "s0")

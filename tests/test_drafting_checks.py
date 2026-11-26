@@ -12,6 +12,7 @@ from drafting_paper import LONG_FIRST, draft, paper, placed
 
 from hepph_paper_miner.drafting.checks import (
     CHECKS,
+    LEAST_DIGITS,
     as_written,
     check,
     counted,
@@ -20,9 +21,11 @@ from hepph_paper_miner.drafting.checks import (
     numbers_with_ends,
     numbers_written,
     phrase_written,
+    short_numbers,
     squeezed,
     unit_after,
     unit_of,
+    with_power,
 )
 from hepph_paper_miner.drafting.draft import Draft
 from hepph_paper_miner.drafting.places import (
@@ -66,6 +69,7 @@ def test_the_checks_are_these_in_this_order():
         "question_clean",
         "lengths",
         "running_text",
+        "two_digits",
     )
 
 
@@ -505,6 +509,117 @@ def test_the_stretches_that_are_no_running_text():
 )
 def test_each_kind_of_stretch_is_found_on_its_own(text, stretch):
     assert [text[start:end] for start, end in not_running(text)] == [stretch]
+
+
+# --- two digits ------------------------------------------------------------------------------
+
+
+def one_number(value, min_sig_figs: int = 1) -> Draft:
+    numbers = [{"label": "n", "value": value, "unit": "", "min_sig_figs": min_sig_figs}]
+    return Draft.from_dict(draft(numbers=numbers))
+
+
+@pytest.mark.parametrize(
+    ("tex", "value", "short"),
+    [
+        ("a shell of 5~pc", 5, True),
+        ("a shell of $\\sim5$~pc", 5, True),  # read off the TeX, as the other checks read it
+        ("a fraction of 0.5", 0.5, True),
+        ("about 0.5 of the flux", 0.52, True),  # the key allows one digit, and the text has one
+        ("$-3$ in the slope", -3, True),
+        ("at 3\\sigma", 3, True),
+        ("a radius of 37~kpc", 37, False),
+        ("a ratio of 1.0", 1.0, False),  # two digits written, whatever the key holds
+        ("0.52 of the flux", 0.52, False),
+        ("20~kpc", 20, False),
+        ("10\\% of the sky", 10, False),
+        ("one in $10^{15}$ events", 1e15, False),  # one digit to the grader, but a power
+        ("$2\\times10^{-26}$ cm$^3$/s", 2e-26, False),
+        ("a value of 2.26e-26", 2.26e-26, False),
+        ("$10^2$ samples", 100, False),
+        ("5 and 5.0 pc", 5.0, False),  # written once with two digits
+        ("37.2 square metres", 5, False),  # not written at all: that is key_in_anchor's
+    ],
+)
+def test_a_number_of_the_key_is_written_with_two_digits_or_a_power_of_ten(tex, value, short):
+    assert LEAST_DIGITS == 2
+    assert (short_numbers(one_number(value), tex) == [0]) == short
+
+
+def test_a_power_of_ten_is_read_off_the_text_of_a_number():
+    written = numbers_written("10^{15}, 2.5\\times10^{-3}, 2e-26, 2×10⁻²⁶, 10⁻⁵, 0.79^2 and 37")
+    assert [with_power(number) for number in written] == [True] * 5 + [False, False]
+
+
+def test_only_the_numbers_of_the_key_that_are_short_are_named():
+    numbers = [
+        {"label": "radius", "value": 37, "unit": "kpc", "min_sig_figs": 2},
+        {"label": "shell", "value": 5, "unit": "pc", "min_sig_figs": 1},
+    ]
+    found = Draft.from_dict(draft(numbers=numbers))
+    assert short_numbers(found, "a radius of 37 kpc and a shell of 5 pc") == [1]
+
+
+def test_a_key_of_one_digit_fails():
+    # The draft that the owner turned down in the second round of the tuning had a radius of
+    # 5 pc for its key: the prompt asked for two digits, and nothing checked it.
+    changes = {
+        "anchor": "A shell of 5 pc lies around the core of the model",
+        "question": "In {paper}, how thick is the shell around the core of the model?",
+        "reference_answer": "5 pc.",
+        "numbers": [{"label": "shell", "value": 5, "unit": "pc", "min_sig_figs": 1}],
+    }
+    of = with_intro("A shell of 5 pc lies around the core of the model.\n")
+    assert failures(checked(changes, section="1", of=of)) == {
+        "two_digits": (
+            "the anchor writes 'shell' with fewer than 2 significant digits and no power of ten"
+        )
+    }
+    # Written with two digits, the same draft passes every check.
+    changes["anchor"] = "A shell of 5.0 pc lies around the core of the model"
+    changes["numbers"] = [{"label": "shell", "value": 5.0, "unit": "pc", "min_sig_figs": 2}]
+    of = with_intro("A shell of 5.0 pc lies around the core of the model.\n")
+    result = checked(changes, section="1", of=of)
+    assert result.passed, result.why
+
+
+def test_the_failure_names_the_short_numbers_only():
+    changes = {
+        "anchor": "A shell of 5 pc lies 37 kpc away from the core",
+        "question": "In {paper}, how thick is the shell, and how far is it from the core?",
+        "reference_answer": "5 pc thick, 37 kpc from the core.",
+        "numbers": [
+            {"label": "distance", "value": 37, "unit": "kpc", "min_sig_figs": 2},
+            {"label": "shell", "value": 5, "unit": "pc", "min_sig_figs": 1},
+        ],
+    }
+    of = with_intro("A shell of 5 pc lies 37 kpc away from the core.\n")
+    why = failures(checked(changes, section="1", of=of))
+    assert list(why) == ["two_digits"] and why["two_digits"].startswith(
+        "the anchor writes 'shell' with"
+    )
+
+
+def test_a_number_that_the_anchor_does_not_write_is_left_to_key_in_anchor():
+    # One fault of a draft is counted once.
+    numbers = [{"label": "area", "value": 5, "unit": "", "min_sig_figs": 1}]
+    result = checked({"numbers": numbers})
+    assert "key_in_anchor" in result.failed and "two_digits" not in result.failed
+
+
+def test_two_digits_is_made_of_an_anchor_that_differs_in_white_space():
+    # The draft writes a space where the paper breaks the line: the anchor is taken as the
+    # paper writes it, and the check is made of it as of any other.
+    changes = {
+        "anchor": "A shell of 5 pc lies around the core",
+        "question": "In {paper}, how thick is the shell around the core of the model?",
+        "reference_answer": "5 pc.",
+        "numbers": [{"label": "shell", "value": 5, "unit": "pc", "min_sig_figs": 1}],
+    }
+    of = with_intro("A shell of 5 pc lies around\nthe core of the model.\n")
+    result = checked(changes, section="1", of=of)
+    assert result.anchor == "A shell of 5 pc lies around\nthe core"
+    assert "two_digits" in result.failed
 
 
 # --- all of them -----------------------------------------------------------------------------

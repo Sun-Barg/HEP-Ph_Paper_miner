@@ -71,7 +71,7 @@ from hepph_paper_miner.survey.records import RecordError
 
 # The name of everything the generator reads beside the paper: the system prompt, the
 # layout of a request and the form of a draft. Raise it with any of them.
-DRAFTER_VERSION = "d2"
+DRAFTER_VERSION = "d3"
 
 # The most drafts a reply is read for. The form cannot hold a limit on a list (the
 # structured outputs page, read again 2026-11-26: no array keyword beyond minItems of 0 or
@@ -88,7 +88,14 @@ DRAFTING: dict[str, Any] = {**JUDGE, "thinking": {"type": "adaptive", "display":
 # the ones the checks of checks.py hold a draft to, so that a draft is not made only to
 # be dropped. The lines that d2 added came from the first round of the tuning: what the
 # drafts of d1 failed, the checks or the owner's review, and why (the summaries of the
-# thinking). Its last line is the judge's: the sentence the API documentation gives to
+# thinking). Those that d3 changed came from the second round: the owner's review of the
+# drafts of d2 (a note that took a value in another unit as right, though the grader reads
+# no units; values that a paper took from another work or told as background; a key of
+# one digit, which no check held then; a value that a table gave with more digits; a
+# narrow list of wordings; a word of a question that the paper also used for its default
+# setting), and the drafts that were answered right without the paper (standard choices
+# that many papers make, and values that the question let a reader work out). Its last
+# line is the judge's: the sentence the API documentation gives to
 # encourage thinking, word for word, since steering is sensitive to the wording
 # (platform.claude.com/docs/en/build-with-claude/thinking-steering-and-cost, read again
 # 2026-11-26).
@@ -98,15 +105,15 @@ You write questions about a physics paper. A question tests whether a model that
 Write up to three drafts, each about another fact of the part, the best first: two or three when the part holds more than one such fact, one when it holds one. A program checks every draft and takes the first one that passes.
 
 What to ask
-- One fact that a sentence of the running text of the part states: a number of two or more digits, or a name.
-- The paper writes the value in this part and nowhere else. If you see it anywhere else in the paper (in another section, in another piece of this section, in a caption or in a table), take another fact.
+- One fact that a sentence of the running text of the part states: a number that the part writes with two or more significant digits (37, 0.52 or 1.0, not 5 or 0.5) or with a power of ten (10^15, 2 × 10^-26), or a name.
+- The paper writes the value in this part and nowhere else. If you see it anywhere else in the paper (in another section, in another piece of this section, in a caption or in a table), take another fact. Take another fact as well when the paper gives the same quantity with more digits elsewhere (in a table, say): an answer that gives those digits counts as another number.
 - The program counts a number with a unit as written elsewhere where the same number stands with the same unit, and a number without a unit, or a name, wherever it stands. A small or round number (5, 10, 20, 100, 300 or 10%, for example) stands in many places of a paper: prefer a value that the paper writes, with its unit, only here.
 - Every value of the answer key is such a value: when one fact has two values, both are. Of a range whose one end the paper writes elsewhere as well, ask only for the other end. Do not add a value of another work for comparison.
-- Not a value that is known outside this paper: the size of a published catalogue, a constant of nature, a value that many papers adopt.
-- A fact of the physics or of the method (a result, a setting, a choice), not an example of the paper's notation. A fact the paper states, not a judgment, a summary or a reason.
+- Not a value that is known outside this paper: the size of a published catalogue, a constant of nature, or a standard choice that many papers make (a parameter of a standard profile, a usual cut or a usual assumption, say), even where this paper states it again. Not a value that a reader can work out from what the question itself gives.
+- A fact of the physics or of the method that this paper finds, sets or chooses (a result, a setting, a choice), not an example of the paper's notation. A fact the paper states, not a judgment, a summary or a reason. Not a value that the paper takes from another work (a measurement, a result or a limit of another paper), or tells as background to its own work.
 - Not a fact of a table, a figure or its caption, an equation, a footnote, a list of authors or the references.
 - Not a value that the title or the abstract states.
-- The question has to read one way in the whole paper. If the same quantity stands elsewhere in the paper under other conditions, say in the question which conditions are meant.
+- The question has to read one way in the whole paper. If the same quantity stands elsewhere in the paper under other conditions, or a word of the question is also the paper's word for another setting (its default one, say), say in the question which one is meant.
 
 How to write it
 - Write {paper} once in the question, where it names the paper, as a noun phrase: "In {paper}, which ..." or "{paper} fits ...; what ...". It is replaced by the identifier or by the title of the paper.
@@ -116,8 +123,8 @@ How to write it
 - Ask only for what the answer key can hold, numbers and names: not for a unit, a sign or a direction on its own.
 - The anchor is a piece of one line of the part, copied character for character as it stands there, TeX and all, 20 to 120 characters long. It holds every number and every name of the answer key.
 - The reference answer is short: the fact, with numbers and units as the paper gives them.
-- The answer key is what a program looks for in an answer. "numbers": each value as a number, its unit as the paper gives it ("" when there is none), and the fewest significant digits an answer may round it to and still be right. "phrases": each name, with the wordings an answer may use, as plain text.
-- The note says what an answer has to contain (everything the question asks for, and nothing that it does not ask for), what it may leave out, and which answers are wrong (another value of the same passage, for example). Name a wrong value only as the paper describes it.
+- The answer key is what a program looks for in an answer. "numbers": each value as a number, its unit as the paper gives it ("" when there is none), and the fewest significant digits an answer may round it to and still be right. "phrases": each name, with the wordings an answer may use, as plain text: the paper's own wording, its abbreviation and the name written out, with and without a hyphen.
+- The note says what an answer has to contain (everything the question asks for, and nothing that it does not ask for), what it may leave out, and which answers are wrong (another value of the same passage, for example). The program reads the numbers of an answer and not their units: the note asks for the value in the unit in which the paper gives it, and does not call it right when it is turned into another unit (kpc into pc, say), which makes another number. A wrong value that the note names is one that the paper states, described only with what the paper says of it.
 - Write in English.
 
 If the part states no fact of this kind, set "nothing_to_ask" to true, say why in one sentence in "why_nothing", and leave "drafts" empty.

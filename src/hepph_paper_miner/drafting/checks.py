@@ -20,6 +20,8 @@ of them are made, so that one draft can be counted under every check it fails:
                      each, the anchor 20 to 120
     running_text     the anchor does not stand in a table, a figure, a display equation,
                      a caption or a footnote
+    two_digits       every number of the key that the anchor writes is written there with
+                     two or more significant digits, or with a power of ten
 
 The check that a question expects an answer is no check here: the form of a draft has no
 field for a question without one.
@@ -58,6 +60,16 @@ without a unit). What it misses: the same value stated again without its unit ri
 after it, as in a table whose unit stands in its head, or written with another spelling
 of the unit. Such a question shows up in the runs as an answer that is right without the
 anchor, which the report counts.
+
+Why two digits (two_digits): the prompt has asked for a number of two or more digits since
+d1, and in the second round of the tuning the owner turned down a draft whose key was a
+radius of 5 pc, which nothing had checked. The grader reads the numbers of an answer and
+not their units, so a key of one digit is met by any number that rounds to it, and a paper
+writes such numbers in many places. A power of ten ("10^{15}", "2\\times 10^{-26}") is
+held by its exponent as well, so it is no such number, though the grader counts one digit
+in a bare "10^{15}". The digits are those the anchor writes, which is what a run is given:
+"1.0" has two. A number of the key that the anchor does not write is left to
+key_in_anchor, so that one fault of a draft is counted once.
 """
 
 from __future__ import annotations
@@ -84,11 +96,13 @@ CHECKS = (
     "question_clean",
     "lengths",
     "running_text",
+    "two_digits",
 )
 
 QUESTION_CHARS = 400
 ANSWER_CHARS = 400
 ANCHOR_CHARS = (20, 120)
+LEAST_DIGITS = 2  # the significant digits that a number of the key is written with, at least
 
 
 @dataclass(frozen=True)
@@ -270,6 +284,32 @@ def written_elsewhere(draft: Draft, tex: str) -> list[int]:
     return found + [
         first + at for at, item in enumerate(draft.phrases) if phrase_written(item, text)
     ]
+
+
+# --- the digits of a number of the key ------------------------------------------------------
+
+# The parts of eval/grade.py's pattern of a number that hold a power of ten.
+_POWERS = ("power", "raised", "exponent", "bare", "bare_raised")
+
+
+def with_power(number: Number) -> bool:
+    """Whether a number is written with a power of ten, as the grader reads its text:
+    "10^{15}", "2.5 \\times 10^{-26}", "2.26e-26"."""
+    found = _NUMBER.match(number.text)
+    return found is not None and any(found[name] for name in _POWERS)
+
+
+def short_numbers(draft: Draft, tex: str) -> list[int]:
+    """Which numbers of the key a text of TeX writes only with fewer than LEAST_DIGITS
+    significant digits and without a power of ten. A number that the text does not write at
+    all is not among them."""
+    numbers = numbers_written(tex)
+    short = []
+    for at, item in enumerate(draft.numbers):
+        written = [n for n in numbers if agrees(n, item["value"], item.get("min_sig_figs"))]
+        if written and not any(n.digits >= LEAST_DIGITS or with_power(n) for n in written):
+            short.append(at)
+    return short
 
 
 def labels(draft: Draft, places: Iterable[int]) -> str:
@@ -547,6 +587,17 @@ def check(draft: Draft, paper: Paper, place: Placed, kind: str) -> Checked:
                     "equation, a caption or a footnote",
                 )
             )
+
+    # Held to the same text as key_in_anchor.
+    short = short_numbers(draft, anchor if anchor is not None else draft.anchor)
+    if short:
+        failed.append(
+            (
+                "two_digits",
+                f"the anchor writes {labels(draft, short)} with fewer than {LEAST_DIGITS} "
+                "significant digits and no power of ten",
+            )
+        )
 
     ordered = sorted(failed, key=lambda pair: CHECKS.index(pair[0]))
     return Checked(tuple(name for name, _ in ordered), tuple(why for _, why in ordered), anchor, at)
