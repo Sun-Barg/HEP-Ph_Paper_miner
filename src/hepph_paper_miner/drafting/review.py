@@ -1,4 +1,4 @@
-"""The sheet on which the owner reads every draft that is kept, beside its passage.
+"""The sheet on which the owner reads the draft that every place keeps, beside its passage.
 
     uv run python -m hepph_paper_miner.drafting.review \\
         --places runs_private/drafting/round-1/places.jsonl \\
@@ -20,9 +20,11 @@ would be asked it, the section of its passage, the passage (the paragraph of the
 that holds the anchor, with the anchor between ⟦ and ⟧), the reference answer, the key
 and the note. Not its kind, its archive or its place in the walk: the first four drafts
 that are accepted in a kind and archive become the questions, and which kind is short of
-drafts is not to enter a verdict. The rows stand in the order of the SHA-256 of
-"<seed>:<paper>:<section>:<start>", so that the order is drawn by no one, and the key
-says which place a row is.
+drafts is not to enter a verdict. Nor which of its place's drafts it is (sift.kept): a
+place shows one draft, the first of the generator's order that passed everything. The
+rows stand in the order of the SHA-256 of "<seed>:<paper>:<section>:<start>", so that
+the order is drawn by no one, and the key says which place, and which draft of it, a row
+is.
 
 A verdict is "accept" or "reject", and a draft is judged as it stands: no word of it is
 changed. A rejection names one of the kinds of REASONS, and "other" says what in the
@@ -50,8 +52,15 @@ from typing import Any
 from hepph_paper_miner.agent.origin import file_digest
 from hepph_paper_miner.drafting import ask
 from hepph_paper_miner.drafting.assign import Placed, PlacesFile, paper_source, read_places
-from hepph_paper_miner.drafting.draft import Draft, fill_paper, papers_of, read_drafts, section_of
-from hepph_paper_miner.drafting.sift import kept, read_sift
+from hepph_paper_miner.drafting.draft import (
+    Draft,
+    drafts_in,
+    fill_paper,
+    papers_of,
+    read_drafts,
+    section_of,
+)
+from hepph_paper_miner.drafting.sift import draft_of, kept, read_sift
 from hepph_paper_miner.sources.base import Paper, PaperSource, SourceError
 from hepph_paper_miner.survey.records import RecordError, now, read_lines, write_lines
 
@@ -126,6 +135,7 @@ def order_key(seed: int, place: Placed) -> str:
 class Row:
     row: int
     place: Placed
+    draft: int  # which draft of its place: 1 for the first
     question: str
     section: str
     passage: str
@@ -140,26 +150,31 @@ def rows_of(
     lines: Sequence[Mapping[str, Any]],
     papers: Mapping[str, Paper],
 ) -> list[Row]:
-    """A row for every draft the filters kept, in the order of the hash."""
+    """A row for the draft every place keeps, in the order of the hash."""
     by_number = {place.number: place for place in places.places}
-    checked = {line["number"]: line for line in lines if line.get("record") == "checked"}
+    checked = {
+        (line["number"], draft_of(line)): line for line in lines if line.get("record") == "checked"
+    }
+    keep = kept(lines)
     chosen = sorted(
-        (by_number[number] for number in kept(lines)),
+        (by_number[number] for number in keep),
         key=lambda place: order_key(places.head["seed"], place),
     )
     rows = []
     for at, place in enumerate(chosen, start=1):
         paper = papers[place.paper]
         section = section_of(paper, place.section)
-        draft = Draft.from_dict(drafts[place.number]["draft"])
-        anchor, where = checked[place.number]["anchor"], checked[place.number]["at"]
+        index = keep[place.number]
+        draft = Draft.from_dict(drafts_in(drafts[place.number])[index - 1])
+        line = checked[(place.number, index)]
         rows.append(
             Row(
                 at,
                 place,
+                index,
                 fill_paper(draft.question, place.kind, place.paper, paper.meta.title),
                 f"{section.section_id} | {section.title}",
-                passage_of(section.text, place.start, place.end, where, anchor),
+                passage_of(section.text, place.start, place.end, line["at"], line["anchor"]),
                 draft.reference_answer,
                 key_text(draft),
                 draft.accept_note,
@@ -193,6 +208,7 @@ def key_lines(rows: Sequence[Row], head: Mapping[str, Any]) -> list[dict[str, An
                 "record": "row",
                 "row": row.row,
                 "number": row.place.number,
+                "draft": row.draft,
                 "paper": row.place.paper,
                 "kind": row.place.kind,
                 "section": row.place.section,
@@ -216,6 +232,7 @@ class Verdict:
     kind: str
     verdict: str  # ACCEPT or REJECT
     why_rejected: str  # one of REASONS, or "" for an accepted draft
+    draft: int = 1  # which draft of its place was judged
 
 
 def _same(one: str, other: str) -> bool:
@@ -272,7 +289,9 @@ def read_verdicts(sheet: Path, key: Path) -> tuple[dict[str, Any], list[Verdict]
             raise ReviewError(f"{where}: an accepted draft has a reason for a rejection")
         if why == OTHER and not values.get("note"):
             raise ReviewError(f"{where}: a rejection for another reason says which in the note")
-        verdicts[number] = Verdict(number, row["number"], row["paper"], row["kind"], verdict, why)
+        verdicts[number] = Verdict(
+            number, row["number"], row["paper"], row["kind"], verdict, why, draft_of(row)
+        )
     missing = sorted(set(rows) - set(verdicts))
     if missing:
         shown = ", ".join(str(number) for number in missing[:10])
@@ -301,6 +320,7 @@ def verdict_lines(
         {
             "record": "verdict",
             "number": each.number,
+            "draft": each.draft,
             "paper": each.paper,
             "kind": each.kind,
             "verdict": each.verdict,
@@ -311,28 +331,35 @@ def verdict_lines(
     return [head, *lines]
 
 
-def read_review(path: Path) -> tuple[dict[str, Any], dict[int, tuple[str, str]], str]:
-    """A file of verdicts (--read --out): its first line, by place the verdict and the reason
-    of a rejection ("" for an accepted draft), and its SHA-256."""
+def _is_count(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+
+
+def read_review(path: Path) -> tuple[dict[str, Any], dict[int, tuple[str, str, int]], str]:
+    """A file of verdicts (--read --out): its first line, by place the verdict, the reason of
+    a rejection ("" for an accepted draft) and the draft of the place that was judged (1
+    where a file made before a place could have more drafts names none), and its SHA-256."""
     lines, digest = read_lines(path, "review")
-    found: dict[int, tuple[str, str]] = {}
+    found: dict[int, tuple[str, str, int]] = {}
     for line in lines[1:]:
         if line.get("record") != "verdict":
             continue
         number, verdict, why = line.get("number"), line.get("verdict"), line.get("why_rejected")
-        if isinstance(number, bool) or not isinstance(number, int) or number in found:
+        if not _is_count(number) or number in found:
             raise RecordError(f"{path.name}: a verdict without its place, or one twice")
         named = isinstance(why, str) and why in REASONS
         if verdict not in VERDICTS or (verdict == REJECT) != named or (not named and why):
             raise RecordError(f"{path.name}: the verdict on place {number} is not of the form")
-        found[number] = (verdict, why or "")
+        if not _is_count(draft_of(line)):
+            raise RecordError(f"{path.name}: the verdict on place {number} names no draft")
+        found[number] = (verdict, why or "", draft_of(line))
     return lines[0], found, digest
 
 
 def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m hepph_paper_miner.drafting.review",
-        description="Write the sheet of the drafts that are kept, or read its verdicts back.",
+        description="Write the sheet of the draft every place keeps, or read its verdicts back.",
     )
     parser.add_argument("--places", type=Path, help="the file of places")
     parser.add_argument("--drafts", type=Path, help="the record of the generator")

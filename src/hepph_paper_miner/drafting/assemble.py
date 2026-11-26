@@ -16,12 +16,14 @@ arXiv lists. The questions stand in the order of the walk and are named archives
 archives-02, ... A question file has no line of its own to name what it was made of, so
 the summary names it by its SHA-256 beside the records it came from.
 
-The summary (--summary) has a line for every candidate: its place; what the generator
-returned; the checks it failed; what the rule said of the two answers of the filters; the
-verdict and its reason; the question it became; and the tokens and the computed cost of
-its requests. Then the counts by kind and archive, and by reason (a draft counts under
-every check it failed). It holds no text of a paper: no question, no anchor, no answer,
-no reason the generator wrote, no note. It can go into the repository.
+The summary (--summary) has a line for every candidate, which is a place: its place; what
+the generator returned; for each of its drafts, the checks it failed and what the rule
+said of the two answers of the filters; which draft the place keeps; the verdict and its
+reason; the question it became; and the tokens and the computed cost of its requests.
+Then the counts by kind and archive, and by reason (a draft counts under every check it
+failed), with how many places kept their first, their second and their third draft. It
+holds no text of a paper: no question, no anchor, no answer, no reason the generator
+wrote, no note. It can go into the repository.
 
 The summary is always written: a question file without it would not say where it came
 from. A round of the tuning is summed up the same way, from its own files, without
@@ -55,7 +57,16 @@ from hepph_paper_miner.drafting import draft as drafting
 from hepph_paper_miner.drafting import sift as sifting
 from hepph_paper_miner.drafting.assign import Placed, PlacesFile, look_up, paper_source, read_places
 from hepph_paper_miner.drafting.checks import CHECKS
-from hepph_paper_miner.drafting.draft import DRAFT, NO_DRAFT, NOTHING, Draft, line_of, section_of
+from hepph_paper_miner.drafting.draft import (
+    DRAFT,
+    MAX_DRAFTS,
+    NO_DRAFT,
+    NOTHING,
+    Draft,
+    drafts_in,
+    line_of,
+    section_of,
+)
 from hepph_paper_miner.drafting.places import KINDS, NAMED_FIRST, SEARCH_FIRST
 from hepph_paper_miner.drafting.review import ACCEPT, REASONS, REJECT, read_review
 from hepph_paper_miner.eval.grade import RIGHT
@@ -72,15 +83,23 @@ REHEARSAL_PER_KIND = 2  # questions of every kind in the rehearsal: ten
 
 
 @dataclass(frozen=True)
+class Drafted:
+    """One draft of a place, and what the checks and the filters said of it."""
+
+    index: int  # 1 for the first draft of its place
+    failed: tuple[str, ...]  # the checks it failed
+    without: str | None  # what the rule said of the answer without the paper, if asked
+    passage: str | None  # and of the answer from the passage
+
+
+@dataclass(frozen=True)
 class Candidate:
     place: Placed
     draft: str  # DRAFT, NOTHING or NO_DRAFT
     problem: str | None  # what keeps a reply from being a draft, in the code's words
-    failed: tuple[str, ...] | None  # the checks it failed; None when there was no draft
-    without: str | None  # what the rule said of the answer without the paper, if asked
-    passage: str | None  # and of the answer from the passage
-    kept: bool
-    verdict: str | None  # ACCEPT or REJECT for a draft on the sheet
+    drafts: tuple[Drafted, ...]  # in the generator's order; none when there was no draft
+    kept: int | None  # the draft the place keeps (sift.kept), or None
+    verdict: str | None  # ACCEPT or REJECT for the draft on the sheet
     why_rejected: str | None
     lines: tuple[Mapping[str, Any], ...]  # its replies, for the usage
 
@@ -101,7 +120,7 @@ class Records:
     sift: list[dict[str, Any]]
     sift_sha256: str
     review_head: dict[str, Any]
-    verdicts: dict[int, tuple[str, str]]
+    verdicts: dict[int, tuple[str, str, int]]  # by place: verdict, reason, draft judged
     review_sha256: str
 
 
@@ -122,7 +141,8 @@ def read_records(places: Path, drafts: Path, sift: Path, review: Path) -> Record
     missing = [place.number for place in found.places if place.number not in by_place]
     if missing:
         raise RecordError(f"{drafts.name} has no reply for place {missing[0]}")
-    if set(verdicts) != set(sifting.kept(lines)):
+    keep = sifting.kept(lines)
+    if {number: judged[2] for number, judged in verdicts.items()} != keep:
         raise RecordError(f"{review.name} does not judge the drafts that {sift.name} kept")
     return Records(
         found,
@@ -140,31 +160,45 @@ def read_records(places: Path, drafts: Path, sift: Path, review: Path) -> Record
 
 def candidates_of(records: Records) -> list[Candidate]:
     """What became of every place, in the order of the file of places."""
-    checked = {line["number"]: line for line in records.sift if line.get("record") == "checked"}
-    said = ask.replies(records.sift)
-    kept = set(sifting.kept(records.sift))
+    checked: dict[int, list[dict[str, Any]]] = {}
+    for line in records.sift:
+        if line.get("record") == "checked":
+            checked.setdefault(line["number"], []).append(line)
+    said = sifting.filter_replies(records.sift)
+    keep = sifting.kept(records.sift)
     found = []
     for place in records.places.places:
         reply = records.drafts[place.number]
         outcome = reply.get("outcome")
-        line = checked.get(place.number)
-        if (outcome == DRAFT) != (line is not None):
+        lines = sorted(checked.get(place.number, ()), key=sifting.draft_of)
+        count = len(drafts_in(reply)) if outcome == DRAFT else 0
+        if [sifting.draft_of(line) for line in lines] != list(range(1, count + 1)):
             raise RecordError(f"the checks of place {place.number} do not fit its reply")
-        without = said.get(f"{place.number}:{sifting.WITHOUT}")
-        passage = said.get(f"{place.number}:{sifting.PASSAGE}")
-        verdict, why = records.verdicts.get(place.number, (None, None))
+        drafted, asked = [], []
+        for line in lines:
+            index = sifting.draft_of(line)
+            without = said.get((place.number, index, sifting.WITHOUT))
+            passage = said.get((place.number, index, sifting.PASSAGE))
+            drafted.append(
+                Drafted(
+                    index,
+                    tuple(line["failed"]),
+                    without.get("outcome") if without else None,
+                    passage.get("outcome") if passage else None,
+                )
+            )
+            asked += [each for each in (without, passage) if each]
+        verdict, why, _ = records.verdicts.get(place.number, (None, None, None))
         found.append(
             Candidate(
                 place=place,
                 draft=outcome,
                 problem=reply.get("problem"),
-                failed=tuple(line["failed"]) if line is not None else None,
-                without=without.get("outcome") if without else None,
-                passage=passage.get("outcome") if passage else None,
-                kept=place.number in kept,
+                drafts=tuple(drafted),
+                kept=keep.get(place.number),
                 verdict=verdict,
                 why_rejected=why or None,
-                lines=tuple(each for each in (reply, without, passage) if each),
+                lines=(reply, *asked),
             )
         )
     return found
@@ -256,17 +290,22 @@ def question_lines(
 ) -> list[dict[str, Any]]:
     """The lines of the question file, each checked as a question file is read."""
     anchors = {
-        line["number"]: line["anchor"] for line in records.sift if line.get("record") == "checked"
+        (line["number"], sifting.draft_of(line)): line["anchor"]
+        for line in records.sift
+        if line.get("record") == "checked"
     }
+    keep = sifting.kept(records.sift)
     width = max(2, len(str(len(chosen))))
     lines = []
     for at, each in enumerate(chosen, start=1):
         place = each.place
-        found = Draft.from_dict(records.drafts[place.number]["draft"])
+        index = keep[place.number]
+        found = Draft.from_dict(drafts_in(records.drafts[place.number])[index - 1])
         paper = papers[place.paper]
         name = f"{prefix}-{at:0{width}d}"
-        line = line_of(found, place, each.kind, paper.meta.title, anchors[place.number], name)
-        notes = {**line["notes"], "candidate": str(place.number)}
+        anchor = anchors[(place.number, index)]
+        line = line_of(found, place, each.kind, paper.meta.title, anchor, name)
+        notes = {**line["notes"], "candidate": str(place.number), "draft": str(index)}
         if place.archive:
             notes["archive"] = place.archive
         line["notes"] = notes
@@ -323,16 +362,21 @@ class Finder:
 # --- the summary --------------------------------------------------------------------------
 
 
-def _counts(found: Sequence[Candidate]) -> dict[str, int]:
+def _counts(found: Sequence[Candidate]) -> dict[str, Any]:
+    """Counts of places, and of drafts where the name says drafts: a place has up to three."""
+    drafts = [one for each in found for one in each.drafts]
+    keeps = [each.kept for each in found if each.kept is not None]
     return {
         "places": len(found),
-        "drafts": sum(1 for each in found if each.draft == DRAFT),
+        "with_drafts": sum(1 for each in found if each.draft == DRAFT),
+        "drafts": len(drafts),
         "nothing_to_ask": sum(1 for each in found if each.draft == NOTHING),
         "no_draft": sum(1 for each in found if each.draft == NO_DRAFT),
-        "passed_checks": sum(1 for each in found if each.failed == ()),
-        "right_without_the_paper": sum(1 for each in found if each.without == RIGHT),
-        "right_from_the_passage": sum(1 for each in found if each.passage == RIGHT),
-        "kept": sum(1 for each in found if each.kept),
+        "passed_checks": sum(1 for one in drafts if one.failed == ()),
+        "right_without_the_paper": sum(1 for one in drafts if one.without == RIGHT),
+        "right_from_the_passage": sum(1 for one in drafts if one.passage == RIGHT),
+        "kept": len(keeps),
+        "kept_by_draft": {str(index): keeps.count(index) for index in range(1, MAX_DRAFTS + 1)},
         "accepted": sum(1 for each in found if each.verdict == ACCEPT),
         "rejected": sum(1 for each in found if each.verdict == REJECT),
     }
@@ -388,10 +432,17 @@ def summary_lines(
             **{key: value for key, value in place.as_line().items() if key != "record"},
             "draft": each.draft,
             "problem": each.problem,
-            "failed_checks": list(each.failed) if each.failed is not None else None,
-            "without_the_paper": each.without,
-            "from_the_passage": each.passage,
-            "kept": each.kept,
+            "drafts": [
+                {
+                    "draft": one.index,
+                    "failed_checks": list(one.failed),
+                    "without_the_paper": one.without,
+                    "from_the_passage": one.passage,
+                }
+                for one in each.drafts
+            ],
+            "kept": each.kept is not None,
+            "kept_draft": each.kept,
             "verdict": each.verdict,
             "why_rejected": each.why_rejected,
             "question": names.get(place.number),
@@ -428,7 +479,7 @@ def summary_lines(
         {
             "record": "reasons",
             "failed_checks": {
-                name: sum(1 for each in found if each.failed and name in each.failed)
+                name: sum(1 for each in found for one in each.drafts if name in one.failed)
                 for name in CHECKS
             },
             "no_draft": dict(Counter(each.problem for each in found if each.draft == NO_DRAFT)),
@@ -566,6 +617,8 @@ def main(
     for line in table(lines):
         print(line)
     total = lines[-1]
+    by_draft = ", ".join(f"draft {name}: {n}" for name, n in total["kept_by_draft"].items())
+    print(f"the places that keep a draft keep ({by_draft})")
     if total["cost"] is not None:
         print(f"cost of the requests, computed: ${total['cost']:.2f}")
     return 0

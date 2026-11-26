@@ -11,7 +11,8 @@ of them are made, so that one draft can be counted under every check it fails:
                      the anchor: so a run that was given the passage was given the value
     not_in_listing   no value of the key is written in the abstract or in the title
     not_elsewhere    no value of the key is written in the paper outside the part, nor in
-                     the title of a section (the outline shows the titles)
+                     the title of a section (the outline shows the titles); there a number
+                     of the key that has a unit counts only with that unit after it
     question_clean   the question holds the mark of its paper once, and no identifier, no
                      value of the key, no title of its section, no number of a section,
                      an equation, a figure or a table, and not the word "appendix"
@@ -32,23 +33,44 @@ question of a later piece, and one that a subsection also writes makes none of t
 of a section in front of its subsections.
 
 "Written" is read the way the grader reads an answer. Numbers are read off the TeX as
-eval/check.py reads them, and held to the key with its significant digits. A phrase is
+eval/check.py reads them, save that "--" is the dash of a range and no minus ("30--37.2"
+holds 37.2), and held to the key with its significant digits. A phrase is
 written when one of its wordings stands in the text, regardless of capitals, after the
 TeX is made plain (spacing and the signs of math mode become spaces, braces go, a control
 word loses its backslash) and white space is taken out of both: "\\textit{Fermi}-LAT"
 then holds "Fermi-LAT", and a name that runs over a line break is found.
+
+Outside the part (not_elsewhere), a number of the key that has a unit is written only
+where the same number stands with the same unit right after it: "20~kpc" and
+"20\\,{\\rm kpc}" are 20 kpc, "20^\\circ", "20 cm" and "20 pc" are not. Between the number
+and its unit may stand spacing, braces, font commands, a range ("6.4-9.1 GeV", "40 to 60
+GeV") or an uncertainty ("40 \\pm 5 GeV", "40^{+5}_{-3} GeV", "(40 \\pm 5) GeV"). Units are
+held to each other by their first word, without capitals; a Greek letter by its name
+("\\sigma" is σ), and degrees and per cent in their usual spellings. A number of the key
+without a unit, and a phrase, are written wherever they stand, as everywhere else.
+
+Why the unit there: in the first round of the tuning five of the eight drafts that this
+check dropped had a value that stood elsewhere for another quantity (a 20 of "20 cm"
+for a radius of 20 kpc, a 5 of "{5mm}" for a mass of 5 keV), and three had their fact
+stated again. Read with the unit, the three are still dropped, and three of the five
+pass (the other two: a 10% that stands elsewhere for other quantities, and a number
+without a unit). What it misses: the same value stated again without its unit right
+after it, as in a table whose unit stands in its head, or written with another spelling
+of the unit. Such a question shows up in the runs as an answer that is right without the
+anchor, which the report counts.
 """
 
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from hepph_paper_miner.drafting.assign import Placed
 from hepph_paper_miner.drafting.draft import PAPER_MARK, Draft, line_of, section_of
 from hepph_paper_miner.eval.check import _CONTROL_WORD_BEFORE_DIGIT, _TEX_SPACING
-from hepph_paper_miner.eval.grade import Number, agrees, numbers_in
+from hepph_paper_miner.eval.grade import _NUMBER, Number, agrees, numbers_in
 from hepph_paper_miner.eval.questions import QuestionFileError, _question
 from hepph_paper_miner.sources.base import Paper, Section
 
@@ -85,12 +107,21 @@ class Checked:
 
 _BRACES = re.compile(r"[{}]")
 _CONTROL_WORD = re.compile(r"\\([A-Za-z]+)")
+# The dash of a range in TeX ("6.4--9.1~GeV"), and the long dash of a sentence.
+_TEX_DASH = re.compile(r"-{2,3}")
+
+
+def _number_text(tex: str) -> str:
+    """A text of TeX as its numbers are read: as eval/check.py makes it of an anchor, save
+    that "--" and "---" become a dash that is no minus. Read as they stand, "30--37.2"
+    would hold -37.2, since a minus sign is a minus where no number stands right before it."""
+    text = _TEX_DASH.sub(" – ", _TEX_SPACING.sub(" ", tex))
+    return _CONTROL_WORD_BEFORE_DIGIT.sub(r"\1 ", text)
 
 
 def numbers_written(tex: str) -> list[Number]:
     """The numbers of a text of TeX, as eval/check.py reads the numbers of an anchor."""
-    text = _TEX_SPACING.sub(" ", tex)
-    return numbers_in(_CONTROL_WORD_BEFORE_DIGIT.sub(r"\1 ", text))
+    return numbers_in(_number_text(tex))
 
 
 def _plain(text: str) -> str:
@@ -117,6 +148,124 @@ def written_in(draft: Draft, tex: str) -> list[int]:
     """Which values of the key a text of TeX writes: their places among numbers, then phrases."""
     numbers, text = numbers_written(tex), squeezed(tex)
     found = [at for at, item in enumerate(draft.numbers) if number_written(item, numbers)]
+    first = len(draft.numbers)
+    return found + [
+        first + at for at, item in enumerate(draft.phrases) if phrase_written(item, text)
+    ]
+
+
+# --- a number with its unit, outside the part ----------------------------------------------
+
+_DIGITS = r"[-−+]?\d+(?:\.\d+)?(?:\s*(?:×|\\times)\s*10\s*\^\s*\{?\s*[-−+]?\d+\s*\}?)?"
+_UP = r"\^\s*\{\s*\+\s*\d+(?:\.\d+)?\s*\}"
+_DOWN = r"_\s*\{\s*[-−]\s*\d+(?:\.\d+)?\s*\}"
+# What may stand between a number and its unit, once or twice: the other end of a range,
+# an uncertainty, or an uncertainty in the last digits ("1.2345(6) GeV").
+_BETWEEN = re.compile(
+    rf"\s*(?:-{{1,3}}|–|—|to|and|\\pm|±|\+/-)\s*{_DIGITS}"
+    rf"|\s*{_UP}\s*{_DOWN}|\s*{_DOWN}\s*{_UP}"
+    r"|\(\d+\)"
+)
+# Spacing, braces and brackets, and font commands, which say nothing of the unit.
+_LEAD = re.compile(r"[\s{}()\[\]^_]+")
+_FONT = re.compile(
+    r"\\(?:rm|mathrm|textrm|text|mbox|hbox|it|mathit|textit|bf|mathbf|textbf|sf|mathsf|textsf"
+    r"|mathnormal|operatorname|ensuremath|unit|units)(?![A-Za-z])"
+)
+# The sign of degrees, which is no letter. "^\circ" and "\degree" need nothing: the "^" is
+# skipped as spacing is, and their control words are spellings of "deg" (_SAME).
+_DEGREES = re.compile(r"°")
+_WORD = re.compile(r"\\?%|\\([A-Za-z]+)|([^\W\d_]+)")
+# Spellings of one unit that are held to be the same.
+_SAME = {
+    "degree": "deg",
+    "degrees": "deg",
+    "circ": "deg",
+    "textdegree": "deg",
+    "percent": "%",
+    "µ": "mu",
+}
+
+
+def _word(text: str) -> str:
+    """A word as units are held to each other: without capitals, a Greek letter by its name."""
+    first = text[0]
+    if first in _SAME:
+        text = _SAME[first]
+    elif "GREEK" in unicodedata.name(first, ""):
+        text = unicodedata.name(first).split()[-1]  # GREEK SMALL LETTER SIGMA: sigma
+    text = text.casefold()
+    return _SAME.get(text, text)
+
+
+def first_word(text: str, at: int = 0) -> str:
+    """The first word of a unit that stands at `at`, past spacing, braces and font commands,
+    as units are held to each other; "" when no word stands there."""
+    while at < len(text):
+        skipped = _LEAD.match(text, at) or _FONT.match(text, at)
+        if skipped is None or skipped.end() == at:
+            break
+        at = skipped.end()
+    found = _WORD.match(text, at)
+    if found is None:
+        return ""
+    if found.group(0) in ("%", "\\%"):
+        return "%"
+    return _word(found.group(1) or found.group(2))
+
+
+def unit_of(item: dict) -> str:
+    """The first word of the unit of a number of the key, or "" when it has none."""
+    unit = _DEGREES.sub(" deg ", _TEX_SPACING.sub(" ", str(item.get("unit") or "")))
+    return first_word(unit)
+
+
+def unit_after(text: str, end: int) -> str:
+    """The first word of the unit after a number that ends at `end`, or "" when none follows.
+
+    `text` is TeX, or the text that numbers_with_ends read the number off: TeX spacing is
+    made a space either way.
+    """
+    rest = _DEGREES.sub(" deg ", _TEX_SPACING.sub(" ", text[end : end + 160]))
+    for _ in range(2):
+        between = _BETWEEN.match(rest)
+        if between is None:
+            break
+        rest = rest[between.end() :]
+    return first_word(rest)
+
+
+def numbers_with_ends(tex: str) -> tuple[str, list[tuple[Number, int]]]:
+    """The numbers of a text of TeX as numbers_written reads them, each with where it ends in
+    the text they were read off, which comes with them."""
+    text = _number_text(tex)
+    found = []
+    for match in _NUMBER.finditer(text):
+        # Read on its own, a match is the number that numbers_in reads of it in the text:
+        # what stands before it is no part of it.
+        read = numbers_in(text[match.start() : match.end()])
+        if read:
+            found.append((read[0], match.start() + len(read[0].text)))
+    return text, found
+
+
+def number_elsewhere(item: dict, tex: str) -> bool:
+    """Whether a text outside the part writes a number of the key: with the key's unit right
+    after it when the key has one, anywhere when it has none."""
+    unit = unit_of(item)
+    text, numbers = numbers_with_ends(tex)
+    return any(
+        agrees(number, item["value"], item.get("min_sig_figs"))
+        and (not unit or unit_after(text, end) == unit)
+        for number, end in numbers
+    )
+
+
+def written_elsewhere(draft: Draft, tex: str) -> list[int]:
+    """Which values of the key a text outside the part writes, as not_elsewhere reads it:
+    numbers with their units, phrases as written_in reads them."""
+    text = squeezed(tex)
+    found = [at for at, item in enumerate(draft.numbers) if number_elsewhere(item, tex)]
     first = len(draft.numbers)
     return found + [
         first + at for at, item in enumerate(draft.phrases) if phrase_written(item, text)
@@ -369,7 +518,7 @@ def check(draft: Draft, paper: Paper, place: Placed, kind: str) -> Checked:
     if pieces is None:
         failed.append(("not_elsewhere", "the part cannot be placed in its section"))
     else:
-        elsewhere = [at for piece in pieces for at in written_in(draft, piece)]
+        elsewhere = [at for piece in pieces for at in written_elsewhere(draft, piece)]
         if elsewhere:
             failed.append(("not_elsewhere", f"outside the part: {labels(draft, elsewhere)}"))
 

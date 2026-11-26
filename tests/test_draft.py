@@ -34,11 +34,13 @@ from hepph_paper_miner.drafting.draft import (
     DRAFT_SCHEMA,
     DRAFTER_VERSION,
     DRAFTING,
+    MAX_DRAFTS,
     MESSAGE,
     NO_DRAFT,
     NOTHING,
     SYSTEM_PROMPT,
     Draft,
+    drafts_in,
     fill_paper,
     key_of,
     line_of,
@@ -54,7 +56,7 @@ from hepph_paper_miner.server import full_text
 
 ROOT = Path(__file__).parent.parent
 # The name of the texts the generator reads, and the digest of those texts.
-PINNED = ("d1", "f7f9d5169c3a454d6d1669adcc346c16358bc1d447a32549617b9bf86cd9255b")
+PINNED = ("d2", "525e9c906a59ebc49d1079bcf4d59726db02cd38bada1f3d3058d8ee78ccf387")
 
 
 # --- the texts the generator reads ---------------------------------------------------------
@@ -122,6 +124,7 @@ def objects_of(schema: dict):
 
 
 def test_the_form_of_a_draft_is_one_the_api_can_hold():
+    objects = [part for part in objects_of(DRAFT_SCHEMA) if part.get("type") == "object"]
     for part in objects_of(DRAFT_SCHEMA):
         assert not UNSUPPORTED & set(part), part
         assert part.get("minItems", 0) in (0, 1)
@@ -129,9 +132,10 @@ def test_the_form_of_a_draft_is_one_the_api_can_hold():
             # Every field is required, so that the order of the work is the order written.
             assert part["additionalProperties"] is False
             assert part["required"] == list(part["properties"])
-    assert list(DRAFT_SCHEMA["properties"]) == [
-        "nothing_to_ask",
-        "why_nothing",
+    # The reply, a draft, an item of numbers and an item of phrases: every object is seen.
+    assert len(objects) == 4
+    assert list(DRAFT_SCHEMA["properties"]) == ["nothing_to_ask", "why_nothing", "drafts"]
+    assert list(DRAFT_SCHEMA["properties"]["drafts"]["items"]["properties"]) == [
         "anchor",
         "question",
         "reference_answer",
@@ -139,6 +143,15 @@ def test_the_form_of_a_draft_is_one_the_api_can_hold():
         "phrases",
         "accept_note",
     ]
+    # A list cannot be held to a length by the form: the reader keeps to three.
+    assert MAX_DRAFTS == 3 and "three" in DRAFT_SCHEMA["properties"]["drafts"]["description"]
+
+
+def test_the_prompt_asks_for_up_to_as_many_drafts_as_are_read():
+    assert "Write up to three drafts, each about another fact of the part, the best first" in (
+        SYSTEM_PROMPT
+    )
+    assert 'leave "drafts" empty' in SYSTEM_PROMPT
 
 
 # --- what a request holds -------------------------------------------------------------------
@@ -232,14 +245,30 @@ async def test_a_request_the_api_refuses_gives_no_reply():
 
 def test_a_draft_is_read_from_a_reply_of_the_form():
     read = read_draft(reply_of(as_reply(draft())))
-    assert read.outcome == DRAFT and read.problem is None
-    assert read.draft == Draft.from_dict(draft())
-    assert read.draft.as_dict() == draft()
+    assert read.outcome == DRAFT and read.problem is None and read.left_out == 0
+    assert read.drafts == (Draft.from_dict(draft()),)
+    assert read.drafts[0].as_dict() == draft()
+
+
+def test_up_to_three_drafts_are_read_in_their_order_and_more_are_left_out():
+    first, second, third = draft(), later_draft(), draft(question="In {paper}, how big?")
+    read = read_draft(reply_of(as_reply(first, second, third)))
+    assert [each.as_dict() for each in read.drafts] == [first, second, third]
+    fourth = draft(question="In {paper}, how wide?")
+    read = read_draft(reply_of(as_reply(first, second, third, fourth, fourth)))
+    assert [each.as_dict() for each in read.drafts] == [first, second, third]
+    assert (read.outcome, read.left_out) == (DRAFT, 2)
+    # A draft past the third is not read, so its form does not matter.
+    read = read_draft(reply_of(as_reply(first, second, third, {"question": "q"})))
+    assert (read.outcome, len(read.drafts), read.left_out) == (DRAFT, 3, 1)
 
 
 def test_nothing_to_ask_is_read_with_its_reason():
     read = read_draft(reply_of(nothing("Only a list of names.")))
-    assert (read.outcome, read.draft, read.why_nothing) == (NOTHING, None, "Only a list of names.")
+    assert (read.outcome, read.drafts, read.why_nothing) == (NOTHING, (), "Only a list of names.")
+    # Drafts beside "nothing to ask" are not read: the reply says there is nothing.
+    said = {**as_reply(draft()), "nothing_to_ask": True, "why_nothing": "Only a list."}
+    assert read_draft(reply_of(said)).outcome == NOTHING
 
 
 @pytest.mark.parametrize(
@@ -247,11 +276,28 @@ def test_nothing_to_ask_is_read_with_its_reason():
     [
         (reply_of(as_reply(draft()), stop="max_tokens"), "the reply stopped with max_tokens"),
         (reply_of(as_reply(draft()), stop="refusal"), "the reply stopped with refusal"),
-        (reply_of({"question": "q"}), "the reply does not have the fields of a draft"),
+        (reply_of({"question": "q"}), "the reply does not have the fields of the form"),
+        (reply_of(draft()), "the reply does not have the fields of the form"),  # d1's form
         (
             reply_of({**as_reply(draft()), "nothing_to_ask": "no"}),
             "a field of the reply is not of its kind",
         ),
+        (
+            reply_of({**as_reply(draft()), "why_nothing": None}),
+            "a field of the reply is not of its kind",
+        ),
+        (
+            reply_of({**as_reply(draft()), "drafts": draft()}),
+            "a field of the reply is not of its kind",
+        ),
+        (reply_of(as_reply()), "the reply has no draft"),
+        (reply_of(as_reply(draft(), ["a list"])), "a draft does not have the fields of a draft"),
+        (
+            reply_of(as_reply({**draft(), "kind": "x"})),
+            "a draft does not have the fields of a draft",
+        ),
+        (reply_of(as_reply(draft(question=7))), "a field of a draft is not of its kind"),
+        (reply_of(as_reply(draft(numbers={}))), "numbers or phrases is not a list"),
         (
             reply_of(
                 as_reply(
@@ -272,11 +318,27 @@ def test_nothing_to_ask_is_read_with_its_reason():
             reply_of(as_reply(draft(phrases=[{"label": "a", "any_of": "x"}]))),
             "an item of phrases is not of the form",
         ),
+        # One draft that is not of the form makes the whole reply no draft, a good one too.
+        (
+            reply_of(as_reply(draft(), draft(phrases=[{"label": "a", "any_of": "x"}]))),
+            "an item of phrases is not of the form",
+        ),
     ],
 )
 def test_a_reply_that_is_no_draft_is_not_read_as_one(reply, problem):
     read = read_draft(reply)
-    assert (read.outcome, read.draft, read.problem) == (NO_DRAFT, None, problem)
+    assert (read.outcome, read.drafts, read.problem) == (NO_DRAFT, (), problem)
+
+
+def test_the_drafts_of_a_line_are_read_from_a_record_of_d1_as_well():
+    assert drafts_in({"outcome": "draft", "drafts": [draft(), later_draft()]}) == [
+        draft(),
+        later_draft(),
+    ]
+    assert drafts_in({"outcome": "nothing_to_ask", "drafts": []}) == []
+    # d1 wrote its one draft under "draft", and None where there was none.
+    assert drafts_in({"outcome": "draft", "draft": draft()}) == [draft()]
+    assert drafts_in({"outcome": "no_draft", "draft": None}) == []
 
 
 def test_a_text_that_is_no_json_is_no_draft():
@@ -357,10 +419,13 @@ def answers(system, message, schema):
     # and one named_first place (which one, the hash decides).
     part = re.search(r"<part>\nSection: (\S+) \| [^\n]*\nCharacters (\d+)", message)
     if part[1] == "2.2" and part[2] != "0":
-        return reply_of(as_reply(later_draft()), thinking="A coupling is stated once.")
+        return reply_of(as_reply(later_draft(), SECOND), thinking="A coupling is stated once.")
     if part[1] == "A":
         return reply_of(nothing(), thinking="Only a cutoff.")
     return reply_of(as_reply(draft()), stop="max_tokens")
+
+
+SECOND = later_draft(question="In {paper}, what is the coupling fixed to at the reference scale?")
 
 
 def test_the_command_drafts_every_place_and_writes_its_record(places, tmp_path, capsys):
@@ -385,12 +450,35 @@ def test_the_command_drafts_every_place_and_writes_its_record(places, tmp_path, 
     ]
     assert outcomes.count(DRAFT) == 1 and outcomes.count(NOTHING) == 1
     drafted = next(line for line in replies if line["outcome"] == DRAFT)
-    assert drafted["draft"] == later_draft()
+    assert drafted["drafts"] == [later_draft(), SECOND] and "left_out" not in drafted
     assert drafted["thinking"] == ["A coupling is stated once."]
     cut = [line for line in replies if line["outcome"] == NO_DRAFT]
     assert all(line["problem"] == "the reply stopped with max_tokens" for line in cut)
+    assert all(line["drafts"] == [] for line in replies if line["outcome"] != DRAFT)
     assert end["record"] == "end" and end["outcomes"] == {DRAFT: 1, NOTHING: 1, NO_DRAFT: 2}
-    assert "4 reply(ies): draft 1, nothing_to_ask 1, no_draft 2" in capsys.readouterr().out
+    assert (end["drafts"], end["left_out"]) == (2, 0)
+    said = capsys.readouterr().out
+    assert "4 reply(ies): draft 1, nothing_to_ask 1, no_draft 2; 2 draft(s)" in said
+    assert "left out" not in said
+
+
+def test_drafts_past_the_third_are_left_out_and_counted(places, tmp_path, capsys):
+    out = tmp_path / "drafts.jsonl"
+
+    def many(system, message, schema):
+        return reply_of(as_reply(*(draft(question=f"In {{paper}}, what {n}?") for n in range(5))))
+
+    argv = ["--places", str(places), "--out", str(out)]
+    assert drafting.main(argv, asker=Scripted(many), source=source()) == 0
+    head, *replies, end = [json.loads(line) for line in out.read_text().splitlines()]
+    assert all(len(line["drafts"]) == MAX_DRAFTS and line["left_out"] == 2 for line in replies)
+    assert [each["question"] for each in replies[0]["drafts"]] == [
+        "In {paper}, what 0?",
+        "In {paper}, what 1?",
+        "In {paper}, what 2?",
+    ]
+    assert (end["drafts"], end["left_out"]) == (12, 8)
+    assert "left out, past 3 drafts of a reply: 8" in capsys.readouterr().out
 
 
 def test_started_again_it_asks_only_what_the_api_failed(places, tmp_path, capsys):

@@ -4,6 +4,8 @@ The paper is the invented one of drafting_paper.py: every value it holds stands 
 known place, so each check can be made to pass and to fail on purpose.
 """
 
+from dataclasses import replace
+
 import pytest
 from conftest import OWN_PAPER
 from drafting_paper import LONG_FIRST, draft, paper, placed
@@ -14,9 +16,13 @@ from hepph_paper_miner.drafting.checks import (
     check,
     counted,
     not_running,
+    number_elsewhere,
+    numbers_with_ends,
     numbers_written,
     phrase_written,
     squeezed,
+    unit_after,
+    unit_of,
 )
 from hepph_paper_miner.drafting.draft import Draft
 from hepph_paper_miner.drafting.places import (
@@ -27,7 +33,7 @@ from hepph_paper_miner.drafting.places import (
     SEARCH_FIRST,
     places_of,
 )
-from hepph_paper_miner.sources.base import PaperMeta
+from hepph_paper_miner.sources.base import Paper, PaperMeta
 from hepph_paper_miner.sources.fixture import paper_from_latex
 
 
@@ -176,6 +182,18 @@ def test_numbers_are_read_off_tex_as_the_check_of_a_question_file_reads_them():
     assert written == ["2.5 \\times 10^{-26}", "100"]
 
 
+def test_the_dash_of_a_range_in_tex_is_no_minus():
+    # "--" makes the dash of a range in TeX. Read as it stands, the number after it would
+    # be negative: a minus sign is a minus where no number stands right before it.
+    assert [str(n.value) for n in numbers_written("energies of 30--37.2~GeV")] == ["30", "37.2"]
+    assert [str(n.value) for n in numbers_written("from 6.4---290 GeV")] == ["6.4", "290"]
+    # A minus and a range of one dash are read as before.
+    assert [str(n.value) for n in numbers_written("$-3.5$ and 0.2-0.4")] == ["-3.5", "0.2", "0.4"]
+    numbers = [{"label": "area", "value": 37.2, "unit": "", "min_sig_figs": 3}]
+    changes = {"anchor": "detector has an area of 37.2 square metres", "numbers": numbers}
+    assert "key_in_anchor" not in checked(changes).failed
+
+
 # --- 5 and 6: nowhere else -------------------------------------------------------------------
 
 
@@ -235,6 +253,137 @@ def test_the_title_of_a_section_counts_as_elsewhere():
     # The title of the appendix is written in no text of the paper, only in its outline.
     changes = {"phrases": [{"label": "fit", "any_of": ["details of the fit"]}]}
     assert failures(checked(changes))["not_elsewhere"] == "outside the part: 'fit'"
+
+
+# --- 6: a number with its unit, outside the part ------------------------------------------
+
+
+def with_intro(more: str) -> Paper:
+    """The invented paper with a sentence more at the end of its introduction."""
+    base = paper()
+    sections = tuple(
+        replace(section, text=section.text + more) if section.section_id == "1" else section
+        for section in base.sections
+    )
+    return Paper(base.meta, sections, base.parser_version)
+
+
+@pytest.mark.parametrize(
+    ("sentence", "elsewhere"),
+    [
+        ("A ring of 37.2 parsecs is not an area.\n", False),  # the same number, another unit
+        ("We count 37.2 events.\n", False),
+        ("An area of 37.2~square metres is used again.\n", True),
+        ("An area of $37.2\\,{\\rm square}$ metres.\n", True),
+        ("Areas of 30--37.2 square metres were tried.\n", True),  # either end of a range
+        ("Areas of 30-37.2 square metres were tried.\n", True),
+        ("Areas of 37.2--40 square metres were tried.\n", True),
+        ("Areas of 37.2--40 parsecs were tried.\n", False),
+        ("It is (37.2 \\pm 0.1) square metres.\n", True),
+    ],
+)
+def test_a_number_with_a_unit_is_elsewhere_only_with_its_unit(sentence, elsewhere):
+    result = checked(of=with_intro(sentence))
+    assert ("not_elsewhere" in result.failed) == elsewhere, result.why
+
+
+def test_a_number_without_its_unit_after_it_is_not_counted_elsewhere():
+    # What the rule misses, on purpose: the same value without its unit right after it, as
+    # in a table whose unit stands in its head.
+    sentence = "\\begin{tabular}{cc} area (square metres) & 37.2 \\\\ \\end{tabular}\n"
+    assert "not_elsewhere" not in checked(of=with_intro(sentence)).failed
+
+
+def test_a_number_of_the_key_without_a_unit_is_elsewhere_wherever_it_stands():
+    changes = {"numbers": [{"label": "area", "value": 37.2, "unit": "", "min_sig_figs": 3}]}
+    for sentence in ("A ring of 37.2 parsecs.\n", "We count 37.2 events.\n"):
+        result = checked(changes, of=with_intro(sentence))
+        assert failures(result)["not_elsewhere"] == "outside the part: 'area'"
+
+
+def test_the_unit_rule_reads_only_outside_the_part():
+    # In the anchor and the question a number counts without its unit, as before: a value
+    # that the question writes gives the answer away whatever stands after it.
+    changes = {"question": "In {paper}, is 37.2 the area of the detector?"}
+    assert "it writes the value of 'area'" in failures(checked(changes))["question_clean"]
+    numbers = [{"label": "area", "value": 37.2, "unit": "parsecs", "min_sig_figs": 3}]
+    assert "key_in_anchor" not in checked({"numbers": numbers}).failed
+
+
+@pytest.mark.parametrize(
+    ("tex", "value", "unit", "written"),
+    [
+        ("r_s = 20~kpc", 20, "kpc", True),
+        ("$r_s =20$ kpc, and", 20, "kpc", True),
+        ("20\\,{\\rm kpc}", 20, "kpc", True),
+        ("20~\\mathrm{kpc}", 20, "kpc", True),
+        ("\\SI{20}{kpc}", 20, "kpc", True),
+        ("20 pc and 2 kpc", 20, "kpc", False),
+        ("20 & 30 kpc", 20, "kpc", False),
+        ("the value 20.", 20, "kpc", False),
+        ("6.4-9.1 GeV", 6.4, "GeV", True),
+        ("6.4--9.1~GeV", 6.4, "GeV", True),
+        ("6.4$-$9.1 GeV", 6.4, "GeV", True),
+        ("6.4 to 290 GeV", 6.4, "GeV", True),
+        ("20 \\pm 5 kpc", 20, "kpc", True),
+        ("(20 \\pm 5)~kpc", 20, "kpc", True),
+        ("20^{+5}_{-3}\\,{\\rm kpc}", 20, "kpc", True),
+        ("1.3^{+0.2}_{-0.1} \\pm 0.1~TeV", 1.3, "TeV", True),  # two uncertainties
+        ("1.2345(6) GeV", 1.2345, "GeV", True),
+        ("20kpc", 20, "kpc", True),
+        ("10\\%", 10, "%", True),
+        ("10 percent", 10, "%", True),
+        ("10\\% and 20 cm", 20, "%", False),
+        ("5~\\kev", 5, "keV", True),
+        ("\\rule{0mm}{5mm}", 5, "keV", False),
+        ("2 \\times 10^{-9} \\; \\textrm{ph cm}^{-2}", 2e-9, "ph cm^-2 s^-1", True),
+        ("14 &10.0 & 11.5 \\\\ 15 &11.5 & 16.5", 11.5, "GV", False),
+        ("|b| < 20^\\circ", 20, "deg", True),
+        ("|b| < 20$^{\\circ}$", 20, "°", True),
+        ("|b| < 20°", 20, "degrees", True),
+        ("|b| < 20\\textdegree", 20, "°", True),
+        ("|b| < 20\\degree", 20, "$^\\circ$", True),
+        ("|b| < 20^\\circ", 20, "kpc", False),
+        ("3\\sigma", 3, "σ", True),
+        ("3 $\\sigma$", 3, "sigma", True),
+        ("20 \\mu m", 20, "μm", True),
+        ("0.79^2 kpc", 0.79, "kpc", False),  # a power on the number, not the unit
+        ("20~{\\rm kpc}", 20, "{\\rm kpc}", True),  # a unit written as TeX
+        ("20 kpc", 20, "~kpc", True),
+        ("20 cm", 20, "~kpc", False),
+        ("z\\sim 300", 300, "", True),
+        ("\\sim 300 GeV", 300, "", True),  # no unit in the key: wherever it stands
+    ],
+)
+def test_a_number_and_its_unit_are_read_off_tex(tex, value, unit, written):
+    item = {"label": "x", "value": value, "unit": unit, "min_sig_figs": 1}
+    assert number_elsewhere(item, tex) == written
+
+
+def test_units_are_held_to_each_other_by_their_first_word():
+    assert [unit_of({"unit": unit}) for unit in ("GeV/c^2", "ph cm^-2 s^-1", "°", "")] == [
+        "gev",
+        "ph",
+        "deg",
+        "",
+    ]
+    assert unit_of({"unit": "Degrees"}) == unit_of({"unit": "\\circ"}) == "deg"
+    assert unit_of({"unit": "μm"}) == unit_of({"unit": "µm"}) == "mu"  # Greek mu, micro sign
+    text = "a 40\\,{\\rm GeV} b"
+    assert unit_after(text, text.index("40") + 2) == "gev"
+    assert unit_after("12 ", 2) == ""
+
+
+def test_the_numbers_with_their_ends_are_the_numbers_of_the_check():
+    for tex in (
+        "$2.5\\,\\times\\,10^{-26}$ and $\\sim100$",
+        "0.2-0.4 and h2 at -3 and 1,234.5",
+        "a 0.79^2 and 2.26e-26 then 10^{-5}",
+    ):
+        text, found = numbers_with_ends(tex)
+        assert [number for number, _ in found] == numbers_written(tex)
+        for number, end in found:
+            assert text[end - len(number.text) : end] == number.text
 
 
 # --- 7: the question -------------------------------------------------------------------------

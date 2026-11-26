@@ -5,10 +5,11 @@
         --drafts runs_private/drafting/round-1/drafts.jsonl \\
         --out runs_private/drafting/round-1/sift.jsonl
 
-First the checks of checks.py, for every draft: their result stands in the record right
-after its first line. A draft that passes them is put to the model twice, each time
-once, and the answer is graded by the rule of eval/grade.py, which says right or wrong
-of every answer when a key holds numbers and phrases alone:
+First the checks of checks.py, for every draft of every place: their result stands in the
+record right after its first line, a line for each draft. A draft that passes them is put
+to the model twice, each time once, and the answer is graded by the rule of
+eval/grade.py, which says right or wrong of every answer when a key holds numbers and
+phrases alone:
 
     without   the question alone: no paper, no tool. A draft answered right is dropped,
               since its fact can be known or guessed. The form of this answer has no
@@ -27,9 +28,16 @@ in with the identifier, or with the title for search_first. Both filters ask wit
 judge's settings. Their texts have a name, SIFT_VERSION, and tests/test_sift.py holds
 them to it: a change to them is another filter.
 
-A draft is kept when it passes every check, is not answered right without the paper,
-and is answered right from the passage. The record holds anchors and answers, which are
-paper text, so it goes into runs_private/.
+A draft passes when it passes every check, is not answered right without the paper, and
+is answered right from the passage. Of every place, the first draft in the generator's
+order that passes is kept, and its place's others are not: a place makes one question at
+most. Every draft that passes the checks is put to both filters, the later ones too, so
+that the record says how many drafts of each place could have been kept (the requests
+cost little beside those of the generator). The record holds anchors and answers, which
+are paper text, so it goes into runs_private/.
+
+A record of the generator d1 has one draft a place, and it is read as a place's first
+and only draft (draft.drafts_in): such a round is checked and sifted again by this code.
 """
 
 from __future__ import annotations
@@ -50,7 +58,9 @@ from hepph_paper_miner.drafting.assign import Placed, PlacesFile, paper_source, 
 from hepph_paper_miner.drafting.checks import CHECKS, Checked, check
 from hepph_paper_miner.drafting.draft import (
     DRAFT,
+    MAX_DRAFTS,
     Draft,
+    drafts_in,
     line_of,
     papers_of,
     read_drafts,
@@ -164,19 +174,30 @@ def piece_of(paper: Paper, place: Placed) -> str:
     return _section(_OnePaper(paper), place.paper, place.section, place.start, end)
 
 
-def question_of(draft: Draft, place: Placed, paper: Paper, anchor: str) -> Question:
+def question_of(draft: Draft, place: Placed, paper: Paper, anchor: str, index: int = 1) -> Question:
     """The question a draft becomes, as a question file would hold it."""
-    line = line_of(draft, place, place.kind, paper.meta.title, anchor, f"draft-{place.number}")
-    return _question(line, f"draft {place.number}")
+    name = f"draft-{place.number}.{index}"
+    line = line_of(draft, place, place.kind, paper.meta.title, anchor, name)
+    return _question(line, f"draft {place.number}.{index}")
+
+
+def draft_of(line: Mapping[str, Any]) -> int:
+    """Which draft of its place a line of the record is about: 1 for the first.
+
+    A record made before a place could have more than one draft has no such field, and its
+    one draft is the first.
+    """
+    return line.get("draft", 1)
 
 
 # --- the checks ----------------------------------------------------------------------------
 
 
-def checked_line(place: Placed, checked: Checked) -> dict[str, Any]:
+def checked_line(place: Placed, index: int, checked: Checked) -> dict[str, Any]:
     return {
         "record": "checked",
         "number": place.number,
+        "draft": index,
         "paper": place.paper,
         "kind": place.kind,
         "passed": checked.passed,
@@ -190,14 +211,16 @@ def checked_line(place: Placed, checked: Checked) -> dict[str, Any]:
 def checks_of(
     places: PlacesFile, drafts: Mapping[int, Mapping[str, Any]], papers: Mapping[str, Paper]
 ) -> list[dict[str, Any]]:
-    """The checks of every draft of a record, in the order of the places."""
+    """The checks of every draft of a record, in the order of the places and of the drafts."""
     lines = []
     for place in places.places:
         reply = drafts.get(place.number)
         if reply is None or reply.get("outcome") != DRAFT:
             continue
-        draft = Draft.from_dict(reply["draft"])
-        lines.append(checked_line(place, check(draft, papers[place.paper], place, place.kind)))
+        for index, found in enumerate(drafts_in(reply), start=1):
+            draft = Draft.from_dict(found)
+            checked = check(draft, papers[place.paper], place, place.kind)
+            lines.append(checked_line(place, index, checked))
     return lines
 
 
@@ -236,18 +259,18 @@ def jobs_of(
     drafts: Mapping[int, Mapping[str, Any]],
     checks: Sequence[Mapping[str, Any]],
     papers: Mapping[str, Paper],
-) -> tuple[list[ask.Job], dict[str, tuple[Placed, Question, str]]]:
+) -> tuple[list[ask.Job], dict[str, tuple[Placed, int, Question, str]]]:
     """Two requests for every draft that passed the checks, and what grades each."""
     by_number = {place.number: place for place in places.places}
     jobs, grading = [], {}
     for line in checks:
         if not line["passed"]:
             continue
-        place = by_number[line["number"]]
+        place, index = by_number[line["number"]], draft_of(line)
         paper = papers[place.paper]
-        draft = Draft.from_dict(drafts[place.number]["draft"])
-        question = question_of(draft, place, paper, line["anchor"])
-        name = f"{place.number}:{WITHOUT}"
+        draft = Draft.from_dict(drafts_in(drafts[place.number])[index - 1])
+        question = question_of(draft, place, paper, line["anchor"], index)
+        name = f"{place.number}.{index}:{WITHOUT}"
         jobs.append(
             ask.Job(
                 name,
@@ -256,21 +279,22 @@ def jobs_of(
                 WITHOUT_SCHEMA,
             )
         )
-        grading[name] = (place, question, WITHOUT)
-        name = f"{place.number}:{PASSAGE}"
+        grading[name] = (place, index, question, WITHOUT)
+        name = f"{place.number}.{index}:{PASSAGE}"
         message = PASSAGE_MESSAGE.format(piece=piece_of(paper, place), question=question.question)
         jobs.append(ask.Job(name, PASSAGE_SYSTEM, message, PASSAGE_SCHEMA))
-        grading[name] = (place, question, PASSAGE)
+        grading[name] = (place, index, question, PASSAGE)
     return jobs, grading
 
 
-def on_reply(grading: Mapping[str, tuple[Placed, Question, str]]):
+def on_reply(grading: Mapping[str, tuple[Placed, int, Question, str]]):
     def line(job: ask.Job, reply: Reply) -> dict[str, Any]:
-        place, question, kind = grading[job.id]
+        place, index, question, kind = grading[job.id]
         answer, problem = read_answer(reply, with_found=kind == PASSAGE)
         rule, why = graded(question, answer) if answer is not None else (None, [])
         return {
             "number": place.number,
+            "draft": index,
             "filter": kind,
             "outcome": rule or "no_answer",
             "rule": rule,
@@ -284,19 +308,37 @@ def on_reply(grading: Mapping[str, tuple[Placed, Question, str]]):
     return line
 
 
-def kept(lines: Sequence[Mapping[str, Any]]) -> list[int]:
-    """The places whose draft is kept: every check passed, not right without the paper,
-    right from the passage."""
-    passed = [
-        line["number"] for line in lines if line.get("record") == "checked" and line["passed"]
-    ]
-    said = ask.replies(lines)
+def filter_replies(lines: Sequence[Mapping[str, Any]]) -> dict[tuple[int, int, str], dict]:
+    """The reply line of every filter, by its place, its draft and the filter."""
+    return {
+        (line["number"], draft_of(line), line["filter"]): dict(line)
+        for line in lines
+        if line.get("record") == ask.REPLY
+    }
+
+
+def passing(lines: Sequence[Mapping[str, Any]]) -> list[tuple[int, int]]:
+    """Every draft that passes, as (place, draft) in the order of the places and the drafts:
+    every check passed, not right without the paper, right from the passage."""
+    said = filter_replies(lines)
     found = []
-    for number in passed:
-        without = said.get(f"{number}:{WITHOUT}") or {}
-        passage = said.get(f"{number}:{PASSAGE}") or {}
+    for line in lines:
+        if line.get("record") != "checked" or not line["passed"]:
+            continue
+        number, index = line["number"], draft_of(line)
+        without = said.get((number, index, WITHOUT)) or {}
+        passage = said.get((number, index, PASSAGE)) or {}
         if without.get("rule") != RIGHT and passage.get("rule") == RIGHT:
-            found.append(number)
+            found.append((number, index))
+    return sorted(found)
+
+
+def kept(lines: Sequence[Mapping[str, Any]]) -> dict[int, int]:
+    """The draft every place keeps, by place: its first draft that passes, in the
+    generator's order. A place none of whose drafts passes is not there."""
+    found: dict[int, int] = {}
+    for number, index in passing(lines):
+        found.setdefault(number, index)
     return found
 
 
@@ -304,12 +346,14 @@ def totals(lines: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """The last line of a record, from its other lines."""
     checks = [line for line in lines if line.get("record") == "checked"]
     said = [line for line in lines if line.get("record") == ask.REPLY]
+    keep = kept(lines)
 
     def right(kind: str) -> int:
         return sum(1 for line in said if line["filter"] == kind and line["rule"] == RIGHT)
 
     return {
         "record": ask.END,
+        "places": len({line["number"] for line in checks}),
         "drafts": len(checks),
         "passed_checks": sum(1 for line in checks if line["passed"]),
         "failed_checks": {
@@ -318,7 +362,12 @@ def totals(lines: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "right_without_the_paper": right(WITHOUT),
         "right_from_the_passage": right(PASSAGE),
         "no_answer": sum(1 for line in said if line["rule"] is None),
-        "kept": len(kept(lines)),
+        "passed": len(passing(lines)),
+        "kept": len(keep),
+        "kept_by_draft": {
+            str(index): sum(1 for each in keep.values() if each == index)
+            for index in range(1, MAX_DRAFTS + 1)
+        },
         "failed": sum(1 for line in lines if line.get("record") == ask.FAILED),
         **ask.usage_totals(said),
     }
@@ -397,7 +446,8 @@ def main(
         print(f"refused: {error}", file=sys.stderr)
         return 2
     passed = sum(1 for line in checks if line["passed"])
-    print(f"{len(checks)} draft(s): {passed} pass the checks")
+    placed = len({line["number"] for line in checks})
+    print(f"{len(checks)} draft(s) of {placed} place(s): {passed} pass the checks")
     given = asker is not None
     asker = asker or ask.ClaudeAsker(SIFTING)
     head = head_of(asker, ask.checked_code(), places, drafts_head, arguments.drafts)
@@ -416,10 +466,14 @@ def main(
     if status == 0 and not arguments.plan:
         summed = totals(lines)
         print(
-            f"{summed['drafts']} draft(s): {summed['passed_checks']} passed the checks, "
+            f"{summed['drafts']} draft(s) of {summed['places']} place(s): "
+            f"{summed['passed_checks']} passed the checks, "
             f"{summed['right_without_the_paper']} right without the paper, "
-            f"{summed['right_from_the_passage']} right from the passage, {summed['kept']} kept"
+            f"{summed['right_from_the_passage']} right from the passage, "
+            f"{summed['passed']} passed everything"
         )
+        by_draft = ", ".join(f"draft {name}: {n}" for name, n in summed["kept_by_draft"].items())
+        print(f"{summed['kept']} place(s) keep a draft ({by_draft})")
         failed = ", ".join(f"{name} {n}" for name, n in summed["failed_checks"].items() if n)
         if failed:
             print(f"checks failed (a draft counts under each it failed): {failed}")

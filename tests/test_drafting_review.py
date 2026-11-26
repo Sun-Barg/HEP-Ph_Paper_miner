@@ -1,4 +1,5 @@
-"""The sheet of the drafts that are kept, and the verdicts read back from it (drafting/review.py)."""
+"""The sheet of the draft every place keeps, and the verdicts read back from it
+(drafting/review.py)."""
 
 import csv
 import hashlib
@@ -90,7 +91,15 @@ def committed_code(monkeypatch):
 
 def generator(system, message, schema):
     part = re.search(r"<part>\nSection: (\S+)", message)[1]
-    return reply_of(as_reply(draft() if part == "2.1" else later_draft()))
+    if part == "2.1":
+        # Its first draft has an anchor that the paper does not write, so it keeps the second.
+        first = draft(
+            anchor="The detector has no area at all here",
+            question="In {paper}, is there an area of the detector at all?",
+            reference_answer="No area at all.",
+        )
+        return reply_of(as_reply(first, draft()))
+    return reply_of(as_reply(later_draft()))
 
 
 def filters(system, message, schema):
@@ -144,6 +153,14 @@ def test_the_sheet_shows_what_a_draft_is_judged_by_and_nothing_else(made):
     assert area["section"] == "2.1 | Detector setup"
     assert "⟦The detector has an area of 37.2 square metres⟧ in total." in area["passage"]
     assert area["verdict"] == area["why_rejected"] == area["note"] == ""
+    # The sheet shows the draft its place keeps (here the second of 2.1), and not which.
+    assert "no area at all" not in shown and "draft" not in list(rows[0])
+
+
+def test_the_key_says_which_draft_of_its_place_a_row_is(made):
+    keyed = [json.loads(line) for line in made["key"].read_text(encoding="utf-8").splitlines()]
+    drafts = {row["section"]: row["draft"] for row in keyed[1:]}
+    assert drafts == {"2.1": 2, "2.2": 1}
 
 
 def test_the_rows_stand_in_the_order_of_the_hash(made):
@@ -181,7 +198,17 @@ def test_the_verdicts_are_read_back_without_the_notes(made, capsys):
     assert head["reasons"]["ambiguous"] == 1
     assert {line["verdict"] for line in lines} == {"accept", "reject"}
     for line in lines:
-        assert set(line) == {"record", "number", "paper", "kind", "verdict", "why_rejected"}
+        assert set(line) == {
+            "record",
+            "number",
+            "draft",
+            "paper",
+            "kind",
+            "verdict",
+            "why_rejected",
+        }
+    # By place, with the draft of its place that was judged.
+    assert [(line["number"], line["draft"]) for line in lines] == [(1, 2), (2, 1)]
     text = out.read_text(encoding="utf-8")
     for paper_text in ("which coupling", "fine", "detector", "⟦"):
         assert paper_text not in text
@@ -246,19 +273,41 @@ def test_the_file_of_verdicts_is_read_back_by_place(made):
     head, verdicts, digest = review.read_review(out)
     assert head["record"] == "review" and len(digest) == 64
     keyed = [json.loads(line) for line in made["key"].read_text(encoding="utf-8").splitlines()]
-    by_row = {line["row"]: line["number"] for line in keyed[1:]}
-    assert verdicts == {by_row[1]: ("accept", ""), by_row[2]: ("reject", "key_or_note")}
+    by_row = {line["row"]: (line["number"], line["draft"]) for line in keyed[1:]}
+    (first, first_draft), (second, second_draft) = by_row[1], by_row[2]
+    assert verdicts == {
+        first: ("accept", "", first_draft),
+        second: ("reject", "key_or_note", second_draft),
+    }
+
+
+def test_a_verdict_without_a_draft_is_of_the_first_draft_of_its_place(tmp_path):
+    # Written before a place could have more than one draft (the first round of the tuning).
+    line = {"record": "verdict", "number": 3, "verdict": "accept", "why_rejected": None}
+    path = tmp_path / "verdicts.jsonl"
+    write_lines(path, [{"record": "review"}, line])
+    assert review.read_review(path)[1] == {3: ("accept", "", 1)}
 
 
 @pytest.mark.parametrize(
     "line",
     [
         {"record": "verdict", "number": "1", "verdict": "accept", "why_rejected": None},
+        {"record": "verdict", "number": 0, "verdict": "accept", "why_rejected": None},
         {"record": "verdict", "number": 1, "verdict": "maybe", "why_rejected": None},
         {"record": "verdict", "number": 1, "verdict": "reject", "why_rejected": None},
         {"record": "verdict", "number": 1, "verdict": "reject", "why_rejected": ["ambiguous"]},
         {"record": "verdict", "number": 1, "verdict": "accept", "why_rejected": "ambiguous"},
         {"record": "verdict", "number": 1, "verdict": "accept", "why_rejected": "long"},
+        {"record": "verdict", "number": 1, "draft": 0, "verdict": "accept", "why_rejected": None},
+        {"record": "verdict", "number": 1, "draft": "2", "verdict": "accept", "why_rejected": None},
+        {
+            "record": "verdict",
+            "number": 1,
+            "draft": True,
+            "verdict": "accept",
+            "why_rejected": None,
+        },
     ],
 )
 def test_a_file_of_verdicts_that_is_not_of_the_form_is_refused(tmp_path, line):

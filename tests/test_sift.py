@@ -13,8 +13,10 @@ from drafting_paper import (
     TITLE,
     Scripted,
     as_reply,
+    d1_line,
     draft,
     later_draft,
+    own_draft,
     paper,
     placed,
     places_file,
@@ -26,6 +28,7 @@ from hepph_paper_miner.agent.prompt import ANSWER_SCHEMA
 from hepph_paper_miner.agent.prompt import SYSTEM_PROMPT as RUN_PROMPT
 from hepph_paper_miner.drafting import ask, sift
 from hepph_paper_miner.drafting import draft as drafting
+from hepph_paper_miner.drafting.assign import read_places
 from hepph_paper_miner.drafting.draft import Draft
 from hepph_paper_miner.drafting.places import LATER_PIECE, NAMED_FIRST, OWN_TEXT, SEARCH_FIRST
 from hepph_paper_miner.drafting.sift import (
@@ -39,8 +42,10 @@ from hepph_paper_miner.drafting.sift import (
     WITHOUT_MESSAGE,
     WITHOUT_SCHEMA,
     WITHOUT_SYSTEM,
+    checks_of,
     graded,
     kept,
+    passing,
     piece_of,
     question_of,
     read_answer,
@@ -200,7 +205,47 @@ def test_a_draft_is_kept_only_when_it_passes_everything():
         {"record": "reply", "id": f"{n}:{kind}", "number": n, "filter": kind, "rule": rule}
         for (n, kind), rule in said.items()
     ]
-    assert kept(lines) == [1, 5]
+    # Lines without a draft are of the first draft of their place: a record of before.
+    assert kept(lines) == {1: 1, 5: 1}
+
+
+def test_a_place_keeps_its_first_draft_that_passes_everything():
+    checked = {(1, 1): False, (1, 2): True, (1, 3): True, (2, 1): True, (2, 2): True}
+    lines = [
+        {"record": "checked", "number": n, "draft": d, "passed": passed}
+        for (n, d), passed in reversed(checked.items())  # nor the order of the lines
+    ]
+    said = {
+        (1, 2, WITHOUT): "right",  # the second draft of place 1 can be guessed
+        (1, 2, PASSAGE): "right",
+        (1, 3, WITHOUT): "wrong",
+        (1, 3, PASSAGE): "right",
+        (2, 1, WITHOUT): "wrong",
+        (2, 1, PASSAGE): "right",
+        (2, 2, WITHOUT): "wrong",
+        (2, 2, PASSAGE): "right",
+    }
+    lines += [
+        {"record": "reply", "id": f"{n}.{d}:{f}", "number": n, "draft": d, "filter": f, "rule": r}
+        for (n, d, f), r in reversed(said.items())  # the order of the replies does not matter
+    ]
+    assert passing(lines) == [(1, 3), (2, 1), (2, 2)]
+    assert kept(lines) == {1: 3, 2: 1}
+
+
+def test_every_draft_of_a_place_is_checked_and_a_record_of_d1_as_its_first(tmp_path):
+    places = places_file(tmp_path, ("2.1", NAMED_FIRST), ("2", OWN_TEXT))
+    found = read_places(places)
+    drafts = {
+        1: {"number": 1, "outcome": "draft", "drafts": [draft(anchor="not there"), draft()]},
+        2: d1_line(2, own_draft()),
+    }
+    lines = checks_of(found, drafts, {ID: paper()})
+    assert [(line["number"], line["draft"], line["passed"]) for line in lines] == [
+        (1, 1, False),
+        (1, 2, True),
+        (2, 1, True),
+    ]
 
 
 # --- the command ----------------------------------------------------------------------------
@@ -214,19 +259,24 @@ def committed_code(monkeypatch):
 def generator(system, message, schema):
     part = re.search(r"<part>\nSection: (\S+) \| [^\n]*\nCharacters (\d+)", message)
     if part[1] == "2.1":
-        return reply_of(as_reply(draft()))
+        # Two drafts that pass everything: the place keeps the first.
+        return reply_of(as_reply(draft(), AREA_AGAIN))
     if part[1] == "2.2":
         return reply_of(as_reply(later_draft()))
-    # The own text of 2, with the anchor of 2.1: it fails its checks.
-    return reply_of(as_reply(draft()))
+    # The own text of 2. Its first draft has the anchor of 2.1 and fails its checks; its
+    # second is of the own text.
+    return reply_of(as_reply(draft(), own_draft()))
+
+
+AREA_AGAIN = draft(question="In {paper}, how large is the area of the detector in all?")
 
 
 def filters(system, message, schema):
     if system == sift.WITHOUT_SYSTEM:
-        # The coupling can be guessed; the area cannot.
+        # The coupling can be guessed; the area and the points cannot.
         guess = "0.0318" if "coupling" in message else "About 40 square metres."
         return reply_of({"answer": guess})
-    return reply_of({"answer": "37.2 square metres; 0.0318.", "found": True})
+    return reply_of({"answer": "37.2 square metres; 0.0318; 4096 points.", "found": True})
 
 
 @pytest.fixture
@@ -248,28 +298,40 @@ def test_the_command_checks_then_asks_the_drafts_that_pass(records, capsys):
     assert head["record"] == "sift" and head["sift_version"] == SIFT_VERSION
     assert head["drafts"]["sha256"] == hashlib.sha256(drafts.read_bytes()).hexdigest()
     checks = [line for line in middle if line["record"] == "checked"]
-    # The checks stand right after the first line, before any reply.
-    assert [line["record"] for line in middle[:3]] == ["checked"] * 3
-    assert [(line["number"], line["passed"]) for line in checks] == [
-        (1, True),
-        (2, True),
-        (3, False),
+    # The checks stand right after the first line, before any reply, a line for each draft.
+    assert [line["record"] for line in middle[:5]] == ["checked"] * 5
+    assert [(line["number"], line["draft"], line["passed"]) for line in checks] == [
+        (1, 1, True),
+        (1, 2, True),
+        (2, 1, True),
+        (3, 1, False),
+        (3, 2, True),
     ]
-    assert "anchor_once" in checks[2]["failed"]
-    # Two requests for each draft that passed, none for the one that did not.
-    assert len(model.asked) == 4
+    assert "anchor_once" in checks[3]["failed"]
+    # Two requests for each draft that passed, a later one too, none for the one that did not.
+    assert len(model.asked) == 8
     asked = {line["id"]: line for line in middle if line["record"] == "reply"}
-    assert asked["1:without"]["rule"] == "wrong" and asked["1:passage"]["rule"] == "right"
-    assert asked["2:without"]["rule"] == "right"
-    assert kept(lines) == [1]
-    assert (
-        end["kept"] == 1 and end["passed_checks"] == 2 and end["failed_checks"]["anchor_once"] == 1
-    )
+    assert asked["1.1:without"]["rule"] == "wrong" and asked["1.1:passage"]["rule"] == "right"
+    assert asked["1.2:passage"]["rule"] == "right"
+    assert asked["2.1:without"]["rule"] == "right"
+    assert asked["3.2:without"]["draft"] == 2 and asked["3.2:passage"]["rule"] == "right"
+    # The filters of a later draft are asked its own question.
+    points = f"How many points does the scan of the model in arXiv:{ID} use?"
+    assert WITHOUT_MESSAGE.format(question=points) in [message for _, message, _ in model.asked]
+    # Place 1 keeps the first of its two drafts that pass; place 2 can be guessed; place 3
+    # keeps its second draft.
+    assert passing(lines) == [(1, 1), (1, 2), (3, 2)]
+    assert kept(lines) == {1: 1, 3: 2}
+    assert (end["places"], end["drafts"], end["passed_checks"], end["passed"]) == (3, 5, 4, 3)
+    assert end["failed_checks"]["anchor_once"] == 1
+    assert (end["kept"], end["kept_by_draft"]) == (2, {"1": 1, "2": 1, "3": 0})
     said = capsys.readouterr().out
+    assert "5 draft(s) of 3 place(s): 4 pass the checks" in said
     assert (
-        "3 draft(s): 2 passed the checks, 1 right without the paper, 2 right from the passage, 1 kept"
-        in said
-    )
+        "5 draft(s) of 3 place(s): 4 passed the checks, 1 right without the paper, "
+        "4 right from the passage, 3 passed everything"
+    ) in said
+    assert "2 place(s) keep a draft (draft 1: 1, draft 2: 1, draft 3: 0)" in said
 
 
 def test_the_passage_filter_is_given_the_piece_and_the_question_alone(records):
@@ -322,5 +384,5 @@ def test_started_again_it_asks_only_what_is_left(records):
     assert len(again.asked) == 1
     lines = [json.loads(line) for line in out.read_text(encoding="utf-8").splitlines()]
     # The checks were written once, when the record was begun.
-    assert [line["record"] for line in lines].count("checked") == 3
-    assert kept(lines) == [1]
+    assert [line["record"] for line in lines].count("checked") == 5
+    assert kept(lines) == {1: 1, 3: 2}

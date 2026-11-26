@@ -37,7 +37,7 @@ from hepph_paper_miner.eval.questions import load_questions
 from hepph_paper_miner.sources.arxiv_latex import PARSER_VERSION
 from hepph_paper_miner.sources.base import Paper
 from hepph_paper_miner.sources.fixture import FixtureSource
-from hepph_paper_miner.survey.records import write_lines
+from hepph_paper_miner.survey.records import RecordError, write_lines
 
 # --- which accepted drafts become questions -----------------------------------------------
 
@@ -268,11 +268,17 @@ def committed():
     return {"commit": "c0ffee", "modified": False}
 
 
-def made_of(folder, places, source, verdicts):
+def made_of(folder, places, source, verdicts, generate=None):
     """The drafts, the sift and the review of a file of places; `verdicts` by paper."""
-    drafts, sifted = folder / "drafts.jsonl", folder / "sift.jsonl"
+    drafts = folder / "drafts.jsonl"
     argv = ["--places", str(places), "--out", str(drafts)]
-    assert drafting.main(argv, asker=Scripted(generator), source=source) == 0
+    assert drafting.main(argv, asker=Scripted(generate or generator), source=source) == 0
+    return sifted_and_judged(folder, places, drafts, source, verdicts)
+
+
+def sifted_and_judged(folder, places, drafts, source, verdicts):
+    """The sift and the review of a record of drafts; `verdicts` by paper."""
+    sifted = folder / "sift.jsonl"
     argv = ["--places", str(places), "--drafts", str(drafts), "--out", str(sifted)]
     assert sift.main(argv, asker=Scripted(filters), source=source) == 0
     sheet, key, judged = folder / "sheet.csv", folder / "key.jsonl", folder / "review.jsonl"
@@ -365,8 +371,15 @@ def test_the_summary_holds_every_candidate_and_no_text_of_a_paper(evaluation):
     candidates = [line for line in lines if line["record"] == "candidate"]
     assert [line["number"] for line in candidates] == list(range(1, 8))
     first = candidates[0]
-    assert (first["draft"], first["failed_checks"], first["kept"]) == ("draft", [], True)
-    assert (first["without_the_paper"], first["from_the_passage"]) == ("wrong", "right")
+    assert (first["draft"], first["kept"], first["kept_draft"]) == ("draft", True, 1)
+    assert first["drafts"] == [
+        {
+            "draft": 1,
+            "failed_checks": [],
+            "without_the_paper": "wrong",
+            "from_the_passage": "right",
+        }
+    ]
     assert (first["verdict"], first["question"], first["asked_as"]) == (
         "accept",
         "archives-01",
@@ -380,9 +393,10 @@ def test_the_summary_holds_every_candidate_and_no_text_of_a_paper(evaluation):
         "ambiguous",
         None,
     )
-    assert (empty["draft"], empty["failed_checks"], empty["without_the_paper"]) == (
+    assert (empty["draft"], empty["drafts"], empty["kept"], empty["kept_draft"]) == (
         "nothing_to_ask",
-        None,
+        [],
+        False,
         None,
     )
     text = summary.read_text(encoding="utf-8")
@@ -438,14 +452,126 @@ def test_a_round_of_the_tuning_is_summed_up_without_questions(tmp_path):
     # The reply cut short is no draft, and says why in the code's words.
     *_, cut, failing = [line for line in lines if line["record"] == "candidate"]
     assert (cut["draft"], cut["problem"]) == ("no_draft", "the reply stopped with max_tokens")
-    assert "anchor_once" in failing["failed_checks"] and not failing["kept"]
-    assert failing["without_the_paper"] is None and failing["verdict"] is None
+    assert cut["drafts"] == [] and cut["kept_draft"] is None
+    (only,) = failing["drafts"]
+    assert "anchor_once" in only["failed_checks"] and not failing["kept"]
+    assert only["without_the_paper"] is None and failing["verdict"] is None
     reasons = next(line for line in lines if line["record"] == "reasons")
     assert reasons["no_draft"] == {"the reply stopped with max_tokens": 1}
     assert reasons["failed_checks"]["anchor_once"] == 1
     total = lines[-1]
-    assert (total["places"], total["drafts"], total["no_draft"]) == (9, 7, 1)
+    assert (total["places"], total["with_drafts"], total["drafts"], total["no_draft"]) == (
+        9,
+        7,
+        7,
+        1,
+    )
     assert (total["passed_checks"], total["kept"]) == (6, 6)
+    assert total["kept_by_draft"] == {"1": 6, "2": 0, "3": 0}
+
+
+LATER_ASKED = draft(question="In {paper}, how large is the area of the detector?")
+
+
+def second_kept(system, message, schema):
+    """The named_first place of 2609.10002v1 has three drafts: its first fails a check, its
+    second passes everything, and its third fails another check. The later piece of
+    2609.10001v1 has two drafts that both pass everything."""
+    title = re.search(r"^Title: (.*)$", message, re.MULTILINE)[1]
+    if title == "Gadgets on a lattice":
+        wrong = draft(anchor="The detector has an area of 99.9 square metres")
+        named = draft(question="In {paper}, what area does Section 2 give?")
+        return reply_of(as_reply(wrong, LATER_ASKED, named))
+    if title == "Widgets at low energy":
+        again = later_draft(question="In {paper}, to what is the coupling fixed at the reference?")
+        return reply_of(as_reply(later_draft(), again))
+    return generator(system, message, schema)
+
+
+def test_a_place_that_keeps_a_later_draft_is_asked_by_that_draft(tmp_path, capsys):
+    source = FixtureSource(papers())
+    places = places_of_file(tmp_path, SAMPLE[:2])
+    files = made_of(tmp_path, places, source, {}, second_kept)
+    out, summary = tmp_path / "questions.jsonl", tmp_path / "sum.jsonl"
+    argv = argv_of(files, questions=out, summary=summary)
+    assert assemble.main(argv, source=source, origin=committed) == 0
+    later, named = load_questions(out)
+    assert named.question == "In arXiv:2609.10002v1, how large is the area of the detector?"
+    assert (named.notes["candidate"], named.notes["draft"]) == ("2", "2")
+    assert (later.notes["candidate"], later.notes["draft"]) == ("1", "1")
+    candidates = [line for line in read_jsonl(summary) if line["record"] == "candidate"]
+    second = candidates[1]
+    assert [one["draft"] for one in second["drafts"]] == [1, 2, 3]
+    assert "anchor_once" in second["drafts"][0]["failed_checks"]
+    assert second["drafts"][0]["without_the_paper"] is None  # dropped before the filters
+    assert second["drafts"][1]["from_the_passage"] == "right"
+    assert second["drafts"][2]["failed_checks"] == ["question_clean"]
+    assert (second["kept"], second["kept_draft"], second["verdict"]) == (True, 2, "accept")
+    lines = read_jsonl(summary)
+    reasons = next(line for line in lines if line["record"] == "reasons")
+    # Every draft counts under the checks it failed, the later ones too.
+    assert (
+        reasons["failed_checks"]["anchor_once"],
+        reasons["failed_checks"]["question_clean"],
+    ) == (
+        1,
+        1,
+    )
+    total = lines[-1]
+    assert (total["places"], total["drafts"], total["passed_checks"]) == (2, 5, 3)
+    assert total["kept_by_draft"] == {"1": 1, "2": 1, "3": 0}
+    assert "keep (draft 1: 1, draft 2: 1, draft 3: 0)" in capsys.readouterr().out
+
+
+def test_checks_that_do_not_fit_the_drafts_of_a_place_are_refused(tmp_path):
+    source = FixtureSource(papers())
+    places = places_of_file(tmp_path, SAMPLE[:2])
+    files = made_of(tmp_path, places, source, {}, second_kept)
+    records = assemble.read_records(
+        *(files[name] for name in ("places", "drafts", "sift", "review"))
+    )
+    assert len(assemble.candidates_of(records)) == 2
+    # The record of the filters without the checks of the third draft of place 2.
+    lines = [
+        line
+        for line in records.sift
+        if not (line.get("record") == "checked" and (line["number"], line["draft"]) == (2, 3))
+    ]
+    with pytest.raises(RecordError, match="the checks of place 2 do not fit its reply"):
+        assemble.candidates_of(replace(records, sift=lines))
+
+
+def test_a_review_of_another_draft_than_the_kept_one_is_refused(evaluation, capsys):
+    head, *lines = read_jsonl(evaluation["review"])
+    lines[0] = {**lines[0], "draft": 2}
+    write_lines(evaluation["review"], [head, *lines])
+    argv = argv_of(evaluation, summary=evaluation["folder"] / "sum.jsonl")
+    assert assemble.main(argv, origin=committed) == 1
+    assert "does not judge the drafts that" in capsys.readouterr().err
+
+
+def test_a_round_of_d1_is_sifted_and_summed_up_by_this_code(tmp_path):
+    # d1 wrote one draft a place under "draft" (the first round of the tuning). Its records
+    # are read as places whose first and only draft that is.
+    source = FixtureSource(papers())
+    places = places_of_file(tmp_path, SAMPLE[:3], input="tuning", last=False)
+    drafts = tmp_path / "drafts.jsonl"
+    argv = ["--places", str(places), "--out", str(drafts)]
+    assert drafting.main(argv, asker=Scripted(generator), source=source) == 0
+    head, *replies, end = read_jsonl(drafts)
+    old = [{**head, "drafter_version": "d1"}]
+    for line in replies:
+        found = line.pop("drafts")
+        old.append({**line, "draft": found[0] if found else None})
+    write_lines(drafts, [*old, end])
+    files = sifted_and_judged(tmp_path, places, drafts, source, {})
+    summary = tmp_path / "sum.jsonl"
+    assert assemble.main(argv_of(files, summary=summary), origin=committed) == 0
+    first, *lines = read_jsonl(summary)
+    assert first["drafts"]["drafter_version"] == "d1"
+    candidates = [line for line in lines if line["record"] == "candidate"]
+    assert [(line["kept_draft"], len(line["drafts"])) for line in candidates] == [(1, 1)] * 3
+    assert lines[-1]["accepted"] == 3
 
 
 def test_the_rehearsal_takes_two_of_every_kind_from_the_last_round(tmp_path, capsys):
@@ -545,7 +671,7 @@ def test_records_of_other_texts_make_no_questions(evaluation, monkeypatch, capsy
     argv = argv_of(evaluation, questions=out, summary=summary)
     monkeypatch.setattr(drafting, "DRAFTER_VERSION", "d0")
     assert assemble.main(argv, origin=committed) == 1
-    assert "made by the generator d1, and this code holds d0" in capsys.readouterr().err
+    assert "made by the generator d2, and this code holds d0" in capsys.readouterr().err
     monkeypatch.undo()
     monkeypatch.setattr(ask, "code_version", lambda: {"commit": "c0ffee", "modified": False})
     monkeypatch.setattr(sift, "SIFT_VERSION", "s0")

@@ -120,6 +120,19 @@ def later_draft(**changed) -> dict:
     return {**values, **changed}
 
 
+def own_draft(**changed) -> dict:
+    """A draft about the own text of section 2 that passes every check."""
+    values = {
+        "anchor": "The scan of the model uses 4096 points on a regular grid",
+        "question": "How many points does the scan of the model in {paper} use?",
+        "reference_answer": "4096 points.",
+        "numbers": [{"label": "points", "value": 4096, "unit": "", "min_sig_figs": 4}],
+        "phrases": [],
+        "accept_note": "The number 4096 has to be there.",
+    }
+    return {**values, **changed}
+
+
 def reply_of(data: dict, stop: str = "end_turn", thinking: str = "") -> Reply:
     """A reply of the model that writes `data` as its text."""
     blocks = [{"type": "thinking", "thinking": thinking, "signature": "c2ln"}]
@@ -136,21 +149,23 @@ def reply_of(data: dict, stop: str = "end_turn", thinking: str = "") -> Reply:
     )
 
 
-def as_reply(found: dict) -> dict:
-    """What the generator writes for a draft."""
-    return {"nothing_to_ask": False, "why_nothing": "", **found}
+def as_reply(*found: dict) -> dict:
+    """What the generator writes for one or more drafts, in its order."""
+    return {"nothing_to_ask": False, "why_nothing": "", "drafts": list(found)}
 
 
 def nothing(why: str = "The part holds only a list.") -> dict:
+    return {"nothing_to_ask": True, "why_nothing": why, "drafts": []}
+
+
+def d1_line(number: int, found: dict | None, outcome: str = "draft") -> dict:
+    """A reply line of a record of the generator d1, which had one draft a place."""
     return {
-        "nothing_to_ask": True,
-        "why_nothing": why,
-        "anchor": "",
-        "question": "",
-        "reference_answer": "",
-        "numbers": [],
-        "phrases": [],
-        "accept_note": "",
+        "record": "reply",
+        "id": str(number),
+        "number": number,
+        "outcome": outcome,
+        "draft": found,
     }
 
 
