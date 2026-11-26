@@ -32,6 +32,7 @@ from hepph_paper_miner.drafting.review import (
     passage_of,
     read_verdicts,
 )
+from hepph_paper_miner.survey.records import RecordError, write_lines
 
 
 def test_a_passage_is_the_paragraph_of_its_anchor_inside_the_part():
@@ -235,3 +236,41 @@ def test_a_sheet_or_key_that_is_there_is_not_written_over(made, capsys):
     ]
     assert review.main(argv, source=source()) == 1
     assert "is there already" in capsys.readouterr().err
+
+
+def test_the_file_of_verdicts_is_read_back_by_place(made):
+    judged(made, [("accept", "", ""), ("reject", "key_or_note", "")])
+    out = made["folder"] / "verdicts.jsonl"
+    argv = ["--read", "--sheet", str(made["sheet"]), "--key", str(made["key"]), "--out", str(out)]
+    assert review.main(argv) == 0
+    head, verdicts, digest = review.read_review(out)
+    assert head["record"] == "review" and len(digest) == 64
+    keyed = [json.loads(line) for line in made["key"].read_text(encoding="utf-8").splitlines()]
+    by_row = {line["row"]: line["number"] for line in keyed[1:]}
+    assert verdicts == {by_row[1]: ("accept", ""), by_row[2]: ("reject", "key_or_note")}
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        {"record": "verdict", "number": "1", "verdict": "accept", "why_rejected": None},
+        {"record": "verdict", "number": 1, "verdict": "maybe", "why_rejected": None},
+        {"record": "verdict", "number": 1, "verdict": "reject", "why_rejected": None},
+        {"record": "verdict", "number": 1, "verdict": "reject", "why_rejected": ["ambiguous"]},
+        {"record": "verdict", "number": 1, "verdict": "accept", "why_rejected": "ambiguous"},
+        {"record": "verdict", "number": 1, "verdict": "accept", "why_rejected": "long"},
+    ],
+)
+def test_a_file_of_verdicts_that_is_not_of_the_form_is_refused(tmp_path, line):
+    path = tmp_path / "verdicts.jsonl"
+    write_lines(path, [{"record": "review"}, line])
+    with pytest.raises(RecordError):
+        review.read_review(path)
+
+
+def test_a_verdict_twice_is_refused(tmp_path):
+    line = {"record": "verdict", "number": 1, "verdict": "accept", "why_rejected": None}
+    path = tmp_path / "verdicts.jsonl"
+    write_lines(path, [{"record": "review"}, line, line])
+    with pytest.raises(RecordError, match="or one twice"):
+        review.read_review(path)

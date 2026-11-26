@@ -9,7 +9,8 @@ plan before any of those papers is fetched.
 
 The parts, in the order they are used:
 
-    papers.py   which papers: places 41 to 80 of the survey's order, from its list
+    papers.py   which papers: places 41 to 80 of the survey's order, from its list; and
+                the command that writes their sample from the plan of the evaluation
     places.py   where in a split paper a question can stand, and of which kind
     assign.py   which place every paper is given, by a rule that no choice enters; and
                 the command that writes the places, for a round of the tuning of the
@@ -19,6 +20,8 @@ The parts, in the order they are used:
     sift.py     the checks, then two filters of a model: without the paper, and with the
                 passage alone
     review.py   the sheet on which every draft that is kept is read beside its passage
+    assemble.py the questions, made of the drafts that were accepted, and a summary of
+                every candidate in counts; the questions of the rehearsal
     ask.py      how draft.py and sift.py ask the model and keep its replies
 
 eval/paired.py holds the interval that the comparison of the two layouts is read by.

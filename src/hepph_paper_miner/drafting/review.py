@@ -311,6 +311,24 @@ def verdict_lines(
     return [head, *lines]
 
 
+def read_review(path: Path) -> tuple[dict[str, Any], dict[int, tuple[str, str]], str]:
+    """A file of verdicts (--read --out): its first line, by place the verdict and the reason
+    of a rejection ("" for an accepted draft), and its SHA-256."""
+    lines, digest = read_lines(path, "review")
+    found: dict[int, tuple[str, str]] = {}
+    for line in lines[1:]:
+        if line.get("record") != "verdict":
+            continue
+        number, verdict, why = line.get("number"), line.get("verdict"), line.get("why_rejected")
+        if isinstance(number, bool) or not isinstance(number, int) or number in found:
+            raise RecordError(f"{path.name}: a verdict without its place, or one twice")
+        named = isinstance(why, str) and why in REASONS
+        if verdict not in VERDICTS or (verdict == REJECT) != named or (not named and why):
+            raise RecordError(f"{path.name}: the verdict on place {number} is not of the form")
+        found[number] = (verdict, why or "")
+    return lines[0], found, digest
+
+
 def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m hepph_paper_miner.drafting.review",
