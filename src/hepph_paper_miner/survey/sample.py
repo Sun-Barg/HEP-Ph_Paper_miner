@@ -202,6 +202,11 @@ def read_sample(path: Path) -> Sample:
     paper has the hash the seed gives it, the papers of an archive stand in the order
     of their hashes and are numbered from 1, and the counts fit. A sample with a paper
     put in by hand, or moved, is refused.
+
+    A sample can also be a later stretch of the order: its first line then says at
+    which place it begins (`first`), and its papers are numbered from there. The
+    second evaluation asks about places 41 to 80 (drafting/papers.py), which the
+    survey's sample does not hold. A file without `first` begins at the front.
     """
     lines, digest = read_lines(path, "sample")
     head = lines[0]
@@ -215,6 +220,9 @@ def read_sample(path: Path) -> Sample:
         raise RecordError(
             f"{path.name}: its first line does not name a seed and a number of papers"
         )
+    first = head.get("first", 1)
+    if isinstance(first, bool) or not isinstance(first, int) or first < 1:
+        raise RecordError(f"{path.name}: its first line names no place to begin at")
     counts = {line.get("archive"): line for line in lines[1:] if line.get("record") == "archive"}
     papers: list[Drawn] = []
     seen: set[str] = set()
@@ -240,8 +248,10 @@ def read_sample(path: Path) -> Sample:
         papers.append(Drawn(archive, line.get("rank"), name, primary, line["sha256"]))
     for archive in dict.fromkeys(paper.archive for paper in papers):
         own = [paper for paper in papers if paper.archive == archive]
-        if [paper.rank for paper in own] != list(range(1, len(own) + 1)):
-            raise RecordError(f"{path.name}: the papers of {archive} are not numbered from 1 on")
+        if [paper.rank for paper in own] != list(range(first, first + len(own))):
+            raise RecordError(
+                f"{path.name}: the papers of {archive} are not numbered from {first} on"
+            )
         if own != sorted(own, key=lambda paper: (paper.sha256, paper.arxiv_id)):
             raise RecordError(
                 f"{path.name}: the papers of {archive} are not in the order of their hashes"
