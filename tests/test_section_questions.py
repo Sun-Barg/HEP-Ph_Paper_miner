@@ -11,9 +11,15 @@ files and of the papers against what this repository keeps.
 The sources of the six papers are not kept here, so no test can say that a passage
 stands where a file says. `eval.check` says that, run by the code of each parser, on a
 computer that has the papers.
+
+The questions were asked on 2026-11-25, and what came back stands in the same file as
+the plan, below it (tests/test_more_sections_results.py). The last test here holds the
+plan to the commit that brought it, and with the plan the two question files, which it
+names by their digests.
 """
 
 import copy
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -28,6 +34,8 @@ FILES = {
     "5": ROOT / "eval_data" / "questions_sections_parser5.jsonl",
 }
 PLAN = ROOT / "results" / "runs" / "more-sections" / "README.md"
+# The plan as the commit before the runs brought it (44bca1f): the whole file then.
+PLAN_SHA256 = "036c0f609c508a4c02bb2107f1fdafd668f9af514213eb4204ae41996a776726"
 
 # The paper of each question, and the characters parser 4 returned of it.
 PAPERS = {
@@ -137,9 +145,22 @@ def test_the_plan_names_each_file_by_its_digest_where_it_describes_it_and_in_its
         assert f"--questions eval_data/{path.name} --questions-sha256 {digest} " in plan
 
 
-def test_the_plan_says_that_it_came_before_the_runs_and_the_readme_points_to_it():
-    # When what came back is written into the folder, these sentences are rewritten,
-    # and this test with them: one that holds the text against the records takes its place.
-    assert "No run has been\nmade with it." in PLAN.read_text(encoding="utf-8")
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "is written down before any of it in\n`results/runs/more-sections/README.md`" in readme
+def test_the_plan_stands_above_what_came_back_as_the_commit_before_the_runs_brought_it():
+    # The plan was pushed before any run with parser 5. What came back was written into
+    # the same file afterwards, under a heading of its own, and the plan was left as it
+    # was: the file still begins with the bytes it had then. So a sentence of the plan
+    # that is changed once the runs are known fails here, and so does a question file
+    # that is changed, because the plan names both by their digests (the test above).
+    plan, heading, came_back = PLAN.read_bytes().partition(b"\n# What came back\n")
+    assert heading and came_back.strip()
+    assert hashlib.sha256(plan).hexdigest() == PLAN_SHA256
+    text = plan.decode("utf-8")
+    assert "No run has been\nmade with it." in text
+    assert "under a heading of its own, with this text left as it is." in text
+    # The README of the repository says which commit that was, and where both texts are.
+    readme = " ".join((ROOT / "README.md").read_text(encoding="utf-8").split())
+    assert (
+        "was written down before any of it (`44bca1f`), in "
+        "`results/runs/more-sections/README.md`" in readme
+    )
+    assert "the same file goes through what came back, below the plan" in readme

@@ -302,3 +302,32 @@ reads the records, the sheet and the key.
   twenty right. No reading of this was fixed before the requests, and the grader had
   been told beforehand what the rule finds in the answers; the sheet and its key are in
   that folder.
+- **2026-11-25, the parser was changed after the runs, under a new name.** Nothing above
+  changes: no count of `results/report.md` moves, and the records of the evaluation stay
+  held against the conditions of Section 2, which name parser `4`. Commit `6aaf20f`
+  makes the parser begin a section in three more places (at the acknowledgements that a
+  class sets, behind a list of references that text follows, and at titles that are run
+  into the paragraphs of a text without headings), and take the first `\maketitle` for
+  the end of the title block, where it took the last. A model reads another outline of a
+  paper that is split differently, so the parser has the name `5`, and
+  `eval/conditions.py` names a fourth set of conditions beside the three there were. The
+  reason is what the check of the survey's outlines had noted (`results/survey/`).
+- The questions of the evaluation are not asked again with it. What would be run instead
+  was written down before any of it (`44bca1f`, `results/runs/more-sections/README.md`):
+  six questions about papers of the survey's sample that the two parsers split
+  differently, asked by the last commit with parser `4` and by the code with parser `5`,
+  to be counted and neither passed nor failed; the five development questions again, by
+  the second set of criteria; and the sample of the survey split again. The Claude
+  session that wrote the change chose the six papers and drafted the questions, and the
+  maintainer held each against its paper.
+- All of it was run on 2026-11-25. On the question about the one letter that parser `4`
+  had left out, the passage was given in 0 of 6 runs before and in 6 of 6 after. On the
+  five questions about letters that parser `5` cuts at their titles, the passage was
+  given in 15 of 15 staged runs on both sides, and the median of the characters that the
+  staged runs were given is lower after in each of the five. The thirty runs of the
+  development questions passed by the five criteria of the second set, held against the
+  thirty of 2026-11-23, which says nothing of the parser: the papers they read are split
+  alike by both. No paper of the survey's sample was left unanswered: the same 494 of
+  its 520 papers were split, and 108 of them have a piece of more than 20,000
+  characters, where 125 had one. The records, and what can and cannot be said of them,
+  are in `results/runs/more-sections/`.

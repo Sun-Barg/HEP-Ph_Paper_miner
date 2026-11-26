@@ -54,8 +54,10 @@ SETS = {
 # evaluation, the sets of development runs, and the five sets above. Named and not looked
 # for, as DEV_SETS is.
 THEN = ("eval", *(f"dev/{name}" for name in DEV_SETS), *(f"regress/{name}" for name in SETS))
-# And every folder it keeps now. The last was made on 2026-11-23 by a loop that asks for
-# the call when a turn ends without it (tests/test_asking_again_results.py).
+# And every folder it kept when the runs of 2026-11-23 were written up. The last was made
+# on that day by a loop that asks for the call when a turn ends without it
+# (tests/test_asking_again_results.py). The runs made since are counted where they are
+# written up (tests/test_more_sections_results.py).
 ASKING = "asking-again/dev-after"
 KEPT = (*THEN, ASKING)
 
@@ -389,8 +391,8 @@ def test_of_the_runs_that_hand_in_with_the_tool_one_before_the_change_ended_with
     with_the_tool: Counter = Counter()
     without_the_call: Counter = Counter()
     # "Every run that this repository held then" is every run of the folders it kept when
-    # the README of this folder was written (THEN), and "every run in this repository"
-    # every run of the folders it keeps (KEPT). Whatever else lies under results/runs in
+    # the README of this folder was written (THEN), and "with the thirty" every run of the
+    # folders it kept three days later (KEPT). Whatever else lies under results/runs in
     # a checkout is not counted.
     for folder in KEPT:
         runs = counted(attempts_in(RUNS / folder))

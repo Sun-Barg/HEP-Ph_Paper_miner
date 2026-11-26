@@ -65,6 +65,13 @@ works here follows the rules below.
   runs were made under: every record stays held against the conditions it was made under.
   Runs made before a change are no runs of what comes after, so the development questions
   are run again and held against the runs before (`eval/regress.py`).
+- `eval_data/questions_sections_parser4.jsonl` and
+  `eval_data/questions_sections_parser5.jsonl` were asked on 2026-11-25 UTC, and are fixed
+  since. So is the plan of those runs, the first part of
+  `results/runs/more-sections/README.md`: it names each file by its SHA-256, and
+  `tests/test_section_questions.py` holds it to the commit that brought it. Do not change
+  a question, an answer, a passage or a note in the two files, or a sentence of the plan.
+  What is found later is written below the plan.
 
 ## The survey
 
@@ -93,6 +100,12 @@ works here follows the rules below.
   agent fills in such a sheet, it fills in a draft for the owner to check, and the README
   says who did what. A paper that is looked at again gets its verdicts in a new file
   under another name.
+- The sample was split again by parser `5` on 2026-11-25 UTC, into
+  `results/survey/outcomes-parser5.jsonl`, and that file is fixed as well:
+  `tests/test_survey_parser5.py` holds it by its SHA-256, and `survey.run` is not run over
+  it again unless the owner asks for exactly that. `outcomes.jsonl` stays the result of
+  the survey, and the check of the outlines is of it. Another parser gets a file of its
+  own under another name.
 - `unanswered` is not an outcome of the survey. A number about the papers that were read
   is given with the papers that are still unanswered beside it, never with them counted
   as failures or left out without a word.

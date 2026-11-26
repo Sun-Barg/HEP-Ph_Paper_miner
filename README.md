@@ -18,6 +18,7 @@ Everything ticked under Status is done, and the results of the evaluation are be
 - [x] The loop asks for an answer that was written and not handed in, tried on two such ends
 - [x] A survey of which papers the server can read, in thirteen archives: 520 papers fetched and counted, and 65 of their outlines held against the papers, from a draft by a model that the maintainer checked paper by paper
 - [x] The parser begins a section in three more places, for what that check noted, and no longer loses a letter in front of a second `\maketitle` (parser `5`)
+- [x] Parser `5` held beside parser `4`, as written down before the runs: six questions about papers that the two split differently, the development questions again, and the sample of the survey split again
 
 ## The two tool layouts
 
@@ -499,21 +500,57 @@ The outline of the maintainer's own paper is the same under both parsers
 (`tests/test_own_paper.py`). Of the other twelve papers of the evaluation, the tests
 cannot say that: their sources are not kept here. So `conditions.py` names a fourth set
 of conditions (`MORE_SECTIONS`: `ASKING_AGAIN` with the parser `5` and nothing else),
-and every set now names its parser, which is `4` for the three sets that runs were made
-under. A record made by this code is held against the fourth set; held against an
-earlier one, it differs in the parser its results name. And a kept record that this code
-grades again is told so run by run: it read papers split by parser `4`, so the places
-its question names may have moved (`eval/grade.py`).
+and every set now names its parser, which is `4` for the three sets before it. A record
+made by this code is held against the fourth set; held against an earlier one, it
+differs in the parser its results name. And a kept record that this code grades again
+is told so run by run: it read papers split by parser `4`, so the places its question
+names may have moved (`eval/grade.py`).
 
-Not done yet: the sample of the survey has not been split again by parser `5`, the
-outlines it gives have not been held against any paper, and the development questions
-have not been run again with it. The survey and its check, as they stand below, are of
-parser `4`. The twenty questions of the evaluation are not run again with it. What will
-be run with it, and how each thing will be read, is written down before any of it in
-`results/runs/more-sections/README.md`: six questions about papers that the two parsers
-split differently (`eval_data/questions_sections_parser4.jsonl` and
-`eval_data/questions_sections_parser5.jsonl`, the same questions with the section
-identifiers of each parser), the development questions, and the sample of the survey.
+What would be run with parser `5`, and how each thing would be read, was written down
+before any of it (`44bca1f`), in `results/runs/more-sections/README.md`. All of it was
+run on 2026-11-25, with the model and the settings of the evaluation, and the same file
+goes through what came back, below the plan. The twenty questions of the evaluation
+were not run again.
+
+- **Six questions about papers that the two parsers split differently**
+  (`eval_data/questions_sections_parser4.jsonl` and
+  `eval_data/questions_sections_parser5.jsonl`, the same questions with the section
+  identifiers of each parser). One is about the letter that parser `4` left out, five
+  are about letters that it returned as one section and parser `5` cuts at titles run
+  into the paragraphs. A Claude session, the one that wrote the change, chose the six
+  papers from the sample of the survey and drafted the questions, and the maintainer
+  held each against its paper before the plan was pushed. Each question was asked with
+  both layouts, three times, by the last commit with parser `4` (`e7e9576`) and by the
+  code with parser `5`: 72 runs, each side graded by its own code.
+  **The letter that was left out:** with parser `4` its passage was given in none of
+  the six runs, and all six answers say that the paper does not state what is asked.
+  With parser `5` it was given in all six, and all six answers are right.
+  **The five letters:** the passage was given in all 15 staged runs with either parser,
+  so there was nothing to gain there. In each of the five questions the staged runs
+  were given fewer characters with parser `5`: medians of 9,862 to 29,105 before, and of
+  1,922 to 11,864 after.
+- **The development questions again.** Thirty runs, held against the thirty of
+  2026-11-23 by `eval.regress --criteria 2`. **All five criteria held.** As was said
+  before the runs, that says nothing of parser `5`: the two papers that these questions
+  read are split alike by both parsers.
+- **The sample of the survey, split again**
+  (`results/survey/outcomes-parser5.jsonl`). No paper was left unanswered. The same 494
+  papers were split, and the same 26 have no TeX source. The lines of 191 of the 494
+  differ. **A piece of more than 20,000 characters is in 108 papers, where it was in
+  125**, and 9 have no section heading at all, where 26 had none. The survey and its
+  check, as they stand below, stay those of parser `4`.
+
+| Claim | Strength | What it does not cover |
+|---|---|---|
+| With parser `5` a letter that supplemental material follows in the same file can be read | shown on one question about the one such paper that had been found: its passage was given in 0 of 6 runs with parser `4` and in 6 of 6 with parser `5`, and 0 and then 6 of the answers are right | One paper and one question, chosen and drafted by the session that wrote the change. The judge called the six answers after right, and nobody else graded them. The maintainer graded the six answers before, knowing what the judge had said of them |
+| With parser `5` a staged run gets to the passage of a letter that is cut at its titles, where it did not before | not shown: the passage was given in 15 of 15 staged runs before and in 15 of 15 after | With parser `4` the runs got to it in the one section every time: in its first piece, by reading on, or by naming where to begin |
+| With parser `5` a staged run is given less text of such a letter | counted: the median is lower in 5 of 5 questions. No test is made of five | Five questions about five letters that were chosen for it, three runs each. In two of the five the runs before did not read the section from its beginning, so how much less depends on what a model does with the one section. Every answer was right on both sides, so nothing says that a smaller piece makes an answer better |
+| With parser `5` the development runs do what they did before | shown: the comparison passed, by the five criteria of the second set | It says nothing of the parser, as the plan said before the runs. The judge stands in for a person in the fourth criterion, since nobody graded the sheet |
+| With parser `5` fewer papers of the sample have a piece that takes more than one call | counted on the 494 papers that were split: 125 with parser `4`, 108 with parser `5` | No outline of parser `5` has been held against a paper, so nothing says that the new sections are the sections of the papers. The other count, 26 and then 9 papers without any section heading, falls as soon as a paper gets one section, also when that is its acknowledgements |
+
+This is not "parser `5` answers better". The change does what it was made for in six
+cases that were chosen for it, and the split of the sample moved as the table says. The
+questions about the five letters were answered right before the change as well.
 
 ## Checking a question file
 
@@ -760,10 +797,12 @@ picked.
 The survey and the check are of parser `4`: the first line of the outcomes names it, and
 every number below is a number of that parser. The parser has been changed since, for
 what the check noted (see
-[A parser that begins a section in more places](#a-parser-that-begins-a-section-in-more-places)),
-and the sample has not been split again by the new one. The command that writes the
-sheet refuses outcomes that another parser made, so the code as it is now writes no
-sheet for these.
+[A parser that begins a section in more places](#a-parser-that-begins-a-section-in-more-places)).
+The sample was split again by the new one, into a file of its own
+(`results/survey/outcomes-parser5.jsonl`), and what the two files say, line against
+line, is under that heading. No outline of the new parser has been held against a
+paper. The command that writes the sheet refuses outcomes that another parser made, so
+the code as it is now writes no sheet for the outcomes of parser `4`.
 
 ### The plan
 

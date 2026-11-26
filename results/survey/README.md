@@ -12,6 +12,7 @@ evaluation.
 | `sample.jsonl` | the 520 papers that the rule of the plan draws from that list, 40 of each of the 13 archives, in their order |
 | `outcomes.jsonl` | what came back for each of the 520 papers: the file that the third run of `survey.run` wrote on 2026-11-25 |
 | `outcomes-first-run.jsonl`, `outcomes-second-run.jsonl` | the files that the two runs before it wrote, with 67 papers and with 3 papers unanswered. They are kept to show what asking again changed, and they are not the result |
+| `outcomes-parser5.jsonl` | what came back for the same 520 papers when parser `5` split them again: the file that one run of `survey.run` wrote on 2026-11-25, by `44bca1f`. It is not the result of the survey either, which stays `outcomes.jsonl`, and the check of the outlines is of that file |
 | `outline-check.jsonl` | what was found when 65 outlines were held against the papers: for each paper two verdicts and a note. `survey.sheet` wrote it on 2026-11-25 from the sheet, which a Claude session had filled in as a draft and the maintainer had checked against each paper. The sheet is not here, because it holds section titles |
 | `outline-check-first.jsonl` | what the same command wrote when it first read the sheet, earlier that day. It is kept to show what was changed after it, and it is not the result |
 
@@ -19,7 +20,8 @@ evaluation.
 against the plan. `tests/test_survey_outcomes.py` holds the three other files against
 the sample and against each other, and holds what is said here and in the README of the
 repository against them. `tests/test_survey_checks.py` does the same for the two files
-of the check of the outlines.
+of the check of the outlines. `tests/test_survey_parser5.py` holds the file of parser
+`5` against the sample and against `outcomes.jsonl`, line by line.
 
 ## The three runs
 
@@ -128,3 +130,44 @@ Its standard error is 2.0 points. That is the square root of
 where w is the weight of the archive, N the number of its papers in the list, n the 40
 that were drawn and p the share of them that was split. An archive whose forty papers
 were all split adds nothing to that sum, so the error is somewhat too small.
+
+## The sample split again by parser 5
+
+Everything above is of parser `4`. The parser was changed afterwards for what the check
+of the outlines had noted ("A parser that begins a section in more places" in the
+README of the repository), and on 2026-11-25 the same 520 papers were split again by
+the code that has parser `5` (`44bca1f`), into `outcomes-parser5.jsonl`. What would be
+read from the two files was written down before that run, in
+`../runs/more-sections/README.md`, which also goes through what came back. The run
+began at 10:46 UTC and ended within a minute, and left no paper unanswered.
+
+The same 494 papers were split, and the same 26 have no TeX source. Of the 494, the
+lines of 191 differ. Archive by archive:
+
+| Archive | Split | Lines that differ | Without a section heading, parser `4` | parser `5` | With a piece of more than 20,000 characters, parser `4` | parser `5` |
+|---|---|---|---|---|---|---|
+| astro-ph | 39 | 23 | 0 | 0 | 5 | 5 |
+| cond-mat | 30 | 14 | 1 | 0 | 9 | 7 |
+| gr-qc | 40 | 15 | 0 | 0 | 5 | 4 |
+| hep-ex | 40 | 21 | 6 | 2 | 14 | 11 |
+| hep-lat | 40 | 20 | 0 | 0 | 9 | 8 |
+| hep-ph | 40 | 18 | 1 | 0 | 8 | 8 |
+| hep-th | 40 | 11 | 1 | 0 | 9 | 8 |
+| math-ph | 40 | 5 | 1 | 1 | 15 | 15 |
+| nlin | 39 | 8 | 0 | 0 | 10 | 9 |
+| nucl-ex | 37 | 14 | 7 | 4 | 12 | 12 |
+| nucl-th | 39 | 14 | 3 | 0 | 9 | 6 |
+| physics | 30 | 11 | 4 | 1 | 11 | 8 |
+| quant-ph | 40 | 17 | 2 | 1 | 9 | 7 |
+| all | 494 | 191 | 26 | 9 | 125 | 108 |
+
+A paper leaves the count of papers without a section heading as soon as parser `5`
+makes one section in it, also when that section is its acknowledgements and the rest is
+one piece as before. So the columns to read for how the papers are cut are the last
+two. Eighteen papers left that count, and one came into it: `2610.39042v1` of hep-ex,
+whose letter parser `4` had left out and parser `5` returns as one piece of 24,532
+characters.
+
+The share of the papers that were split is what it was, since the same papers were
+split. No outline of parser `5` has been held against a paper: the check above is of
+the outlines of parser `4`, and it says nothing of the new sections.

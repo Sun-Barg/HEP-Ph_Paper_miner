@@ -75,5 +75,8 @@ in the first five folders, `p2-tool` in `diag-3-tool/` and `p2-text` in `diag-3-
 - The runs made after the loop began to ask for the call (2026-11-23, prompt `p3-tool`)
   are in `../asking-again/`, with a README of their own. They are held against the
   runs of `../regress/dev-after/`.
+- The runs made after the parser began a section in more places (2026-11-25, parser
+  `5`) are in `../more-sections/`, with a README of their own. They are held against
+  the runs of `../asking-again/dev-after/`.
 - A file is named after its run: `<UTC time>_<question id>_<layout>_<four random
   characters>.jsonl`.

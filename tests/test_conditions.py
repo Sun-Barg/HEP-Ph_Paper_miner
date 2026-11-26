@@ -169,7 +169,7 @@ def test_the_readme_names_the_parser_of_the_code_and_the_parser_of_the_survey():
     assert (
         f"(`MORE_SECTIONS`: `ASKING_AGAIN` with the parser `{now}` and nothing else), and "
         f"every set now names its parser, which is `{ASKING_AGAIN['parser']}` for the three "
-        "sets that runs were made under" in readme
+        "sets before it" in readme
     )
     assert (
         f"`staged-6` and `flat-5`, the prompt `{MORE_SECTIONS['prompt_version']}` and the "
@@ -180,9 +180,21 @@ def test_the_readme_names_the_parser_of_the_code_and_the_parser_of_the_survey():
         made_with = json.loads(next(lines))["parser_version"]
     assert made_with == EVALUATION["parser"]
     assert f"The survey and the check are of parser `{made_with}`" in readme
-    # What is still to do stands in the README as not done. When it is done, that
-    # sentence goes, and this line with it.
-    assert f"the sample of the survey has not been split again by parser `{now}`" in readme
+    # The sample was split again by the parser of the code, into a file of its own
+    # (tests/test_survey_parser5.py). The survey and its check stay those of the parser
+    # before, and the README says both.
+    again = root / "results" / "survey" / "outcomes-parser5.jsonl"
+    with again.open(encoding="utf-8") as lines:
+        assert json.loads(next(lines))["parser_version"] == now
+    assert (
+        "The sample was split again by the new one, into a file of its own "
+        f"(`results/survey/{again.name}`)" in readme
+    )
+    assert (
+        "The survey and its check, as they stand below, stay those of parser "
+        f"`{made_with}`." in readme
+    )
+    assert "has not been split again" not in readme and "Not done yet" not in readme
 
 
 # --- the code ----------------------------------------------------------------------------
