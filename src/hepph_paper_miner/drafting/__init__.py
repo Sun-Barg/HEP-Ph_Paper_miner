@@ -25,5 +25,7 @@ The parts, in the order they are used:
                 every candidate in counts; the questions of the rehearsal
     ask.py      how draft.py and sift.py ask the model and keep its replies
 
-eval/paired.py holds the interval that the comparison of the two layouts is read by.
+What comes after the runs is in eval/: hand.py picks the answers that a person grades and
+makes the verdict on each, paired.py holds the interval that the comparison of the two
+layouts is read by, and second.py writes the report.
 """

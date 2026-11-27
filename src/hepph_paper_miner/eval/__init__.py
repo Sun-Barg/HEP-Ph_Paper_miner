@@ -11,4 +11,7 @@ judge.py        a model as a second grader of the answers of a sheet
 agree.py        the judge held against the grades a person gave
 regress.py      the runs of a changed version held against the runs of the one before
 replay.py       the end of a run sent again with the message of the loop, and what came back
+paired.py       the interval of the difference of two rates on the same questions
+hand.py         the second evaluation: which answers a person grades, and the verdict on each
+second.py       the report of the second evaluation: one run for a cell, and three graders
 """
