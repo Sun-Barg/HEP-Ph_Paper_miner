@@ -205,7 +205,7 @@ def read_sample(path: Path) -> Sample:
 
     A sample can also be a later stretch of the order: its first line then says at
     which place it begins (`first`), and its papers are numbered from there. The
-    second evaluation asks about places 41 to 80 (drafting/papers.py), which the
+    second evaluation asks about places 41 to 100 (drafting/papers.py), which the
     survey's sample does not hold. A file without `first` begins at the front.
     """
     lines, digest = read_lines(path, "sample")

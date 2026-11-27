@@ -1,15 +1,15 @@
-"""Which papers the second evaluation asks about: places 41 to 80 of the survey's order.
+"""Which papers the second evaluation asks about: places 41 to 100 of the survey's order.
 
 The survey drew the first forty papers of every archive from the order of its list
 (survey/sample.py: the SHA-256 of "<seed>:<identifier without its version>", smallest
 first), and the parser was then changed for what those papers had shown (parser 5). A
-question about them would be about papers that the code was fitted to. The next forty
+question about them would be about papers that the code was fitted to. The next sixty
 of the same order are papers that nobody had opened when the plan was written. They
 come from the same list by the same rule, so no new request to arXiv decides which
 they are, and anyone can work them out again from the files of the repository.
 
-`draw_places` is the survey's own `draw`, asked for eighty papers an archive, with the
-first forty left out: a longer stretch of one order holds the shorter one.
+`draw_places` is the survey's own `draw`, asked for a hundred papers an archive, with
+the first forty left out: a longer stretch of one order holds the shorter one.
 
 The command writes the sample of the second evaluation, as survey.sample writes the
 survey's, from the list that the survey committed:

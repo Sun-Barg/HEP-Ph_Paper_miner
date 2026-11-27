@@ -76,7 +76,7 @@ from hepph_paper_miner.sources.base import Paper, PaperSource, SourceError, pars
 from hepph_paper_miner.survey.records import RecordError, now, write_lines
 
 PER_CELL = 4  # questions of every kind and archive
-REHEARSAL_PER_KIND = 2  # questions of every kind in the rehearsal: ten
+REHEARSAL_PER_KIND = 2  # questions of every kind in the rehearsal: ten at most
 
 
 # --- what became of every place -----------------------------------------------------------

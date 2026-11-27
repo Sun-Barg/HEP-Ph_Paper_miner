@@ -69,12 +69,14 @@ def test_worse_and_not_worse_by_more_than_the_margin_can_both_hold():
     assert reading(low, high, 0.10) == WORSE_WITHIN
 
 
-def test_with_eighty_questions_they_never_hold_both():
-    # So the pre-registration can read 80 questions in three ways.
-    for b in range(81):
-        for c in range(81 - b):
-            _, low, high = adjusted_wald(b, c, 80)
-            assert reading(low, high, 0.10) != WORSE_WITHIN
+def test_with_eighty_questions_or_fewer_they_never_hold_both():
+    # So the pre-registration can read its questions in three ways, however many of the
+    # 80 there are in the end.
+    for n in range(1, 81):
+        for b in range(n + 1):
+            for c in range(n + 1 - b):
+                _, low, high = adjusted_wald(b, c, n)
+                assert reading(low, high, 0.10) != WORSE_WITHIN
 
 
 def test_the_ends_of_the_margin():

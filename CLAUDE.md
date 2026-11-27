@@ -110,6 +110,37 @@ works here follows the rules below.
   is given with the papers that are still unanswered beside it, never with them counted
   as failures or left out without a word.
 
+## The second evaluation
+
+- `eval_data/archives_plan.json` says which papers the second evaluation asks about, and
+  `eval_data/PREREGISTRATION_2.md` says how its questions are made, asked and read. Both
+  were committed before any of those papers was fetched, and both are fixed.
+  `tests/test_archives_plan.py` holds the plan by its SHA-256, and Sections 1 to 15 of the
+  pre-registration by theirs. Do not change a sentence of them, and editing the two
+  digests until the test passes is not a fix. What turns out otherwise is written under
+  Deviations (Section 16), with its date and reason. Another stretch of the order, other
+  archives or another count of places is another plan, in a file of its own under another
+  name.
+- One thing is put into Sections 9 and 10 later: the SHA-256 of
+  `eval_data/questions_archives.jsonl`, in the place of the words
+  `<SHA-256 of the question file>`, by the commit that adds that file and before any run.
+  The test reads the digest as those words, so it passes with it and with nothing else.
+- `DRAFTER_VERSION` in `src/hepph_paper_miner/drafting/draft.py` and `SIFT_VERSION` in
+  `src/hepph_paper_miner/drafting/sift.py` name the texts that draft and sift the
+  questions. They are `d3` and `s1` since the last round of their tuning (2026-11-26 UTC),
+  and the pre-registration names them by their digests. Do not change those texts, the
+  checks of `drafting/checks.py`, the places and kinds of `drafting/places.py`, or the
+  rules of `drafting/assign.py` and `drafting/assemble.py` unless the owner asks for
+  exactly that: the questions of the evaluation are what these make of its papers.
+  `tests/test_draft.py` and `tests/test_sift.py` fail when a text changes under an
+  unchanged name. Another text is another generator, and no part of this evaluation.
+- No paper of the plan is fetched before the commit that holds the plan is pushed: not by
+  a command, and not through the tools of the server. After that they are fetched by
+  `survey.run`, from the sample that `drafting.papers` writes.
+- The drafts, the replies of the filters and the sheet of the review hold paper text. They
+  are written into `runs_private/` and never committed. `results/archives/` holds
+  identifiers, kinds, counts and verdicts, and no text of a paper.
+
 ## Style
 
 - Format with `uvx ruff format` (line length 100).

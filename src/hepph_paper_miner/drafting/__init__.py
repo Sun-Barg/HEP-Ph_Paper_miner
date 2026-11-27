@@ -1,7 +1,7 @@
 """The second evaluation: questions that a model drafts about papers that nobody picked.
 
 The first evaluation asked twenty questions about papers that one person had read.
-This one takes its papers by the rule of the survey (places 41 to 80 of four archives
+This one takes its papers by the rule of the survey (places 41 to 100 of four archives
 in the survey's order), gives every paper one place to ask about, has a model draft up
 to three questions bound to a passage there, and sifts the drafts by program, by model
 and by hand before any run: a place makes one question at most. A pre-registration says
@@ -9,7 +9,7 @@ why and how, and it is committed with the plan before any of those papers is fet
 
 The parts, in the order they are used:
 
-    papers.py   which papers: places 41 to 80 of the survey's order, from its list; and
+    papers.py   which papers: places 41 to 100 of the survey's order, from its list; and
                 the command that writes their sample from the plan of the evaluation
     places.py   where in a split paper a question can stand, and of which kind
     assign.py   which place every paper is given, by a rule that no choice enters; and

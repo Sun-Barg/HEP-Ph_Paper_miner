@@ -28,10 +28,11 @@ The command writes the places to draft about, one line each, for one of two uses
         A paper gets one place of every kind it has, search_first aside: with one draft a
         paper, a round would have six drafts, and a share of six says little.
 
-    uv run python -m hepph_paper_miner.drafting.assign --sample <sample of places 41 to 80> \\
-        --outcomes <what survey.run made of it> --out results/archives/places.jsonl
+    uv run python -m hepph_paper_miner.drafting.assign --sample results/archives/sample.jsonl \\
+        --outcomes results/archives/outcomes.jsonl --out results/archives/places.jsonl
 
-        The papers of the second evaluation: `assign` above, six drafts for every kind and
+        The papers of the second evaluation: `assign` above, twelve drafts for every kind
+        and archive (PER_KIND), which is a place for each of the sixty papers of an
         archive. A paper with a named_first place is looked up first: whether arXiv lists
         the version of the sample as its latest one, and at which rank a search for its
         title lists it. That search is the only use of the network here.
@@ -159,6 +160,14 @@ def _choose(
         candidates,
         key=lambda place: (place_key(seed, paper.arxiv_id, place.section), place.start),
     )
+
+
+# The drafts of each kind that an archive of the second evaluation is to have. The design
+# began with six, for the forty papers of places 41 to 80. The last round of the tuning
+# then left an accepted draft in 8 of its 27 places, so the plan took the papers as far as
+# place 100 and has a place for every one of them: five kinds of twelve are the sixty
+# papers of an archive (eval_data/PREREGISTRATION_2.md, Section 3).
+PER_KIND = 12
 
 
 # --- the papers the texts are written on --------------------------------------------------
@@ -489,10 +498,13 @@ def main(argv: Sequence[str] | None = None, source: PaperSource | None = None) -
         default=Path("eval_data/survey_plan.json"),
         help="the plan of the survey, for its seed (default: %(default)s)",
     )
-    parser.add_argument("--sample", type=Path, help="a sample of places 41 to 80")
+    parser.add_argument("--sample", type=Path, help="the sample of the second evaluation")
     parser.add_argument("--outcomes", type=Path, help="what survey.run made of that sample")
     parser.add_argument(
-        "--per-kind", type=int, default=6, help="drafts of each kind an archive (default: 6)"
+        "--per-kind",
+        type=int,
+        default=PER_KIND,
+        help="drafts of each kind an archive (default: %(default)s)",
     )
     parser.add_argument("--out", type=Path, required=True, help="the file of places to write")
     arguments = parser.parse_args(argv)

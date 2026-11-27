@@ -1,6 +1,8 @@
-"""Which papers the second evaluation asks about: places 41 to 80 of the survey's order.
+"""Which papers the second evaluation asks about: a later stretch of the survey's order.
 
 Drawn from the list that the survey committed, by the survey's own rule. No network.
+The stretch of these tests is places 41 to 80, which the design began with. The stretch
+of the plan, places 41 to 100, is held in test_archives_plan.py.
 """
 
 import hashlib

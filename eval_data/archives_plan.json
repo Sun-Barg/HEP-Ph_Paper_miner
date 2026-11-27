@@ -1,0 +1,11 @@
+{
+  "plan": "archives-1",
+  "about": "The papers of the second evaluation: places 41 to 100 of four archives in the order of the survey's list. Written before any of them was fetched. PREREGISTRATION_2.md says how their questions are made, asked and read.",
+  "papers": {
+    "survey_plan": {"name": "survey-1", "sha256": "64cedd39dc4b2901cea3b4dc310a0eff264be2ccf151897e1b7af08ef751a95b"},
+    "population": {"sha256": "ed1a8e897f69011cd166fda8405483e7c693c2a1c4102356be1b7a85ab866760"},
+    "archives": ["hep-ph", "hep-th", "hep-ex", "astro-ph"],
+    "first": 41,
+    "last": 100
+  }
+}

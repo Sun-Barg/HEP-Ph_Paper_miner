@@ -343,6 +343,19 @@ def test_the_places_of_the_evaluation_are_given_out_by_the_rule(tmp_path, capsys
     assert TITLE not in out.read_text(encoding="utf-8")
 
 
+def test_without_a_count_the_command_gives_out_the_count_of_the_plan(tmp_path):
+    ids = ["2609.00001v1", "2609.00002v1"]
+    papers = [another(paper_id) for paper_id in ids]
+    sample, outcomes = sample_and_outcomes(tmp_path, [("hep-ph", each) for each in ids])
+    out = tmp_path / "places.jsonl"
+    argv = ["--sample", str(sample), "--outcomes", str(outcomes), "--out", str(out)]
+    assert assign.main(argv, source=FixtureSource(papers)) == 0
+    head = json.loads(out.read_text(encoding="utf-8").splitlines()[0])
+    assert head["per_kind"] == assign.PER_KIND == 12
+    # Twelve of a kind are more than two papers hold: both get a place, of the rarest kind.
+    assert [place.kind for place in read_places(out).places] == [LATER_PIECE, LATER_PIECE]
+
+
 def test_outcomes_of_another_sample_or_with_papers_left_unanswered_are_refused(tmp_path, capsys):
     ids = ["2609.00001v1"]
     sample, outcomes = sample_and_outcomes(tmp_path, [("hep-ph", ids[0])], unanswered=1)
