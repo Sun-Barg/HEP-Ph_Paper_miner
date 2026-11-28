@@ -1,0 +1,482 @@
+{"record": "places", "input": "sample", "sample": {"file": "sample.jsonl", "sha256": "563cd02a19808ea22d76007057efbccabb296c80e007ebc4acc943a9f67c49fd"}, "outcomes": {"file": "outcomes.jsonl", "sha256": "6bcb8032fa491b9d70f97a49fbd32cccbbb2af946f1271d38dd97180242717de"}, "seed": 20261124, "per_kind": 12, "parser_version": "5", "code": {"commit": "5a45e8db5939849cc5b1ef70d6327559ce96a8c0", "modified": false}, "made": "2026-11-27T14:51:35+00:00"}
+{"record": "paper", "archive": "hep-ph", "rank": 41, "id": "2608.15275v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 41, "id": "2609.16153v1", "outcome": "ok", "places": {"appendix": 5, "named_first": 16}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 41, "id": "2608.15367v2", "outcome": "ok", "places": {"appendix": 7, "own_text": 1, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 41, "id": "2609.08778v1", "outcome": "ok", "places": {"appendix": 2, "named_first": 14}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 42, "id": "2609.26533v1", "outcome": "ok", "places": {"named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 42, "id": "2610.35135v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 12}, "search": {"findable": false, "latest": false, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 42, "id": "2610.30894v1", "outcome": "ok", "places": {"appendix": 4, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 42, "id": "2609.16194v1", "outcome": "ok", "places": {"later_piece": 1, "own_text": 7, "named_first": 32}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 43, "id": "2609.04175v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 43, "id": "2609.05164v1", "outcome": "ok", "places": {"later_piece": 1, "appendix": 1, "named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 43, "id": "2609.39196v1", "outcome": "ok", "places": {"appendix": 3, "own_text": 1, "named_first": 15}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 43, "id": "2611.00199v2", "outcome": "ok", "places": {"later_piece": 1, "appendix": 9, "own_text": 1, "named_first": 17}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 44, "id": "2609.10716v1", "outcome": "ok", "places": {"appendix": 1, "own_text": 2, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 44, "id": "2608.05280v1", "outcome": "ok", "places": {"appendix": 5, "own_text": 1, "named_first": 15}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 44, "id": "2608.03888v1", "outcome": "ok", "places": {"named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 44, "id": "2608.27892v1", "outcome": "ok", "places": {"own_text": 2, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 45, "id": "2609.18693v1", "outcome": "ok", "places": {"named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 45, "id": "2609.24873v1", "outcome": "ok", "places": {"appendix": 2, "own_text": 2, "named_first": 7}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 45, "id": "2608.01289v2", "outcome": "ok", "places": {"later_piece": 1, "appendix": 1, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 45, "id": "2608.04282v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 7}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 46, "id": "2610.26652v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 46, "id": "2610.38226v1", "outcome": "ok", "places": {"appendix": 3, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 46, "id": "2610.13634v2", "outcome": "ok", "places": {"later_piece": 1, "appendix": 1, "own_text": 2, "named_first": 17}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 46, "id": "2609.20933v1", "outcome": "ok", "places": {"appendix": 2, "named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 47, "id": "2610.02096v1", "outcome": "ok", "places": {"named_first": 5}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 47, "id": "2611.00196v1", "outcome": "ok", "places": {"later_piece": 2, "appendix": 3, "own_text": 4, "named_first": 21}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 47, "id": "2609.16276v2", "outcome": "parse_error"}
+{"record": "paper", "archive": "astro-ph", "rank": 47, "id": "2610.09564v1", "outcome": "ok", "places": {"own_text": 2, "named_first": 18}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 48, "id": "2608.00506v2", "outcome": "ok", "places": {"named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 48, "id": "2609.02472v1", "outcome": "ok", "places": {"appendix": 7, "named_first": 16}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 48, "id": "2608.21216v2", "outcome": "ok", "places": {"own_text": 1, "named_first": 12}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 48, "id": "2609.28257v2", "outcome": "ok", "places": {"appendix": 3, "named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 49, "id": "2609.20914v1", "outcome": "ok", "places": {"later_piece": 1, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 49, "id": "2609.20788v2", "outcome": "ok", "places": {"named_first": 9}, "search": {"findable": true, "latest": true, "rank": 2, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 49, "id": "2609.03879v2", "outcome": "ok", "places": {"named_first": 14}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 49, "id": "2610.24057v1", "outcome": "ok", "places": {"later_piece": 1, "named_first": 4}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 50, "id": "2609.28616v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 50, "id": "2609.09303v1", "outcome": "ok", "places": {"later_piece": 1, "own_text": 2, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 50, "id": "2609.25943v2", "outcome": "ok", "places": {"own_text": 2, "named_first": 16}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 50, "id": "2609.20642v1", "outcome": "ok", "places": {"named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 51, "id": "2609.04296v1", "outcome": "ok", "places": {"later_piece": 4, "appendix": 8, "own_text": 3, "named_first": 42}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 51, "id": "2609.11089v1", "outcome": "ok", "places": {"later_piece": 1, "appendix": 3, "own_text": 2, "named_first": 12}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 51, "id": "2609.01546v2", "outcome": "ok", "places": {"later_piece": 1, "own_text": 1, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 51, "id": "2610.14987v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 52, "id": "2608.04069v1", "outcome": "ok", "places": {"named_first": 4}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 52, "id": "2610.27824v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 52, "id": "2609.02923v1", "outcome": "ok", "places": {"appendix": 6, "own_text": 1, "named_first": 17}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 52, "id": "2610.30310v1", "outcome": "ok", "places": {"named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 53, "id": "2609.12182v1", "outcome": "ok", "places": {"own_text": 2, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 53, "id": "2610.36057v1", "outcome": "ok", "places": {"appendix": 7, "own_text": 1, "named_first": 15}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 53, "id": "2609.18799v1", "outcome": "no_full_text"}
+{"record": "paper", "archive": "astro-ph", "rank": 53, "id": "2608.30312v1", "outcome": "ok", "places": {"appendix": 2, "own_text": 1, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 54, "id": "2608.11040v2", "outcome": "ok", "places": {"named_first": 23}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 54, "id": "2610.18086v1", "outcome": "ok", "places": {"later_piece": 1, "appendix": 10, "own_text": 2, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 54, "id": "2610.12042v1", "outcome": "ok", "places": {"named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 54, "id": "2609.03371v2", "outcome": "ok", "places": {"own_text": 5, "named_first": 22}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 55, "id": "2610.06628v1", "outcome": "ok", "places": {"appendix": 1, "own_text": 1, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 55, "id": "2610.00453v2", "outcome": "ok", "places": {"appendix": 5, "named_first": 26}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 55, "id": "2608.10900v1", "outcome": "ok", "places": {"own_text": 5, "named_first": 16}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 55, "id": "2610.33324v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 15}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 56, "id": "2610.30338v1", "outcome": "ok", "places": {"appendix": 4, "own_text": 2, "named_first": 15}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 56, "id": "2609.05606v1", "outcome": "ok", "places": {"later_piece": 4, "appendix": 7, "own_text": 2, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 56, "id": "2610.23112v1", "outcome": "ok", "places": {"appendix": 2, "own_text": 1, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 56, "id": "2609.35343v1", "outcome": "ok", "places": {"appendix": 2, "own_text": 2, "named_first": 12}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 57, "id": "2610.41078v2", "outcome": "ok", "places": {"appendix": 2, "own_text": 1, "named_first": 7}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 57, "id": "2609.10692v1", "outcome": "ok", "places": {"own_text": 4, "named_first": 14}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 57, "id": "2608.19764v1", "outcome": "ok", "places": {"appendix": 6, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 57, "id": "2609.04036v1", "outcome": "ok", "places": {"named_first": 19}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 58, "id": "2610.27006v1", "outcome": "ok", "places": {"appendix": 5, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 58, "id": "2610.39804v1", "outcome": "ok", "places": {"appendix": 1, "own_text": 3, "named_first": 21}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 58, "id": "2610.13165v2", "outcome": "ok", "places": {"named_first": 7}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 58, "id": "2608.28507v2", "outcome": "ok", "places": {"appendix": 1, "own_text": 2, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 59, "id": "2608.19406v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 59, "id": "2608.02447v3", "outcome": "ok", "places": {"appendix": 24, "own_text": 4, "named_first": 18}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 59, "id": "2610.21982v2", "outcome": "ok", "places": {"later_piece": 1, "named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 59, "id": "2608.17004v2", "outcome": "ok", "places": {"appendix": 2, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 60, "id": "2610.20940v2", "outcome": "ok", "places": {"own_text": 1, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 60, "id": "2610.02415v2", "outcome": "ok", "places": {"named_first": 4}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 60, "id": "2609.02950v1", "outcome": "ok", "places": {"named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 60, "id": "2610.03876v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 61, "id": "2608.00564v1", "outcome": "ok", "places": {"named_first": 4}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 61, "id": "2610.35283v1", "outcome": "ok", "places": {"appendix": 10, "own_text": 5, "named_first": 16}, "search": {"findable": true, "latest": true, "rank": 2, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 61, "id": "2609.00152v2", "outcome": "ok", "places": {"own_text": 1, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 61, "id": "2609.03408v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 62, "id": "2609.02970v1", "outcome": "ok", "places": {"appendix": 5, "named_first": 19}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 62, "id": "2610.08252v2", "outcome": "ok", "places": {"own_text": 1, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 62, "id": "2610.12058v1", "outcome": "ok", "places": {"own_text": 2, "named_first": 22}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 62, "id": "2609.26659v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 63, "id": "2608.08515v2", "outcome": "ok", "places": {"named_first": 14}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 63, "id": "2608.05146v2", "outcome": "ok", "places": {"appendix": 5, "own_text": 1, "named_first": 20}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 63, "id": "2610.17932v1", "outcome": "ok", "places": {"named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 63, "id": "2610.38836v1", "outcome": "ok", "places": {"appendix": 3, "own_text": 2, "named_first": 14}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 64, "id": "2610.07331v1", "outcome": "ok", "places": {"later_piece": 1, "appendix": 3, "own_text": 2, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 64, "id": "2608.01349v2", "outcome": "ok", "places": {"appendix": 3, "own_text": 1, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 64, "id": "2609.36028v2", "outcome": "ok", "places": {"named_first": 7}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 64, "id": "2608.19687v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 11}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 65, "id": "2610.30649v1", "outcome": "ok", "places": {"named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 65, "id": "2610.27511v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 65, "id": "2608.26935v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 65, "id": "2610.21028v1", "outcome": "ok", "places": {"appendix": 3, "own_text": 1, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 66, "id": "2611.00200v1", "outcome": "ok", "places": {"appendix": 9, "named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 66, "id": "2609.20631v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 66, "id": "2609.37146v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 5}, "search": {"findable": true, "latest": true, "rank": 2, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 66, "id": "2610.30936v1", "outcome": "ok", "places": {"named_first": 14}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 67, "id": "2608.29666v2", "outcome": "ok", "places": {"appendix": 2, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 67, "id": "2610.10821v2", "outcome": "ok", "places": {"appendix": 1, "own_text": 3, "named_first": 38}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 67, "id": "2608.01943v2", "outcome": "ok", "places": {"named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 67, "id": "2610.28006v1", "outcome": "ok", "places": {"appendix": 6, "own_text": 1, "named_first": 18}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 68, "id": "2608.30434v1", "outcome": "ok", "places": {"named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 68, "id": "2608.31151v3", "outcome": "ok", "places": {"appendix": 8, "own_text": 1, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 68, "id": "2610.01761v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 68, "id": "2610.04449v1", "outcome": "ok", "places": {"named_first": 15}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 69, "id": "2608.27558v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 7}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 69, "id": "2610.15737v1", "outcome": "ok", "places": {"named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 69, "id": "2609.01336v1", "outcome": "ok", "places": {"named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 69, "id": "2610.34069v1", "outcome": "ok", "places": {"appendix": 2, "own_text": 1, "named_first": 9}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 70, "id": "2610.28014v1", "outcome": "ok", "places": {"appendix": 4, "named_first": 19}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 70, "id": "2610.36271v1", "outcome": "ok", "places": {"appendix": 4, "own_text": 2, "named_first": 26}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 70, "id": "2609.04402v1", "outcome": "ok", "places": {"later_piece": 2, "appendix": 1, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 70, "id": "2609.16126v1", "outcome": "ok", "places": {"named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 71, "id": "2610.38178v1", "outcome": "ok", "places": {"later_piece": 1, "appendix": 2, "own_text": 1, "named_first": 6}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 71, "id": "2610.39101v1", "outcome": "ok", "places": {"later_piece": 3, "appendix": 2, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 71, "id": "2608.12173v3", "outcome": "ok", "places": {"later_piece": 1, "named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 71, "id": "2610.27101v1", "outcome": "ok", "places": {"appendix": 10, "named_first": 3}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 72, "id": "2608.29844v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 72, "id": "2609.16263v1", "outcome": "ok", "places": {"appendix": 2, "own_text": 1, "named_first": 20}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 72, "id": "2610.14156v1", "outcome": "ok", "places": {"later_piece": 1, "named_first": 3}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 72, "id": "2610.32931v1", "outcome": "ok", "places": {"named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 73, "id": "2609.28129v1", "outcome": "ok", "places": {"named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 73, "id": "2610.13667v1", "outcome": "ok", "places": {"appendix": 34, "own_text": 1, "named_first": 19}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 73, "id": "2608.15149v1", "outcome": "ok", "places": {"appendix": 2, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 73, "id": "2610.20741v1", "outcome": "ok", "places": {"named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 74, "id": "2609.17163v1", "outcome": "ok", "places": {"named_first": 4}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 74, "id": "2609.17858v3", "outcome": "ok", "places": {"appendix": 8, "own_text": 2, "named_first": 20}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 74, "id": "2609.19992v1", "outcome": "ok", "places": {"named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 74, "id": "2610.03913v1", "outcome": "ok", "places": {"appendix": 7, "own_text": 3, "named_first": 22}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 75, "id": "2610.36861v1", "outcome": "ok", "places": {"later_piece": 1, "named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 75, "id": "2608.24083v1", "outcome": "ok", "places": {"later_piece": 1, "appendix": 1, "own_text": 1, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 75, "id": "2610.37345v1", "outcome": "ok", "places": {"appendix": 1, "own_text": 1, "named_first": 17}, "search": {"findable": false, "latest": false, "rank": null, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 75, "id": "2608.02573v1", "outcome": "ok", "places": {"own_text": 3, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 5, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 76, "id": "2608.11814v3", "outcome": "ok", "places": {"appendix": 2, "named_first": 7}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 76, "id": "2609.02437v3", "outcome": "ok", "places": {"appendix": 7, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 76, "id": "2608.21082v1", "outcome": "ok", "places": {"appendix": 2, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 76, "id": "2609.10809v1", "outcome": "ok", "places": {"appendix": 3, "own_text": 2, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 77, "id": "2608.23171v1", "outcome": "ok", "places": {"appendix": 5, "own_text": 2, "named_first": 8}, "search": {"findable": false, "latest": false, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 77, "id": "2608.25007v1", "outcome": "ok", "places": {"appendix": 6, "own_text": 1, "named_first": 7}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 77, "id": "2610.17967v1", "outcome": "ok", "places": {"appendix": 1, "own_text": 1, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 77, "id": "2609.10661v1", "outcome": "ok", "places": {"later_piece": 1, "named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 78, "id": "2611.01305v1", "outcome": "ok", "places": {"appendix": 9, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 78, "id": "2609.24649v1", "outcome": "ok", "places": {"later_piece": 2, "appendix": 3, "own_text": 3, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 78, "id": "2609.08144v1", "outcome": "ok", "places": {"later_piece": 1, "named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 78, "id": "2609.03060v1", "outcome": "ok", "places": {"appendix": 3, "own_text": 1, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 79, "id": "2609.28348v1", "outcome": "ok", "places": {"appendix": 2, "named_first": 4}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 79, "id": "2610.30232v1", "outcome": "ok", "places": {"later_piece": 3, "appendix": 9, "own_text": 3, "named_first": 21}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 79, "id": "2609.26695v1", "outcome": "ok", "places": {"named_first": 3}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 79, "id": "2609.38430v1", "outcome": "ok", "places": {"named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 80, "id": "2608.04990v2", "outcome": "ok", "places": {"appendix": 2, "own_text": 1, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 80, "id": "2608.12472v1", "outcome": "ok", "places": {"appendix": 2, "own_text": 2, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 80, "id": "2610.27346v1", "outcome": "ok", "places": {"later_piece": 1, "appendix": 4, "named_first": 22}, "search": {"findable": false, "latest": false, "rank": null, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 80, "id": "2608.25473v1", "outcome": "ok", "places": {"later_piece": 1, "appendix": 6, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 81, "id": "2609.06890v1", "outcome": "ok", "places": {"later_piece": 1, "named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 81, "id": "2608.01762v2", "outcome": "ok", "places": {"appendix": 2, "own_text": 1, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 81, "id": "2609.17738v4", "outcome": "ok", "places": {"named_first": 3}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 81, "id": "2609.32159v1", "outcome": "ok", "places": {"named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 82, "id": "2608.05322v1", "outcome": "ok", "places": {"own_text": 2, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 82, "id": "2608.04356v2", "outcome": "ok", "places": {"appendix": 2, "own_text": 3, "named_first": 7}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 82, "id": "2610.31430v1", "outcome": "ok", "places": {"own_text": 2, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 82, "id": "2609.00477v1", "outcome": "ok", "places": {"own_text": 2, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 83, "id": "2609.17015v1", "outcome": "ok", "places": {"named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 83, "id": "2610.28730v2", "outcome": "ok", "places": {"appendix": 5, "own_text": 1, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 83, "id": "2610.36224v1", "outcome": "ok", "places": {"named_first": 4}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 83, "id": "2608.24276v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 12}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 84, "id": "2608.14549v1", "outcome": "ok", "places": {"appendix": 3, "own_text": 1, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 84, "id": "2608.29931v1", "outcome": "ok", "places": {"appendix": 2, "own_text": 2, "named_first": 18}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 84, "id": "2610.32084v1", "outcome": "ok", "places": {"named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 84, "id": "2610.40184v2", "outcome": "ok", "places": {"appendix": 4, "own_text": 1, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 85, "id": "2610.22088v1", "outcome": "ok", "places": {"named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 85, "id": "2609.18668v1", "outcome": "ok", "places": {"later_piece": 2, "appendix": 4, "own_text": 3, "named_first": 17}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 85, "id": "2609.05829v1", "outcome": "ok", "places": {"later_piece": 1, "named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 85, "id": "2608.29050v1", "outcome": "ok", "places": {"named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 86, "id": "2609.04673v1", "outcome": "ok", "places": {"named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 86, "id": "2610.23384v1", "outcome": "ok", "places": {"named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 86, "id": "2610.11981v1", "outcome": "ok", "places": {"named_first": 6}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 86, "id": "2609.07417v1", "outcome": "ok", "places": {"named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 87, "id": "2610.15436v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 87, "id": "2610.10686v1", "outcome": "ok", "places": {"own_text": 3, "named_first": 7}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 87, "id": "2610.07773v1", "outcome": "ok", "places": {"named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 87, "id": "2609.08979v3", "outcome": "ok", "places": {"own_text": 2, "named_first": 17}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 88, "id": "2609.04616v1", "outcome": "ok", "places": {"later_piece": 1, "own_text": 1, "named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 88, "id": "2609.12046v1", "outcome": "ok", "places": {"appendix": 4, "named_first": 13}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 88, "id": "2610.11782v1", "outcome": "ok", "places": {"appendix": 3, "own_text": 7, "named_first": 32}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 88, "id": "2609.12494v1", "outcome": "ok", "places": {"appendix": 4, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 89, "id": "2608.14382v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 89, "id": "2610.30235v1", "outcome": "ok", "places": {"later_piece": 1, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 89, "id": "2610.37555v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 89, "id": "2610.30509v1", "outcome": "ok", "places": {"appendix": 1, "named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 90, "id": "2610.17351v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 21}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 90, "id": "2610.09855v1", "outcome": "ok", "places": {"later_piece": 5, "appendix": 32, "own_text": 9, "named_first": 77}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 90, "id": "2608.16063v1", "outcome": "ok", "places": {"own_text": 2, "named_first": 17}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 90, "id": "2608.11253v1", "outcome": "no_full_text"}
+{"record": "paper", "archive": "hep-ph", "rank": 91, "id": "2611.00239v1", "outcome": "ok", "places": {"named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 91, "id": "2608.06755v1", "outcome": "ok", "places": {"appendix": 4, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 91, "id": "2610.26148v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 91, "id": "2610.19881v1", "outcome": "ok", "places": {"appendix": 3, "own_text": 1, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 92, "id": "2609.29314v1", "outcome": "ok", "places": {"named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 92, "id": "2610.08913v1", "outcome": "ok", "places": {"appendix": 11, "own_text": 4, "named_first": 21}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 92, "id": "2608.18743v1", "outcome": "ok", "places": {"later_piece": 3, "appendix": 2, "own_text": 3, "named_first": 42}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 92, "id": "2609.30267v1", "outcome": "ok", "places": {"appendix": 2, "own_text": 2, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 93, "id": "2609.03648v1", "outcome": "ok", "places": {"appendix": 1, "own_text": 2, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 93, "id": "2609.04302v1", "outcome": "ok", "places": {"appendix": 4, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 93, "id": "2608.23773v3", "outcome": "ok", "places": {"appendix": 2, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 93, "id": "2610.27209v1", "outcome": "ok", "places": {"named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 94, "id": "2609.36696v1", "outcome": "ok", "places": {"appendix": 1, "own_text": 1, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 94, "id": "2609.04099v1", "outcome": "ok", "places": {"appendix": 2, "named_first": 17}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 94, "id": "2609.25153v1", "outcome": "ok", "places": {"named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 94, "id": "2608.20239v1", "outcome": "ok", "places": {"named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 95, "id": "2608.06983v2", "outcome": "ok", "places": {"named_first": 16}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 95, "id": "2610.27084v1", "outcome": "ok", "places": {"appendix": 3, "own_text": 1, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 95, "id": "2609.37087v1", "outcome": "ok", "places": {"named_first": 2}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 95, "id": "2608.00770v1", "outcome": "ok", "places": {"appendix": 5, "named_first": 22}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 96, "id": "2609.04441v1", "outcome": "ok", "places": {"appendix": 5, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 96, "id": "2610.29019v2", "outcome": "ok", "places": {"later_piece": 2, "appendix": 26, "own_text": 1, "named_first": 23}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 96, "id": "2608.12793v1", "outcome": "ok", "places": {"later_piece": 1, "named_first": 1}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 96, "id": "2608.21076v1", "outcome": "ok", "places": {"later_piece": 1, "appendix": 6, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 97, "id": "2610.21697v1", "outcome": "ok", "places": {"named_first": 4}, "search": {"findable": false, "latest": true, "rank": null, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 97, "id": "2608.05973v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 5}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 97, "id": "2610.19668v1", "outcome": "ok", "places": {"named_first": 6}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 97, "id": "2610.04553v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 14}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 98, "id": "2609.28223v1", "outcome": "ok", "places": {"named_first": 4}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 98, "id": "2609.10272v1", "outcome": "ok", "places": {"appendix": 5, "own_text": 1, "named_first": 11}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 98, "id": "2609.28144v1", "outcome": "ok", "places": {"named_first": 9}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 98, "id": "2608.25993v1", "outcome": "ok", "places": {"named_first": 18}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 99, "id": "2610.25216v1", "outcome": "ok", "places": {"appendix": 2, "own_text": 2, "named_first": 10}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 99, "id": "2610.37748v1", "outcome": "ok", "places": {"later_piece": 1, "own_text": 1, "named_first": 31}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 99, "id": "2608.10826v2", "outcome": "ok", "places": {"appendix": 2, "own_text": 2, "named_first": 18}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 99, "id": "2609.32726v1", "outcome": "ok", "places": {"appendix": 4, "own_text": 2, "named_first": 20}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ph", "rank": 100, "id": "2610.36107v1", "outcome": "ok", "places": {"own_text": 1, "named_first": 13}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-th", "rank": 100, "id": "2610.34380v1", "outcome": "ok", "places": {"named_first": 4}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "hep-ex", "rank": 100, "id": "2608.15074v2", "outcome": "ok", "places": {"later_piece": 1, "appendix": 1, "named_first": 8}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "paper", "archive": "astro-ph", "rank": 100, "id": "2609.09144v1", "outcome": "ok", "places": {"appendix": 3, "own_text": 1, "named_first": 12}, "search": {"findable": true, "latest": true, "rank": 1, "problem": null}}
+{"record": "archive", "archive": "hep-ph", "filled": {"later_piece": 7, "appendix": 12, "own_text": 12, "search_first": 12, "named_first": 17}, "missing": {"later_piece": 5, "appendix": 0, "own_text": 0, "search_first": 0, "named_first": 0}}
+{"record": "archive", "archive": "hep-th", "filled": {"later_piece": 12, "appendix": 12, "own_text": 12, "search_first": 12, "named_first": 12}, "missing": {"later_piece": 0, "appendix": 0, "own_text": 0, "search_first": 0, "named_first": 0}}
+{"record": "archive", "archive": "hep-ex", "filled": {"later_piece": 12, "appendix": 12, "own_text": 12, "search_first": 12, "named_first": 10}, "missing": {"later_piece": 0, "appendix": 0, "own_text": 0, "search_first": 0, "named_first": 2}}
+{"record": "archive", "archive": "astro-ph", "filled": {"later_piece": 6, "appendix": 12, "own_text": 12, "search_first": 12, "named_first": 17}, "missing": {"later_piece": 6, "appendix": 0, "own_text": 0, "search_first": 0, "named_first": 0}}
+{"record": "place", "number": 1, "archive": "hep-ph", "rank": 41, "paper": "2608.15275v1", "kind": "appendix", "section": "A", "start": 0, "end": 2054, "chars": 2054}
+{"record": "place", "number": 2, "archive": "hep-th", "rank": 41, "paper": "2609.16153v1", "kind": "appendix", "section": "A.2", "start": 0, "end": 1655, "chars": 1655}
+{"record": "place", "number": 3, "archive": "hep-ex", "rank": 41, "paper": "2608.15367v2", "kind": "appendix", "section": "A.1", "start": 0, "end": 4196, "chars": 4196}
+{"record": "place", "number": 4, "archive": "astro-ph", "rank": 41, "paper": "2609.08778v1", "kind": "appendix", "section": "A", "start": 0, "end": 3192, "chars": 3192}
+{"record": "place", "number": 5, "archive": "hep-ph", "rank": 42, "paper": "2609.26533v1", "kind": "search_first", "section": "9", "start": 0, "end": 2217, "chars": 2217}
+{"record": "place", "number": 6, "archive": "hep-th", "rank": 42, "paper": "2610.35135v1", "kind": "own_text", "section": "3", "start": 0, "end": 1805, "chars": 1805}
+{"record": "place", "number": 7, "archive": "hep-ex", "rank": 42, "paper": "2610.30894v1", "kind": "appendix", "section": "B", "start": 0, "end": 3936, "chars": 3936}
+{"record": "place", "number": 8, "archive": "astro-ph", "rank": 42, "paper": "2609.16194v1", "kind": "later_piece", "section": "2.4", "start": 19594, "end": 38745, "chars": 19151}
+{"record": "place", "number": 9, "archive": "hep-ph", "rank": 43, "paper": "2609.04175v1", "kind": "appendix", "section": "u1", "start": 0, "end": 6006, "chars": 6006}
+{"record": "place", "number": 10, "archive": "hep-th", "rank": 43, "paper": "2609.05164v1", "kind": "later_piece", "section": "0", "start": 19676, "end": 28866, "chars": 9190}
+{"record": "place", "number": 11, "archive": "hep-ex", "rank": 43, "paper": "2609.39196v1", "kind": "appendix", "section": "B", "start": 0, "end": 2498, "chars": 2498}
+{"record": "place", "number": 12, "archive": "astro-ph", "rank": 43, "paper": "2611.00199v2", "kind": "later_piece", "section": "3.3", "start": 19895, "end": 26343, "chars": 6448}
+{"record": "place", "number": 13, "archive": "hep-ph", "rank": 44, "paper": "2609.10716v1", "kind": "appendix", "section": "A", "start": 0, "end": 1082, "chars": 1082}
+{"record": "place", "number": 14, "archive": "hep-th", "rank": 44, "paper": "2608.05280v1", "kind": "appendix", "section": "B", "start": 0, "end": 17006, "chars": 17006}
+{"record": "place", "number": 15, "archive": "hep-ex", "rank": 44, "paper": "2608.03888v1", "kind": "search_first", "section": "3", "start": 0, "end": 5881, "chars": 5881}
+{"record": "place", "number": 16, "archive": "astro-ph", "rank": 44, "paper": "2608.27892v1", "kind": "own_text", "section": "3", "start": 0, "end": 1472, "chars": 1472}
+{"record": "place", "number": 17, "archive": "hep-ph", "rank": 45, "paper": "2609.18693v1", "kind": "search_first", "section": "2", "start": 0, "end": 5277, "chars": 5277}
+{"record": "place", "number": 18, "archive": "hep-th", "rank": 45, "paper": "2609.24873v1", "kind": "appendix", "section": "A", "start": 0, "end": 2037, "chars": 2037}
+{"record": "place", "number": 19, "archive": "hep-ex", "rank": 45, "paper": "2608.01289v2", "kind": "later_piece", "section": "A", "start": 19983, "end": 39510, "chars": 19527}
+{"record": "place", "number": 20, "archive": "astro-ph", "rank": 45, "paper": "2608.04282v1", "kind": "own_text", "section": "3", "start": 0, "end": 2921, "chars": 2921}
+{"record": "place", "number": 21, "archive": "hep-ph", "rank": 46, "paper": "2610.26652v1", "kind": "appendix", "section": "A", "start": 0, "end": 2704, "chars": 2704}
+{"record": "place", "number": 22, "archive": "hep-th", "rank": 46, "paper": "2610.38226v1", "kind": "appendix", "section": "A", "start": 0, "end": 1604, "chars": 1604}
+{"record": "place", "number": 23, "archive": "hep-ex", "rank": 46, "paper": "2610.13634v2", "kind": "later_piece", "section": "A", "start": 19935, "end": 39530, "chars": 19595}
+{"record": "place", "number": 24, "archive": "astro-ph", "rank": 46, "paper": "2609.20933v1", "kind": "appendix", "section": "A", "start": 0, "end": 1044, "chars": 1044}
+{"record": "place", "number": 25, "archive": "hep-ph", "rank": 47, "paper": "2610.02096v1", "kind": "named_first", "section": "u1", "start": 0, "end": 1739, "chars": 1739}
+{"record": "place", "number": 26, "archive": "hep-th", "rank": 47, "paper": "2611.00196v1", "kind": "later_piece", "section": "4.1", "start": 19974, "end": 39725, "chars": 19751}
+{"record": "place", "number": 27, "archive": "astro-ph", "rank": 47, "paper": "2610.09564v1", "kind": "own_text", "section": "3", "start": 0, "end": 1450, "chars": 1450}
+{"record": "place", "number": 28, "archive": "hep-ph", "rank": 48, "paper": "2608.00506v2", "kind": "search_first", "section": "1", "start": 0, "end": 5224, "chars": 5224}
+{"record": "place", "number": 29, "archive": "hep-th", "rank": 48, "paper": "2609.02472v1", "kind": "appendix", "section": "B.1", "start": 0, "end": 2629, "chars": 2629}
+{"record": "place", "number": 30, "archive": "hep-ex", "rank": 48, "paper": "2608.21216v2", "kind": "own_text", "section": "2", "start": 0, "end": 1144, "chars": 1144}
+{"record": "place", "number": 31, "archive": "astro-ph", "rank": 48, "paper": "2609.28257v2", "kind": "appendix", "section": "B", "start": 0, "end": 2631, "chars": 2631}
+{"record": "place", "number": 32, "archive": "hep-ph", "rank": 49, "paper": "2609.20914v1", "kind": "later_piece", "section": "u4", "start": 19377, "end": 38814, "chars": 19437}
+{"record": "place", "number": 33, "archive": "hep-th", "rank": 49, "paper": "2609.20788v2", "kind": "search_first", "section": "u2", "start": 0, "end": 1097, "chars": 1097}
+{"record": "place", "number": 34, "archive": "hep-ex", "rank": 49, "paper": "2609.03879v2", "kind": "search_first", "section": "u2.u3", "start": 0, "end": 7877, "chars": 7877}
+{"record": "place", "number": 35, "archive": "astro-ph", "rank": 49, "paper": "2610.24057v1", "kind": "later_piece", "section": "3", "start": 19843, "end": 22120, "chars": 2277}
+{"record": "place", "number": 36, "archive": "hep-ph", "rank": 50, "paper": "2609.28616v1", "kind": "appendix", "section": "A", "start": 0, "end": 5706, "chars": 5706}
+{"record": "place", "number": 37, "archive": "hep-th", "rank": 50, "paper": "2609.09303v1", "kind": "later_piece", "section": "5.2", "start": 19833, "end": 32197, "chars": 12364}
+{"record": "place", "number": 38, "archive": "hep-ex", "rank": 50, "paper": "2609.25943v2", "kind": "own_text", "section": "3", "start": 0, "end": 1457, "chars": 1457}
+{"record": "place", "number": 39, "archive": "astro-ph", "rank": 50, "paper": "2609.20642v1", "kind": "search_first", "section": "2", "start": 0, "end": 3326, "chars": 3326}
+{"record": "place", "number": 40, "archive": "hep-ph", "rank": 51, "paper": "2609.04296v1", "kind": "later_piece", "section": "2.10", "start": 20000, "end": 32960, "chars": 12960}
+{"record": "place", "number": 41, "archive": "hep-th", "rank": 51, "paper": "2609.11089v1", "kind": "later_piece", "section": "3.3", "start": 19740, "end": 21072, "chars": 1332}
+{"record": "place", "number": 42, "archive": "hep-ex", "rank": 51, "paper": "2609.01546v2", "kind": "later_piece", "section": "2.2", "start": 19627, "end": 23347, "chars": 3720}
+{"record": "place", "number": 43, "archive": "astro-ph", "rank": 51, "paper": "2610.14987v1", "kind": "appendix", "section": "u2", "start": 0, "end": 3316, "chars": 3316}
+{"record": "place", "number": 44, "archive": "hep-ph", "rank": 52, "paper": "2608.04069v1", "kind": "search_first", "section": "4", "start": 0, "end": 2500, "chars": 2500}
+{"record": "place", "number": 45, "archive": "hep-th", "rank": 52, "paper": "2610.27824v1", "kind": "appendix", "section": "A", "start": 0, "end": 5880, "chars": 5880}
+{"record": "place", "number": 46, "archive": "hep-ex", "rank": 52, "paper": "2609.02923v1", "kind": "appendix", "section": "C.1", "start": 0, "end": 1199, "chars": 1199}
+{"record": "place", "number": 47, "archive": "astro-ph", "rank": 52, "paper": "2610.30310v1", "kind": "search_first", "section": "4.4", "start": 0, "end": 7004, "chars": 7004}
+{"record": "place", "number": 48, "archive": "hep-ph", "rank": 53, "paper": "2609.12182v1", "kind": "own_text", "section": "4", "start": 0, "end": 2794, "chars": 2794}
+{"record": "place", "number": 49, "archive": "hep-th", "rank": 53, "paper": "2610.36057v1", "kind": "appendix", "section": "A.u2", "start": 0, "end": 4055, "chars": 4055}
+{"record": "place", "number": 50, "archive": "astro-ph", "rank": 53, "paper": "2608.30312v1", "kind": "appendix", "section": "u2", "start": 0, "end": 1213, "chars": 1213}
+{"record": "place", "number": 51, "archive": "hep-ph", "rank": 54, "paper": "2608.11040v2", "kind": "search_first", "section": "6.3", "start": 0, "end": 1000, "chars": 1000}
+{"record": "place", "number": 52, "archive": "hep-th", "rank": 54, "paper": "2610.18086v1", "kind": "later_piece", "section": "3.2", "start": 19947, "end": 26250, "chars": 6303}
+{"record": "place", "number": 53, "archive": "hep-ex", "rank": 54, "paper": "2610.12042v1", "kind": "search_first", "section": "3", "start": 0, "end": 7965, "chars": 7965}
+{"record": "place", "number": 54, "archive": "astro-ph", "rank": 54, "paper": "2609.03371v2", "kind": "own_text", "section": "6", "start": 0, "end": 1718, "chars": 1718}
+{"record": "place", "number": 55, "archive": "hep-ph", "rank": 55, "paper": "2610.06628v1", "kind": "appendix", "section": "A", "start": 0, "end": 3073, "chars": 3073}
+{"record": "place", "number": 56, "archive": "hep-th", "rank": 55, "paper": "2610.00453v2", "kind": "appendix", "section": "C", "start": 0, "end": 3207, "chars": 3207}
+{"record": "place", "number": 57, "archive": "hep-ex", "rank": 55, "paper": "2608.10900v1", "kind": "own_text", "section": "5", "start": 0, "end": 2819, "chars": 2819}
+{"record": "place", "number": 58, "archive": "astro-ph", "rank": 55, "paper": "2610.33324v1", "kind": "own_text", "section": "2", "start": 0, "end": 3220, "chars": 3220}
+{"record": "place", "number": 59, "archive": "hep-ph", "rank": 56, "paper": "2610.30338v1", "kind": "appendix", "section": "B", "start": 0, "end": 2333, "chars": 2333}
+{"record": "place", "number": 60, "archive": "hep-th", "rank": 56, "paper": "2609.05606v1", "kind": "later_piece", "section": "3.2", "start": 19984, "end": 23651, "chars": 3667}
+{"record": "place", "number": 61, "archive": "hep-ex", "rank": 56, "paper": "2610.23112v1", "kind": "appendix", "section": "B", "start": 0, "end": 2510, "chars": 2510}
+{"record": "place", "number": 62, "archive": "astro-ph", "rank": 56, "paper": "2609.35343v1", "kind": "appendix", "section": "A", "start": 0, "end": 4706, "chars": 4706}
+{"record": "place", "number": 63, "archive": "hep-ph", "rank": 57, "paper": "2610.41078v2", "kind": "appendix", "section": "A", "start": 0, "end": 5748, "chars": 5748}
+{"record": "place", "number": 64, "archive": "hep-th", "rank": 57, "paper": "2609.10692v1", "kind": "own_text", "section": "4", "start": 0, "end": 4979, "chars": 4979}
+{"record": "place", "number": 65, "archive": "hep-ex", "rank": 57, "paper": "2608.19764v1", "kind": "appendix", "section": "B", "start": 0, "end": 4064, "chars": 4064}
+{"record": "place", "number": 66, "archive": "astro-ph", "rank": 57, "paper": "2609.04036v1", "kind": "search_first", "section": "7.2", "start": 0, "end": 1318, "chars": 1318}
+{"record": "place", "number": 67, "archive": "hep-ph", "rank": 58, "paper": "2610.27006v1", "kind": "appendix", "section": "B.2", "start": 0, "end": 2786, "chars": 2786}
+{"record": "place", "number": 68, "archive": "hep-th", "rank": 58, "paper": "2610.39804v1", "kind": "appendix", "section": "A", "start": 0, "end": 9480, "chars": 9480}
+{"record": "place", "number": 69, "archive": "hep-ex", "rank": 58, "paper": "2610.13165v2", "kind": "search_first", "section": "7", "start": 0, "end": 1083, "chars": 1083}
+{"record": "place", "number": 70, "archive": "astro-ph", "rank": 58, "paper": "2608.28507v2", "kind": "appendix", "section": "A", "start": 0, "end": 2579, "chars": 2579}
+{"record": "place", "number": 71, "archive": "hep-ph", "rank": 59, "paper": "2608.19406v1", "kind": "own_text", "section": "2", "start": 0, "end": 5816, "chars": 5816}
+{"record": "place", "number": 72, "archive": "hep-th", "rank": 59, "paper": "2608.02447v3", "kind": "appendix", "section": "B.2", "start": 0, "end": 1904, "chars": 1904}
+{"record": "place", "number": 73, "archive": "hep-ex", "rank": 59, "paper": "2610.21982v2", "kind": "later_piece", "section": "1", "start": 19960, "end": 27104, "chars": 7144}
+{"record": "place", "number": 74, "archive": "astro-ph", "rank": 59, "paper": "2608.17004v2", "kind": "appendix", "section": "A", "start": 0, "end": 4525, "chars": 4525}
+{"record": "place", "number": 75, "archive": "hep-ph", "rank": 60, "paper": "2610.20940v2", "kind": "own_text", "section": "4", "start": 0, "end": 4982, "chars": 4982}
+{"record": "place", "number": 76, "archive": "hep-th", "rank": 60, "paper": "2610.02415v2", "kind": "search_first", "section": "u1", "start": 0, "end": 5459, "chars": 5459}
+{"record": "place", "number": 77, "archive": "hep-ex", "rank": 60, "paper": "2609.02950v1", "kind": "search_first", "section": "1", "start": 0, "end": 1946, "chars": 1946}
+{"record": "place", "number": 78, "archive": "astro-ph", "rank": 60, "paper": "2610.03876v1", "kind": "own_text", "section": "5", "start": 0, "end": 2751, "chars": 2751}
+{"record": "place", "number": 79, "archive": "hep-ph", "rank": 61, "paper": "2608.00564v1", "kind": "search_first", "section": "1", "start": 0, "end": 2606, "chars": 2606}
+{"record": "place", "number": 80, "archive": "hep-th", "rank": 61, "paper": "2610.35283v1", "kind": "appendix", "section": "F.2", "start": 0, "end": 5111, "chars": 5111}
+{"record": "place", "number": 81, "archive": "hep-ex", "rank": 61, "paper": "2609.00152v2", "kind": "own_text", "section": "4", "start": 0, "end": 3293, "chars": 3293}
+{"record": "place", "number": 82, "archive": "astro-ph", "rank": 61, "paper": "2609.03408v1", "kind": "appendix", "section": "A", "start": 0, "end": 2562, "chars": 2562}
+{"record": "place", "number": 83, "archive": "hep-ph", "rank": 62, "paper": "2609.02970v1", "kind": "appendix", "section": "E", "start": 0, "end": 1195, "chars": 1195}
+{"record": "place", "number": 84, "archive": "hep-th", "rank": 62, "paper": "2610.08252v2", "kind": "own_text", "section": "2", "start": 0, "end": 5660, "chars": 5660}
+{"record": "place", "number": 85, "archive": "hep-ex", "rank": 62, "paper": "2610.12058v1", "kind": "own_text", "section": "6", "start": 0, "end": 1274, "chars": 1274}
+{"record": "place", "number": 86, "archive": "astro-ph", "rank": 62, "paper": "2609.26659v1", "kind": "appendix", "section": "A", "start": 0, "end": 1305, "chars": 1305}
+{"record": "place", "number": 87, "archive": "hep-ph", "rank": 63, "paper": "2608.08515v2", "kind": "named_first", "section": "1", "start": 0, "end": 5476, "chars": 5476}
+{"record": "place", "number": 88, "archive": "hep-th", "rank": 63, "paper": "2608.05146v2", "kind": "appendix", "section": "B.2", "start": 0, "end": 9397, "chars": 9397}
+{"record": "place", "number": 89, "archive": "hep-ex", "rank": 63, "paper": "2610.17932v1", "kind": "search_first", "section": "2", "start": 0, "end": 2811, "chars": 2811}
+{"record": "place", "number": 90, "archive": "astro-ph", "rank": 63, "paper": "2610.38836v1", "kind": "appendix", "section": "B", "start": 0, "end": 1582, "chars": 1582}
+{"record": "place", "number": 91, "archive": "hep-ph", "rank": 64, "paper": "2610.07331v1", "kind": "later_piece", "section": "5.2", "start": 19902, "end": 23795, "chars": 3893}
+{"record": "place", "number": 92, "archive": "hep-th", "rank": 64, "paper": "2608.01349v2", "kind": "own_text", "section": "3", "start": 0, "end": 3113, "chars": 3113}
+{"record": "place", "number": 93, "archive": "hep-ex", "rank": 64, "paper": "2609.36028v2", "kind": "named_first", "section": "5", "start": 0, "end": 3258, "chars": 3258}
+{"record": "place", "number": 94, "archive": "astro-ph", "rank": 64, "paper": "2608.19687v1", "kind": "appendix", "section": "A", "start": 0, "end": 5367, "chars": 5367}
+{"record": "place", "number": 95, "archive": "hep-ph", "rank": 65, "paper": "2610.30649v1", "kind": "search_first", "section": "4", "start": 0, "end": 4639, "chars": 4639}
+{"record": "place", "number": 96, "archive": "hep-th", "rank": 65, "paper": "2610.27511v1", "kind": "own_text", "section": "3", "start": 0, "end": 2628, "chars": 2628}
+{"record": "place", "number": 97, "archive": "hep-ex", "rank": 65, "paper": "2608.26935v1", "kind": "own_text", "section": "5", "start": 0, "end": 3136, "chars": 3136}
+{"record": "place", "number": 98, "archive": "astro-ph", "rank": 65, "paper": "2610.21028v1", "kind": "own_text", "section": "2", "start": 0, "end": 1036, "chars": 1036}
+{"record": "place", "number": 99, "archive": "hep-ph", "rank": 66, "paper": "2611.00200v1", "kind": "appendix", "section": "C.4", "start": 0, "end": 1887, "chars": 1887}
+{"record": "place", "number": 100, "archive": "hep-th", "rank": 66, "paper": "2609.20631v1", "kind": "search_first", "section": "5", "start": 0, "end": 4053, "chars": 4053}
+{"record": "place", "number": 101, "archive": "hep-ex", "rank": 66, "paper": "2609.37146v1", "kind": "own_text", "section": "4", "start": 0, "end": 2063, "chars": 2063}
+{"record": "place", "number": 102, "archive": "astro-ph", "rank": 66, "paper": "2610.30936v1", "kind": "search_first", "section": "u3.u1", "start": 0, "end": 2272, "chars": 2272}
+{"record": "place", "number": 103, "archive": "hep-ph", "rank": 67, "paper": "2608.29666v2", "kind": "appendix", "section": "A.1", "start": 0, "end": 3340, "chars": 3340}
+{"record": "place", "number": 104, "archive": "hep-th", "rank": 67, "paper": "2610.10821v2", "kind": "own_text", "section": "4", "start": 0, "end": 7878, "chars": 7878}
+{"record": "place", "number": 105, "archive": "hep-ex", "rank": 67, "paper": "2608.01943v2", "kind": "search_first", "section": "5.1", "start": 0, "end": 1432, "chars": 1432}
+{"record": "place", "number": 106, "archive": "astro-ph", "rank": 67, "paper": "2610.28006v1", "kind": "own_text", "section": "6", "start": 0, "end": 1221, "chars": 1221}
+{"record": "place", "number": 107, "archive": "hep-ph", "rank": 68, "paper": "2608.30434v1", "kind": "search_first", "section": "4.2", "start": 0, "end": 2442, "chars": 2442}
+{"record": "place", "number": 108, "archive": "hep-th", "rank": 68, "paper": "2608.31151v3", "kind": "own_text", "section": "3", "start": 0, "end": 7981, "chars": 7981}
+{"record": "place", "number": 109, "archive": "hep-ex", "rank": 68, "paper": "2610.01761v1", "kind": "own_text", "section": "4", "start": 0, "end": 3575, "chars": 3575}
+{"record": "place", "number": 110, "archive": "astro-ph", "rank": 68, "paper": "2610.04449v1", "kind": "search_first", "section": "8", "start": 0, "end": 1469, "chars": 1469}
+{"record": "place", "number": 111, "archive": "hep-ph", "rank": 69, "paper": "2608.27558v1", "kind": "own_text", "section": "6", "start": 0, "end": 5948, "chars": 5948}
+{"record": "place", "number": 112, "archive": "hep-th", "rank": 69, "paper": "2610.15737v1", "kind": "search_first", "section": "4.2", "start": 0, "end": 2865, "chars": 2865}
+{"record": "place", "number": 113, "archive": "hep-ex", "rank": 69, "paper": "2609.01336v1", "kind": "search_first", "section": "2", "start": 0, "end": 2494, "chars": 2494}
+{"record": "place", "number": 114, "archive": "astro-ph", "rank": 69, "paper": "2610.34069v1", "kind": "own_text", "section": "2", "start": 0, "end": 3428, "chars": 3428}
+{"record": "place", "number": 115, "archive": "hep-ph", "rank": 70, "paper": "2610.28014v1", "kind": "search_first", "section": "5.5", "start": 0, "end": 1363, "chars": 1363}
+{"record": "place", "number": 116, "archive": "hep-th", "rank": 70, "paper": "2610.36271v1", "kind": "own_text", "section": "4", "start": 0, "end": 1288, "chars": 1288}
+{"record": "place", "number": 117, "archive": "hep-ex", "rank": 70, "paper": "2609.04402v1", "kind": "later_piece", "section": "5", "start": 19998, "end": 21553, "chars": 1555}
+{"record": "place", "number": 118, "archive": "astro-ph", "rank": 70, "paper": "2609.16126v1", "kind": "search_first", "section": "4", "start": 0, "end": 5294, "chars": 5294}
+{"record": "place", "number": 119, "archive": "hep-ph", "rank": 71, "paper": "2610.38178v1", "kind": "later_piece", "section": "3", "start": 19966, "end": 29427, "chars": 9461}
+{"record": "place", "number": 120, "archive": "hep-th", "rank": 71, "paper": "2610.39101v1", "kind": "later_piece", "section": "4", "start": 19727, "end": 24089, "chars": 4362}
+{"record": "place", "number": 121, "archive": "hep-ex", "rank": 71, "paper": "2608.12173v3", "kind": "later_piece", "section": "1", "start": 19828, "end": 22606, "chars": 2778}
+{"record": "place", "number": 122, "archive": "astro-ph", "rank": 71, "paper": "2610.27101v1", "kind": "search_first", "section": "3", "start": 0, "end": 5273, "chars": 5273}
+{"record": "place", "number": 123, "archive": "hep-ph", "rank": 72, "paper": "2608.29844v1", "kind": "own_text", "section": "4", "start": 0, "end": 1397, "chars": 1397}
+{"record": "place", "number": 124, "archive": "hep-th", "rank": 72, "paper": "2609.16263v1", "kind": "own_text", "section": "3", "start": 0, "end": 1174, "chars": 1174}
+{"record": "place", "number": 125, "archive": "hep-ex", "rank": 72, "paper": "2610.14156v1", "kind": "later_piece", "section": "0", "start": 20000, "end": 24315, "chars": 4315}
+{"record": "place", "number": 126, "archive": "astro-ph", "rank": 72, "paper": "2610.32931v1", "kind": "search_first", "section": "4.2", "start": 0, "end": 8120, "chars": 8120}
+{"record": "place", "number": 127, "archive": "hep-ph", "rank": 73, "paper": "2609.28129v1", "kind": "search_first", "section": "4", "start": 0, "end": 2560, "chars": 2560}
+{"record": "place", "number": 128, "archive": "hep-th", "rank": 73, "paper": "2610.13667v1", "kind": "own_text", "section": "8", "start": 0, "end": 1431, "chars": 1431}
+{"record": "place", "number": 129, "archive": "hep-ex", "rank": 73, "paper": "2608.15149v1", "kind": "appendix", "section": "A.2", "start": 0, "end": 6796, "chars": 6796}
+{"record": "place", "number": 130, "archive": "astro-ph", "rank": 73, "paper": "2610.20741v1", "kind": "search_first", "section": "4", "start": 0, "end": 5087, "chars": 5087}
+{"record": "place", "number": 131, "archive": "hep-ph", "rank": 74, "paper": "2609.17163v1", "kind": "search_first", "section": "1", "start": 0, "end": 1782, "chars": 1782}
+{"record": "place", "number": 132, "archive": "hep-th", "rank": 74, "paper": "2609.17858v3", "kind": "own_text", "section": "3", "start": 0, "end": 2622, "chars": 2622}
+{"record": "place", "number": 133, "archive": "hep-ex", "rank": 74, "paper": "2609.19992v1", "kind": "search_first", "section": "2", "start": 0, "end": 6463, "chars": 6463}
+{"record": "place", "number": 134, "archive": "astro-ph", "rank": 74, "paper": "2610.03913v1", "kind": "own_text", "section": "3", "start": 0, "end": 1563, "chars": 1563}
+{"record": "place", "number": 135, "archive": "hep-ph", "rank": 75, "paper": "2610.36861v1", "kind": "later_piece", "section": "u1", "start": 19888, "end": 27662, "chars": 7774}
+{"record": "place", "number": 136, "archive": "hep-th", "rank": 75, "paper": "2608.24083v1", "kind": "later_piece", "section": "4.1", "start": 19846, "end": 23471, "chars": 3625}
+{"record": "place", "number": 137, "archive": "hep-ex", "rank": 75, "paper": "2610.37345v1", "kind": "appendix", "section": "A", "start": 0, "end": 1085, "chars": 1085}
+{"record": "place", "number": 138, "archive": "astro-ph", "rank": 75, "paper": "2608.02573v1", "kind": "own_text", "section": "2", "start": 0, "end": 8951, "chars": 8951}
+{"record": "place", "number": 139, "archive": "hep-ph", "rank": 76, "paper": "2608.11814v3", "kind": "search_first", "section": "3", "start": 0, "end": 13894, "chars": 13894}
+{"record": "place", "number": 140, "archive": "hep-th", "rank": 76, "paper": "2609.02437v3", "kind": "search_first", "section": "2", "start": 0, "end": 4578, "chars": 4578}
+{"record": "place", "number": 141, "archive": "hep-ex", "rank": 76, "paper": "2608.21082v1", "kind": "appendix", "section": "A", "start": 0, "end": 2037, "chars": 2037}
+{"record": "place", "number": 142, "archive": "astro-ph", "rank": 76, "paper": "2609.10809v1", "kind": "own_text", "section": "3", "start": 0, "end": 2534, "chars": 2534}
+{"record": "place", "number": 143, "archive": "hep-ph", "rank": 77, "paper": "2608.23171v1", "kind": "own_text", "section": "3", "start": 0, "end": 3012, "chars": 3012}
+{"record": "place", "number": 144, "archive": "hep-th", "rank": 77, "paper": "2608.25007v1", "kind": "own_text", "section": "5", "start": 0, "end": 16069, "chars": 16069}
+{"record": "place", "number": 145, "archive": "hep-ex", "rank": 77, "paper": "2610.17967v1", "kind": "appendix", "section": "A", "start": 0, "end": 1229, "chars": 1229}
+{"record": "place", "number": 146, "archive": "astro-ph", "rank": 77, "paper": "2609.10661v1", "kind": "later_piece", "section": "1", "start": 19991, "end": 39329, "chars": 19338}
+{"record": "place", "number": 147, "archive": "hep-ph", "rank": 78, "paper": "2611.01305v1", "kind": "named_first", "section": "6", "start": 0, "end": 2148, "chars": 2148}
+{"record": "place", "number": 148, "archive": "hep-th", "rank": 78, "paper": "2609.24649v1", "kind": "later_piece", "section": "4.3", "start": 19960, "end": 24002, "chars": 4042}
+{"record": "place", "number": 149, "archive": "hep-ex", "rank": 78, "paper": "2609.08144v1", "kind": "later_piece", "section": "1", "start": 19515, "end": 24159, "chars": 4644}
+{"record": "place", "number": 150, "archive": "astro-ph", "rank": 78, "paper": "2609.03060v1", "kind": "search_first", "section": "2.3", "start": 0, "end": 7990, "chars": 7990}
+{"record": "place", "number": 151, "archive": "hep-ph", "rank": 79, "paper": "2609.28348v1", "kind": "named_first", "section": "4", "start": 0, "end": 4069, "chars": 4069}
+{"record": "place", "number": 152, "archive": "hep-th", "rank": 79, "paper": "2610.30232v1", "kind": "later_piece", "section": "2.5", "start": 19940, "end": 30719, "chars": 10779}
+{"record": "place", "number": 153, "archive": "hep-ex", "rank": 79, "paper": "2609.26695v1", "kind": "search_first", "section": "2", "start": 0, "end": 1908, "chars": 1908}
+{"record": "place", "number": 154, "archive": "astro-ph", "rank": 79, "paper": "2609.38430v1", "kind": "search_first", "section": "4.3", "start": 0, "end": 2475, "chars": 2475}
+{"record": "place", "number": 155, "archive": "hep-ph", "rank": 80, "paper": "2608.04990v2", "kind": "own_text", "section": "4", "start": 0, "end": 4881, "chars": 4881}
+{"record": "place", "number": 156, "archive": "hep-th", "rank": 80, "paper": "2608.12472v1", "kind": "search_first", "section": "3.1", "start": 0, "end": 15271, "chars": 15271}
+{"record": "place", "number": 157, "archive": "hep-ex", "rank": 80, "paper": "2610.27346v1", "kind": "later_piece", "section": "6.2", "start": 19996, "end": 26046, "chars": 6050}
+{"record": "place", "number": 158, "archive": "astro-ph", "rank": 80, "paper": "2608.25473v1", "kind": "later_piece", "section": "3.3", "start": 19964, "end": 21260, "chars": 1296}
+{"record": "place", "number": 159, "archive": "hep-ph", "rank": 81, "paper": "2609.06890v1", "kind": "later_piece", "section": "0", "start": 19814, "end": 26100, "chars": 6286}
+{"record": "place", "number": 160, "archive": "hep-th", "rank": 81, "paper": "2608.01762v2", "kind": "search_first", "section": "0", "start": 0, "end": 2397, "chars": 2397}
+{"record": "place", "number": 161, "archive": "hep-ex", "rank": 81, "paper": "2609.17738v4", "kind": "search_first", "section": "1", "start": 0, "end": 2258, "chars": 2258}
+{"record": "place", "number": 162, "archive": "astro-ph", "rank": 81, "paper": "2609.32159v1", "kind": "search_first", "section": "3.2", "start": 0, "end": 3340, "chars": 3340}
+{"record": "place", "number": 163, "archive": "hep-ph", "rank": 82, "paper": "2608.05322v1", "kind": "own_text", "section": "3", "start": 0, "end": 2993, "chars": 2993}
+{"record": "place", "number": 164, "archive": "hep-th", "rank": 82, "paper": "2608.04356v2", "kind": "search_first", "section": "2.2", "start": 0, "end": 6866, "chars": 6866}
+{"record": "place", "number": 165, "archive": "hep-ex", "rank": 82, "paper": "2610.31430v1", "kind": "own_text", "section": "5", "start": 0, "end": 2842, "chars": 2842}
+{"record": "place", "number": 166, "archive": "astro-ph", "rank": 82, "paper": "2609.00477v1", "kind": "named_first", "section": "4", "start": 0, "end": 4833, "chars": 4833}
+{"record": "place", "number": 167, "archive": "hep-ph", "rank": 83, "paper": "2609.17015v1", "kind": "named_first", "section": "1", "start": 0, "end": 2335, "chars": 2335}
+{"record": "place", "number": 168, "archive": "hep-th", "rank": 83, "paper": "2610.28730v2", "kind": "search_first", "section": "4.1", "start": 0, "end": 2042, "chars": 2042}
+{"record": "place", "number": 169, "archive": "hep-ex", "rank": 83, "paper": "2610.36224v1", "kind": "search_first", "section": "2.1", "start": 0, "end": 2496, "chars": 2496}
+{"record": "place", "number": 170, "archive": "astro-ph", "rank": 83, "paper": "2608.24276v1", "kind": "named_first", "section": "3.1", "start": 0, "end": 1764, "chars": 1764}
+{"record": "place", "number": 171, "archive": "hep-ph", "rank": 84, "paper": "2608.14549v1", "kind": "own_text", "section": "2", "start": 0, "end": 2069, "chars": 2069}
+{"record": "place", "number": 172, "archive": "hep-th", "rank": 84, "paper": "2608.29931v1", "kind": "search_first", "section": "6.3", "start": 0, "end": 6253, "chars": 6253}
+{"record": "place", "number": 173, "archive": "hep-ex", "rank": 84, "paper": "2610.32084v1", "kind": "named_first", "section": "4", "start": 0, "end": 2752, "chars": 2752}
+{"record": "place", "number": 174, "archive": "astro-ph", "rank": 84, "paper": "2610.40184v2", "kind": "named_first", "section": "5", "start": 0, "end": 3730, "chars": 3730}
+{"record": "place", "number": 175, "archive": "hep-ph", "rank": 85, "paper": "2610.22088v1", "kind": "named_first", "section": "u1", "start": 0, "end": 5583, "chars": 5583}
+{"record": "place", "number": 176, "archive": "hep-th", "rank": 85, "paper": "2609.18668v1", "kind": "later_piece", "section": "3.2", "start": 19981, "end": 22792, "chars": 2811}
+{"record": "place", "number": 177, "archive": "hep-ex", "rank": 85, "paper": "2609.05829v1", "kind": "later_piece", "section": "1", "start": 19252, "end": 29271, "chars": 10019}
+{"record": "place", "number": 178, "archive": "astro-ph", "rank": 85, "paper": "2608.29050v1", "kind": "named_first", "section": "4", "start": 0, "end": 4256, "chars": 4256}
+{"record": "place", "number": 179, "archive": "hep-ph", "rank": 86, "paper": "2609.04673v1", "kind": "named_first", "section": "1.2", "start": 0, "end": 1256, "chars": 1256}
+{"record": "place", "number": 180, "archive": "hep-th", "rank": 86, "paper": "2610.23384v1", "kind": "search_first", "section": "3.3", "start": 0, "end": 14704, "chars": 14704}
+{"record": "place", "number": 181, "archive": "hep-ex", "rank": 86, "paper": "2610.11981v1", "kind": "named_first", "section": "3", "start": 0, "end": 8054, "chars": 8054}
+{"record": "place", "number": 182, "archive": "astro-ph", "rank": 86, "paper": "2609.07417v1", "kind": "named_first", "section": "5.4", "start": 0, "end": 4489, "chars": 4489}
+{"record": "place", "number": 183, "archive": "hep-ph", "rank": 87, "paper": "2610.15436v1", "kind": "own_text", "section": "2", "start": 0, "end": 2406, "chars": 2406}
+{"record": "place", "number": 184, "archive": "hep-th", "rank": 87, "paper": "2610.10686v1", "kind": "search_first", "section": "2.2", "start": 0, "end": 3709, "chars": 3709}
+{"record": "place", "number": 185, "archive": "hep-ex", "rank": 87, "paper": "2610.07773v1", "kind": "named_first", "section": "2", "start": 0, "end": 3977, "chars": 3977}
+{"record": "place", "number": 186, "archive": "astro-ph", "rank": 87, "paper": "2609.08979v3", "kind": "named_first", "section": "5.1", "start": 0, "end": 1978, "chars": 1978}
+{"record": "place", "number": 187, "archive": "hep-ph", "rank": 88, "paper": "2609.04616v1", "kind": "later_piece", "section": "3.2", "start": 19992, "end": 25700, "chars": 5708}
+{"record": "place", "number": 188, "archive": "hep-th", "rank": 88, "paper": "2609.12046v1", "kind": "named_first", "section": "4.1", "start": 0, "end": 8897, "chars": 8897}
+{"record": "place", "number": 189, "archive": "hep-ex", "rank": 88, "paper": "2610.11782v1", "kind": "appendix", "section": "A.2", "start": 0, "end": 2756, "chars": 2756}
+{"record": "place", "number": 190, "archive": "astro-ph", "rank": 88, "paper": "2609.12494v1", "kind": "named_first", "section": "3", "start": 0, "end": 7859, "chars": 7859}
+{"record": "place", "number": 191, "archive": "hep-ph", "rank": 89, "paper": "2608.14382v1", "kind": "own_text", "section": "3", "start": 0, "end": 1623, "chars": 1623}
+{"record": "place", "number": 192, "archive": "hep-th", "rank": 89, "paper": "2610.30235v1", "kind": "later_piece", "section": "0", "start": 19835, "end": 39823, "chars": 19988}
+{"record": "place", "number": 193, "archive": "hep-ex", "rank": 89, "paper": "2610.37555v1", "kind": "own_text", "section": "3", "start": 0, "end": 3790, "chars": 3790}
+{"record": "place", "number": 194, "archive": "astro-ph", "rank": 89, "paper": "2610.30509v1", "kind": "named_first", "section": "1", "start": 0, "end": 5119, "chars": 5119}
+{"record": "place", "number": 195, "archive": "hep-ph", "rank": 90, "paper": "2610.17351v1", "kind": "own_text", "section": "8", "start": 0, "end": 9897, "chars": 9897}
+{"record": "place", "number": 196, "archive": "hep-th", "rank": 90, "paper": "2610.09855v1", "kind": "named_first", "section": "31.3", "start": 0, "end": 7303, "chars": 7303}
+{"record": "place", "number": 197, "archive": "hep-ex", "rank": 90, "paper": "2608.16063v1", "kind": "own_text", "section": "2", "start": 0, "end": 1040, "chars": 1040}
+{"record": "place", "number": 198, "archive": "hep-ph", "rank": 91, "paper": "2611.00239v1", "kind": "named_first", "section": "u6", "start": 0, "end": 1727, "chars": 1727}
+{"record": "place", "number": 199, "archive": "hep-th", "rank": 91, "paper": "2608.06755v1", "kind": "named_first", "section": "3.3", "start": 0, "end": 4033, "chars": 4033}
+{"record": "place", "number": 200, "archive": "hep-ex", "rank": 91, "paper": "2610.26148v1", "kind": "own_text", "section": "4", "start": 0, "end": 1210, "chars": 1210}
+{"record": "place", "number": 201, "archive": "astro-ph", "rank": 91, "paper": "2610.19881v1", "kind": "named_first", "section": "4.1", "start": 0, "end": 2410, "chars": 2410}
+{"record": "place", "number": 202, "archive": "hep-ph", "rank": 92, "paper": "2609.29314v1", "kind": "named_first", "section": "4", "start": 0, "end": 5676, "chars": 5676}
+{"record": "place", "number": 203, "archive": "hep-th", "rank": 92, "paper": "2610.08913v1", "kind": "named_first", "section": "7.1", "start": 0, "end": 4799, "chars": 4799}
+{"record": "place", "number": 204, "archive": "hep-ex", "rank": 92, "paper": "2608.18743v1", "kind": "later_piece", "section": "3.3", "start": 19989, "end": 30429, "chars": 10440}
+{"record": "place", "number": 205, "archive": "astro-ph", "rank": 92, "paper": "2609.30267v1", "kind": "named_first", "section": "3.1", "start": 0, "end": 2983, "chars": 2983}
+{"record": "place", "number": 206, "archive": "hep-ph", "rank": 93, "paper": "2609.03648v1", "kind": "named_first", "section": "2.2", "start": 0, "end": 7591, "chars": 7591}
+{"record": "place", "number": 207, "archive": "hep-th", "rank": 93, "paper": "2609.04302v1", "kind": "named_first", "section": "u10", "start": 0, "end": 3907, "chars": 3907}
+{"record": "place", "number": 208, "archive": "hep-ex", "rank": 93, "paper": "2608.23773v3", "kind": "appendix", "section": "A", "start": 0, "end": 2702, "chars": 2702}
+{"record": "place", "number": 209, "archive": "astro-ph", "rank": 93, "paper": "2610.27209v1", "kind": "named_first", "section": "1", "start": 0, "end": 17690, "chars": 17690}
+{"record": "place", "number": 210, "archive": "hep-ph", "rank": 94, "paper": "2609.36696v1", "kind": "named_first", "section": "1", "start": 0, "end": 8902, "chars": 8902}
+{"record": "place", "number": 211, "archive": "hep-th", "rank": 94, "paper": "2609.04099v1", "kind": "named_first", "section": "3.1", "start": 0, "end": 4685, "chars": 4685}
+{"record": "place", "number": 212, "archive": "hep-ex", "rank": 94, "paper": "2609.25153v1", "kind": "named_first", "section": "4", "start": 0, "end": 8286, "chars": 8286}
+{"record": "place", "number": 213, "archive": "astro-ph", "rank": 94, "paper": "2608.20239v1", "kind": "named_first", "section": "2.1", "start": 0, "end": 2447, "chars": 2447}
+{"record": "place", "number": 214, "archive": "hep-ph", "rank": 95, "paper": "2608.06983v2", "kind": "named_first", "section": "2.3", "start": 0, "end": 6666, "chars": 6666}
+{"record": "place", "number": 215, "archive": "hep-th", "rank": 95, "paper": "2610.27084v1", "kind": "named_first", "section": "4.3", "start": 0, "end": 1631, "chars": 1631}
+{"record": "place", "number": 216, "archive": "hep-ex", "rank": 95, "paper": "2609.37087v1", "kind": "named_first", "section": "u1", "start": 0, "end": 6625, "chars": 6625}
+{"record": "place", "number": 217, "archive": "astro-ph", "rank": 95, "paper": "2608.00770v1", "kind": "named_first", "section": "8.7", "start": 0, "end": 3056, "chars": 3056}
+{"record": "place", "number": 218, "archive": "hep-ph", "rank": 96, "paper": "2609.04441v1", "kind": "named_first", "section": "5.3", "start": 0, "end": 2977, "chars": 2977}
+{"record": "place", "number": 219, "archive": "hep-th", "rank": 96, "paper": "2610.29019v2", "kind": "named_first", "section": "2.1", "start": 0, "end": 3970, "chars": 3970}
+{"record": "place", "number": 220, "archive": "hep-ex", "rank": 96, "paper": "2608.12793v1", "kind": "later_piece", "section": "0", "start": 19877, "end": 27158, "chars": 7281}
+{"record": "place", "number": 221, "archive": "astro-ph", "rank": 96, "paper": "2608.21076v1", "kind": "later_piece", "section": "5.2", "start": 19904, "end": 24385, "chars": 4481}
+{"record": "place", "number": 222, "archive": "hep-ph", "rank": 97, "paper": "2610.21697v1", "kind": "named_first", "section": "2", "start": 0, "end": 2858, "chars": 2858}
+{"record": "place", "number": 223, "archive": "hep-th", "rank": 97, "paper": "2608.05973v1", "kind": "named_first", "section": "2", "start": 0, "end": 6922, "chars": 6922}
+{"record": "place", "number": 224, "archive": "hep-ex", "rank": 97, "paper": "2610.19668v1", "kind": "named_first", "section": "6", "start": 0, "end": 2690, "chars": 2690}
+{"record": "place", "number": 225, "archive": "astro-ph", "rank": 97, "paper": "2610.04553v1", "kind": "named_first", "section": "4.3", "start": 0, "end": 3869, "chars": 3869}
+{"record": "place", "number": 226, "archive": "hep-ph", "rank": 98, "paper": "2609.28223v1", "kind": "named_first", "section": "4", "start": 0, "end": 2006, "chars": 2006}
+{"record": "place", "number": 227, "archive": "hep-th", "rank": 98, "paper": "2609.10272v1", "kind": "named_first", "section": "3.1", "start": 0, "end": 6652, "chars": 6652}
+{"record": "place", "number": 228, "archive": "hep-ex", "rank": 98, "paper": "2609.28144v1", "kind": "named_first", "section": "5.4", "start": 0, "end": 1957, "chars": 1957}
+{"record": "place", "number": 229, "archive": "astro-ph", "rank": 98, "paper": "2608.25993v1", "kind": "named_first", "section": "3.5", "start": 0, "end": 8418, "chars": 8418}
+{"record": "place", "number": 230, "archive": "hep-ph", "rank": 99, "paper": "2610.25216v1", "kind": "named_first", "section": "4.2", "start": 0, "end": 3451, "chars": 3451}
+{"record": "place", "number": 231, "archive": "hep-th", "rank": 99, "paper": "2610.37748v1", "kind": "named_first", "section": "5.6", "start": 0, "end": 3848, "chars": 3848}
+{"record": "place", "number": 232, "archive": "hep-ex", "rank": 99, "paper": "2608.10826v2", "kind": "named_first", "section": "6.8", "start": 0, "end": 3555, "chars": 3555}
+{"record": "place", "number": 233, "archive": "astro-ph", "rank": 99, "paper": "2609.32726v1", "kind": "named_first", "section": "4.5", "start": 0, "end": 5190, "chars": 5190}
+{"record": "place", "number": 234, "archive": "hep-ph", "rank": 100, "paper": "2610.36107v1", "kind": "named_first", "section": "1", "start": 0, "end": 4995, "chars": 4995}
+{"record": "place", "number": 235, "archive": "hep-th", "rank": 100, "paper": "2610.34380v1", "kind": "named_first", "section": "3", "start": 0, "end": 4601, "chars": 4601}
+{"record": "place", "number": 236, "archive": "hep-ex", "rank": 100, "paper": "2608.15074v2", "kind": "named_first", "section": "8", "start": 0, "end": 1612, "chars": 1612}
+{"record": "place", "number": 237, "archive": "astro-ph", "rank": 100, "paper": "2609.09144v1", "kind": "named_first", "section": "5", "start": 0, "end": 5268, "chars": 5268}

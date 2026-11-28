@@ -234,7 +234,7 @@ many questions of each kind and archive there are. An accepted draft that this r
 does not take is no question. The questions stand in the order of the walk and are
 named `archives-01`, `archives-02` and so on: 80 at most. The file is
 `eval_data/questions_archives.jsonl`. Its SHA-256 is put here by the commit that adds
-the file, before any run: `<SHA-256 of the question file>`.
+the file, before any run: `09ead4c927a6a0edd13ba8d9d05440ddd7e2b9ebdc3930da949efb3e1002110c`.
 `drafting.assemble` writes the file, and with it `results/archives/candidates.jsonl`:
 what became of every candidate, in counts and names and with no text of a paper, and
 the counts by kind, archive and reason.
@@ -249,7 +249,7 @@ responses, 700 s per tool call and 900 s per run. The code has had them since
 2026-11-25.
 
 ```
-uv run python -m hepph_paper_miner.eval.run --questions eval_data/questions_archives.jsonl --out results/runs/archives --repeats 1 --questions-sha256 <SHA-256 of the question file>
+uv run python -m hepph_paper_miner.eval.run --questions eval_data/questions_archives.jsonl --out results/runs/archives --repeats 1 --questions-sha256 09ead4c927a6a0edd13ba8d9d05440ddd7e2b9ebdc3930da949efb3e1002110c
 ```
 
 Two cells for every question, one for each layout, each run once: 160 cells at most, in
@@ -413,4 +413,26 @@ cell of it was given up (Section 13).
 
 ## 16. Deviations
 
-None so far.
+- **2026-11-28, Section 7: who read the drafts.** A first reader, a Claude session that
+  had helped the maintainer with reviews before, read the 82 rows of the sheet and wrote
+  a verdict and a note for each as a draft, and the maintainer then held every row
+  against its passage and settled its verdict. Section 7 has the maintainer alone read
+  the drafts. The reason: the rows are passages of four archives, the maintainer is no
+  specialist of all of them (Section 15), and 82 rows are many. The first reader was
+  given the sheet as Section 7 describes it, and neither the papers nor the kinds of the
+  places; it knew the text that tells the generator what to ask (Section 4), and its
+  notes name lines of it. What it changes: a rejection may rest on what is known outside
+  the passage, where Section 15 says that a reviewer who has the passage alone may
+  accept a draft that asks for a usual choice or for a value of another study; and the
+  drafts of a model were first read by a model. How many verdicts of that draft the
+  maintainer changed was not counted. No word of a draft was changed, and every
+  rejection names one of the five kinds.
+- **2026-11-28, Section 3: a rule that it does not state.** Nothing was done otherwise.
+  A place of `later_piece` is the second piece of a section or a subsection: what a
+  second call of `read_section` returns of it. What stands behind that second piece,
+  from at most 40,000 characters into a section or subsection on, is no place, and
+  nothing is asked about it. The code that gave out the places had this rule when the
+  plan was committed (`drafting/places.py`); Section 3 says where a `later_piece`
+  passage stands and leaves this out. Of the 237 papers that were split, 19 have a piece
+  of more than 40,000 characters, and so text of that sort
+  (`results/archives/outcomes.jsonl`).

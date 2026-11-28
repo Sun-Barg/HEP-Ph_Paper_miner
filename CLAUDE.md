@@ -121,10 +121,10 @@ works here follows the rules below.
   Deviations (Section 16), with its date and reason. Another stretch of the order, other
   archives or another count of places is another plan, in a file of its own under another
   name.
-- One thing is put into Sections 9 and 10 later: the SHA-256 of
-  `eval_data/questions_archives.jsonl`, in the place of the words
-  `<SHA-256 of the question file>`, by the commit that adds that file and before any run.
-  The test reads the digest as those words, so it passes with it and with nothing else.
+- One thing was put into Sections 9 and 10 afterwards, by the commit that added
+  `eval_data/questions_archives.jsonl` and before any run: the SHA-256 of that file, in
+  the place of the words `<SHA-256 of the question file>`. The test reads the digest as
+  those words, so it passes with it and with nothing else.
 - `DRAFTER_VERSION` in `src/hepph_paper_miner/drafting/draft.py` and `SIFT_VERSION` in
   `src/hepph_paper_miner/drafting/sift.py` name the texts that draft and sift the
   questions. They are `d3` and `s1` since the last round of their tuning (2026-11-26 UTC),
@@ -140,6 +140,26 @@ works here follows the rules below.
 - The drafts, the replies of the filters and the sheet of the review hold paper text. They
   are written into `runs_private/` and never committed. `results/archives/` holds
   identifiers, kinds, counts and verdicts, and no text of a paper.
+- The papers were fetched and the places given out on 2026-11-27 UTC, by the commit that
+  holds the plan. `results/archives/sample.jsonl`, `outcomes.jsonl` and `places.jsonl`
+  are fixed: `tests/test_archives_results.py` holds each by its SHA-256. A command would
+  write its file anew, so `drafting.papers`, `survey.run` and `drafting.assign` are not
+  run over them again unless the owner asks for exactly that, and the places are given
+  out once.
+- The 82 drafts that were left were reviewed on a sheet in `runs_private/`: a first
+  reader, a Claude session, drafted the verdicts and notes, and the owner checked each
+  against its passage.
+  `results/archives/review.jsonl` holds the verdicts as they were read off the sheet on
+  2026-11-28 UTC, and is fixed as well. An agent does not change a verdict in it. Where an
+  agent fills in such a sheet, it fills in a draft for the owner to check, and the README
+  of the folder says who did what.
+- `eval_data/questions_archives.jsonl` holds the 42 questions that `drafting.assemble`
+  made of the accepted drafts that day, and `results/archives/candidates.jsonl` what
+  became of every candidate. Both are fixed: the pre-registration names the question file
+  by its SHA-256, and the test holds both by theirs. Do not change a question, an answer,
+  a key, an anchor or a note, and do not run `drafting.assemble` over them again. No
+  question is left out after the file has its digest (Section 14); what is found about a
+  question later is written under Deviations, or in the report.
 
 ## Style
 
