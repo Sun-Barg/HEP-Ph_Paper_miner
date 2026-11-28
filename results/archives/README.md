@@ -14,10 +14,13 @@ of a paper. Nothing here is a result: no question has been put to the server yet
 | `places.jsonl` | the place that `drafting.assign` gave to each of the 237 papers that were split, with what each paper holds of every kind and whether a search for its title lists it |
 | `review.jsonl` | the verdicts on the 82 drafts that the checks and the filters left, one for a place, as `drafting.review` read them off the sheet on 2026-11-28: for each its place, the verdict and, for a rejection, the kind of its reason. The sheet and its notes are not here, because they hold passages |
 | `candidates.jsonl` | what became of every one of the 237 places, written by `drafting.assemble` on 2026-11-28 beside the question file: what the generator returned, the checks that each draft failed, what the two filters said of it, the verdict, and the question it became; then the counts by kind and archive, and the cost |
+| `rehearsal-candidates.jsonl` | the same for the 27 places of the last round in which the texts of the generator and of the filters were tried, on 11 papers of the first evaluation: `drafting.assemble --rehearsal` wrote it on 2026-11-28 beside the seven questions of the rehearsal |
+| `rehearsal-candidates-first-try.jsonl` | what the same command had written 80 minutes before, when arXiv answered none of its look-ups. It is kept to show what asking again changed, and the question file it names is not kept |
 
-The questions are in `eval_data/questions_archives.jsonl`, 42 of them. The drafts and the
-replies of the filters hold paper text as well and stay outside the repository;
-`review.jsonl` and `candidates.jsonl` name those records by their SHA-256.
+The questions are in `eval_data/questions_archives.jsonl`, 42 of them, and those of the
+rehearsal in `eval_data/questions_rehearsal.jsonl`. The drafts and the replies of the
+filters hold paper text as well and stay outside the repository; `review.jsonl` and the
+summaries name those records by their SHA-256.
 
 `tests/test_archives_results.py` holds every file by its SHA-256, the sample against the
 plan and the list of the survey, each file against the one it was made of, and what is
@@ -207,3 +210,50 @@ If the two layouts answer alike but for some questions, half of them right in `s
 only and half in `flat` only, the reading "not worse by more than 10 points" comes out
 for at most 4 such questions of 42. The table of that section has 2 for 40 questions and
 6 for 50.
+
+## The questions of the rehearsal
+
+Before the runs, the commands are tried from end to end on seven questions about papers
+of the first evaluation (Section 10 of the pre-registration). They are in
+`eval_data/questions_rehearsal.jsonl`, and `rehearsal-candidates.jsonl` says what they
+were made of: the last round in which the texts were tried, with the texts as they are
+now (`d3` and `s1`), on 11 papers of the first evaluation. The records of that round
+stay outside the repository as those of the evaluation do.
+
+That round had 27 places. In 14 the reply said that the part holds nothing to ask about,
+in 2 no draft passed everything, and 11 kept a draft. The maintainer accepted 8 of the
+11 and rejected 3, each for another reason (`other`). Section 8 of the pre-registration
+gives the counts of the places and of the accepted drafts, and no file of the repository
+held them before.
+
+With two of a kind where the evaluation has four, the 8 accepted drafts make 7
+questions:
+
+| Kind | Accepted drafts | Questions |
+|---|---|---|
+| `later_piece` | 0 | 0 |
+| `appendix` | 0 | 0 |
+| `own_text` | 3 | 2 |
+| `search_first` | none: no place of that round is of this kind | 2 |
+| `named_first` | 5 | 3 |
+
+A paper of that round has no `search_first` place. So the command looks up the papers of
+the accepted `named_first` drafts one after the other, until two are found by their
+title. The first two it asked about were: arXiv lists each in the version of the round
+as its latest, and a search for its title lists it first. Their drafts are asked as
+`search_first` and the next two as `named_first`. The fifth takes a place that a kind
+without an accepted draft left open, and the third accepted draft of `own_text` is no
+question. Two of the seven questions are about one paper, because a paper of that round
+was given a place of every kind it holds; the questions of the evaluation are each
+about a paper of its own.
+
+`drafting.assemble --rehearsal` made the file at 08:23 on 2026-11-28, by `97ba66e` with
+no file of the repository changed. It had been run once before, at 07:03, and then
+arXiv answered none of its look-ups: of the five papers it asked about, two came back
+as `timeout` and three as `upstream_busy`, so that no question would have named its
+paper by a title. `rehearsal-candidates-first-try.jsonl` is the summary of that run; its
+lines say of every place what those of the second say, but for the look-ups and the
+questions. Nobody chose a question either time: the same rule made them from what arXiv
+answered. Nothing is read from the rehearsal but whether the commands work.
+
+The requests of that round come to $3.76 at list prices.

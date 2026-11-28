@@ -5,7 +5,10 @@ results/archives/ holds what was made of the 240 papers of the plan
 the sample that drafting.papers drew from the list of the survey, what survey.run made of
 it, the places that drafting.assign gave out, the verdicts that drafting.review read off
 the sheet of the review, and the summary of every candidate that drafting.assemble wrote
-beside the question file, eval_data/questions_archives.jsonl.
+beside the question file, eval_data/questions_archives.jsonl. The questions of the
+rehearsal (eval_data/questions_rehearsal.jsonl) came from the last round of the tuning,
+with a summary of their own, and with the summary of a first try that arXiv left without
+an answer.
 
 These tests hold the files by their SHA-256, against the plan and the list of the survey
 and against each other, and hold up what the README of the folder, the README of all
@@ -32,7 +35,7 @@ from pathlib import Path
 import pytest
 
 from hepph_paper_miner.agent.origin import file_digest
-from hepph_paper_miner.drafting.assemble import PER_CELL, choose
+from hepph_paper_miner.drafting.assemble import PER_CELL, REHEARSAL_PER_KIND, choose
 from hepph_paper_miner.drafting.assign import PER_KIND, Placed, assign, read_places
 from hepph_paper_miner.drafting.checks import ANCHOR_CHARS, ANSWER_CHARS, CHECKS, QUESTION_CHARS
 from hepph_paper_miner.drafting.draft import DRAFT, MAX_DRAFTS, NOTHING
@@ -68,6 +71,10 @@ QUESTIONS = EVAL_DATA / "questions_archives.jsonl"
 HERE = ROOT / "results" / "archives"
 SAMPLE, OUTCOMES, PLACES = HERE / "sample.jsonl", HERE / "outcomes.jsonl", HERE / "places.jsonl"
 REVIEW, CANDIDATES = HERE / "review.jsonl", HERE / "candidates.jsonl"
+REHEARSAL = EVAL_DATA / "questions_rehearsal.jsonl"
+REHEARSED = HERE / "rehearsal-candidates.jsonl"
+FIRST_TRY = HERE / "rehearsal-candidates-first-try.jsonl"
+TUNED_ON = EVAL_DATA / "target_papers.txt"
 
 # The files as the commands wrote them on the maintainer's computer.
 SHA256 = {
@@ -77,6 +84,9 @@ SHA256 = {
     REVIEW: "7993fc9bd070aef59e3135c1e819623f69547d4fd701afa1cdcdab375f2d9351",
     CANDIDATES: "753996728d8a6c656ba7abc62bbc6b9cb9697546ab5ffdfde2a3f1917af8d8c3",
     QUESTIONS: "09ead4c927a6a0edd13ba8d9d05440ddd7e2b9ebdc3930da949efb3e1002110c",
+    REHEARSAL: "8007581ee1aa0d47b47e7bfe1149fa8161a6d6ba16526d3f357b9b56f68141f8",
+    REHEARSED: "bab1a93818682851973a68803e17eff30dcf7268b2f4c39acd34574aa78a37c3",
+    FIRST_TRY: "2ab99afea91e863f05772d1170d81d789a33383cef839c5847331d5929902b63",
 }
 
 # The commit that brought the plan and the pre-registration. The sample, the outcomes and
@@ -127,7 +137,7 @@ CANDIDATE_KEYS = {
     "cost",
 }
 DRAFT_KEYS = {"draft", "failed_checks", "without_the_paper", "from_the_passage"}
-WORDS = {2: "two", 5: "five", 7: "seven"}
+WORDS = {2: "two", 3: "three", 5: "five", 7: "seven"}
 USAGE_KEYS = {
     "cache_creation_input_tokens",
     "cache_read_input_tokens",
@@ -191,6 +201,16 @@ def summary() -> list[dict]:
 
 def candidates() -> list[dict]:
     return [line for line in summary() if line["record"] == "candidate"]
+
+
+@cache
+def rehearsed(path: Path = REHEARSED) -> list[dict]:
+    """The summary of the round that the questions of the rehearsal are made of."""
+    return read_lines(path, "candidates")[0]
+
+
+def of_the_round(path: Path = REHEARSED) -> list[dict]:
+    return [line for line in rehearsed(path) if line["record"] == "candidate"]
 
 
 def passes(draft: dict) -> bool:
@@ -988,6 +1008,176 @@ def test_what_is_listed_under_deviations_is_what_the_files_say():
     assert all(place.end <= twice for place in places_file()[1].places)
 
 
+# --- the rehearsal ------------------------------------------------------------------------
+
+
+def test_the_rehearsal_is_made_of_the_last_round_in_which_the_texts_were_tried():
+    head, total = rehearsed()[0], rehearsed()[-1]
+    found, main = of_the_round(), summary()[0]
+    said = flat(PRE_REGISTRATION)
+
+    assert set(head) == set(main)
+    # The texts are those that drafted and sifted the questions of the evaluation.
+    for name in ("drafts", "sift"):
+        assert set(head[name]) == set(main[name])
+        assert head[name]["texts_sha256"] == main[name]["texts_sha256"]
+        # The records are others, and none of them is in the repository.
+        assert head[name]["file"] == main[name]["file"]
+        assert head[name]["sha256"] != main[name]["sha256"]
+    assert (head["drafts"]["drafter_version"], head["sift"]["sift_version"]) == (DRAFTER, SIFTER)
+    assert head["places"]["file"] == PLACES.name
+    assert head["places"]["sha256"] != file_digest(PLACES)
+    assert head["review"]["sha256"] != file_digest(REVIEW)
+    assert head["questions"] == {
+        "file": REHEARSAL.name,
+        "sha256": file_digest(REHEARSAL),
+        "questions": 7,
+    }
+    assert (head["per_cell"], head["parser_version"]) == (REHEARSAL_PER_KIND, PARSER) == (2, "5")
+    assert head["code"] == main["code"]
+    assert f"{moment(head['made']):%Y-%m-%d %H:%M}" == "2026-11-28 08:23"
+    assert moment(head["made"]) > moment(main["made"])
+
+    # Papers of the first evaluation, which have no archive here and no place in the walk
+    # of the evaluation: none of them is a paper of the sample.
+    tuned_on = {
+        line.strip()
+        for line in TUNED_ON.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+    papers = {line["paper"] for line in found}
+    assert papers <= tuned_on and len(papers) == 11
+    assert not papers & {paper.arxiv_id for paper in sample().papers}
+    assert {line["archive"] for line in found} == {""}
+    assert [line["number"] for line in found] == list(range(1, 28))
+    assert {line["kind"] for line in found} == {LATER_PIECE, APPENDIX, OWN_TEXT, NAMED_FIRST}
+    for line in found:
+        assert set(line) - {"search"} == CANDIDATE_KEYS
+        passing = [draft["draft"] for draft in line["drafts"] if passes(draft)]
+        assert line["kept_draft"] == (passing[0] if passing else None)
+
+    # What Section 8 of the pre-registration says of that round, which the repository
+    # could not count before this file was in it.
+    counted = counts_of(found)
+    assert {name: total[name] for name in counted} == counted
+    none = counted["with_drafts"] - counted["kept"]
+    assert (
+        f"It had {counted['places']} places on {len(papers)} papers: in "
+        f"{counted['nothing_to_ask']} the reply said that the part holds nothing to ask about, "
+        f"in {none} no draft passed, and {counted['kept']} kept a draft" in said
+    )
+    assert f"The maintainer accepted {counted['accepted']} of the {counted['kept']}." in said
+    accepted = Counter(line["kind"] for line in found if line["verdict"] == ACCEPT)
+    assert accepted == {OWN_TEXT: 3, NAMED_FIRST: 5}
+    assert (
+        "No draft of `later_piece` or `appendix` was accepted in that round, so its eight "
+        "accepted drafts give seven questions: two of the three `own_text` drafts and all five "
+        "`named_first` drafts." in said
+    )
+    assert (counted["accepted"], total["questions"]) == (8, 7)
+    assert [line["why_rejected"] for line in found if line["verdict"] == REJECT] == ["other"] * 3
+    assert f"{total['cost']:.2f}" == "3.76"
+
+
+def test_the_questions_of_the_rehearsal_are_what_the_rule_makes_with_two_of_a_kind():
+    found = of_the_round()
+    asked = [line for line in found if line["question"]]
+    accepted = [line for line in found if line["verdict"] == ACCEPT]
+    names = ("number", "archive", "rank", "paper", "kind", "section", "start", "end")
+    looked = {line["paper"]: line["search"] for line in found if "search" in line}
+    asked_of = []
+
+    def findable(paper):
+        # A paper that the rule asks about and the file holds no look-up of is an error.
+        asked_of.append(paper)
+        return looked[paper]["findable"]
+
+    chosen = choose(
+        [Placed(*(line[name] for name in names)) for line in accepted], REHEARSAL_PER_KIND, findable
+    )
+    assert [(x.place.number, x.kind, x.fill) for x in chosen] == [
+        (line["number"], line["asked_as"], line["fill"]) for line in asked
+    ]
+    # The rule asked about the papers of the accepted named_first drafts one after the
+    # other and stopped at the second that a search found: the file holds those look-ups.
+    assert asked_of == list(looked) and len(looked) == 2
+    assert all(
+        search == {"findable": True, "latest": True, "rank": 1, "problem": None}
+        for search in looked.values()
+    )
+    assert [line["question"] for line in asked] == [f"rehearsal-{at:02d}" for at in range(1, 8)]
+    assert Counter(line["asked_as"] for line in asked) == {
+        OWN_TEXT: 2,
+        SEARCH_FIRST: 2,
+        NAMED_FIRST: 3,
+    }
+    # A draft that is asked by the title of its paper is a draft of a named_first place.
+    assert {line["kind"] for line in asked if line["asked_as"] == SEARCH_FIRST} == {NAMED_FIRST}
+    assert [line["asked_as"] for line in asked if line["fill"]] == [NAMED_FIRST]
+    left = [line["kind"] for line in accepted if not line["question"]]
+    assert left == [OWN_TEXT]
+
+    questions = load_questions(REHEARSAL)
+    by_name = {line["question"]: line for line in asked}
+    assert [question.id for question in questions] == list(by_name)
+    for question in questions:
+        line = by_name[question.id]
+        (evidence,) = question.evidence
+        assert (question.type, question.gold_papers) == (line["asked_as"], (line["paper"],))
+        assert (evidence.arxiv_id, evidence.section_id) == (line["paper"], line["section"])
+        # A paper of the tuning has no archive, and its question names none.
+        assert question.notes == {
+            "kind": line["asked_as"],
+            "place": f"{line['section']} {line['start']}-{line['end']}",
+            "drafted": DRAFTER,
+            "candidate": str(line["number"]),
+            "draft": str(line["kept_draft"]),
+        }
+        assert ANCHOR_CHARS[0] <= len(evidence.anchor) <= ANCHOR_CHARS[1]
+        assert question.answer_key and set(question.answer_key) <= {"numbers", "phrases"}
+        # The identifiers of these papers go back to 2013, with four digits behind the point.
+        named = re.findall(r"\d{4}\.\d{4,5}(?:v\d+)?", question.question)
+        if question.type == SEARCH_FIRST:
+            assert not named and 'he paper titled "' in question.question
+        else:
+            assert named == [line["paper"]] and f"arXiv:{line['paper']}" in question.question
+    # Two questions are about one paper: a paper of the tuning has a place of every kind.
+    about = Counter(question.gold_papers for question in questions)
+    assert sorted(about.values()) == [1, 1, 1, 1, 1, 2]
+    # No question of the rehearsal is a question of the evaluation.
+    assert not {q.gold_papers for q in questions} & {
+        q.gold_papers for q in load_questions(QUESTIONS)
+    }
+
+
+def test_the_first_try_of_the_rehearsal_was_left_without_an_answer_by_arxiv():
+    first, second = rehearsed(FIRST_TRY), rehearsed()
+    looked = [line["search"] for line in of_the_round(FIRST_TRY) if "search" in line]
+
+    # The same records, read by the same code, 80 minutes before.
+    for name in ("places", "drafts", "sift", "review", "per_cell", "parser_version", "code"):
+        assert first[0][name] == second[0][name], name
+    made = [moment(lines[0]["made"]) for lines in (first, second)]
+    assert [f"{each:%Y-%m-%d %H:%M}" for each in made] == ["2026-11-28 07:03", "2026-11-28 08:23"]
+    assert round((made[1] - made[0]).total_seconds() / 60) == 80
+    # arXiv answered no look-up, so the rule went through all five papers and found none.
+    assert len(looked) == 5 and not any(search["findable"] for search in looked)
+    assert all(search["latest"] is None and search["rank"] is None for search in looked)
+    assert Counter(search["problem"] for search in looked) == {"timeout": 2, "upstream_busy": 3}
+    asked = [line for line in of_the_round(FIRST_TRY) if line["question"]]
+    assert Counter(line["asked_as"] for line in asked) == {OWN_TEXT: 2, NAMED_FIRST: 5}
+    # The question file of that try is not kept, and is not the one that is.
+    assert first[0]["questions"]["file"] == REHEARSAL.name
+    assert first[0]["questions"]["sha256"] != file_digest(REHEARSAL)
+    # But for the look-ups and what was asked, the two files say the same of every place.
+    apart = {"search", "question", "asked_as", "fill"}
+    for before, after in zip(of_the_round(FIRST_TRY), of_the_round(), strict=True):
+        assert {name: before[name] for name in before if name not in apart} == {
+            name: after[name] for name in after if name not in apart
+        }
+    assert counts_of(of_the_round(FIRST_TRY)) == counts_of(of_the_round())
+
+
 # --- no text of a paper -------------------------------------------------------------------
 
 
@@ -995,8 +1185,8 @@ def test_the_files_of_the_folder_hold_no_text_of_a_paper():
     # The questions are in eval_data/, with their anchors and the titles that seven of
     # them name. Nothing of them is in a file of this folder: not a question, not an
     # anchor, not a reference answer, not a note.
-    questions = load_questions(QUESTIONS)
-    for path in (SAMPLE, OUTCOMES, PLACES, REVIEW, CANDIDATES):
+    questions = (*load_questions(QUESTIONS), *load_questions(REHEARSAL))
+    for path in (SAMPLE, OUTCOMES, PLACES, REVIEW, CANDIDATES, REHEARSED, FIRST_TRY):
         text = path.read_text(encoding="utf-8")
         for question in questions:
             assert question.question not in text and question.reference_answer not in text
@@ -1074,7 +1264,22 @@ def test_the_readme_of_the_folder_says_what_the_files_are():
     assert f"the verdicts on the {kept} drafts that the checks and the filters left" in head
     assert f"what became of every one of the {len(candidates())} places" in head
     asked = len(load_questions(QUESTIONS))
-    assert f"The questions are in `eval_data/{QUESTIONS.name}`, {asked} of them." in head
+    assert (
+        f"The questions are in `eval_data/{QUESTIONS.name}`, {asked} of them, and those of the "
+        f"rehearsal in `eval_data/{REHEARSAL.name}`." in head
+    )
+    tried = of_the_round()
+    assert (
+        f"the same for the {len(tried)} places of the last round in which the texts of the "
+        f"generator and of the filters were tried, on {len({x['paper'] for x in tried})} papers "
+        "of the first evaluation: `drafting.assemble --rehearsal` wrote it on 2026-11-28 beside "
+        f"the {WORDS[len(load_questions(REHEARSAL))]} questions of the rehearsal" in head
+    )
+    apart = moment(rehearsed()[0]["made"]) - moment(rehearsed(FIRST_TRY)[0]["made"])
+    assert (
+        f"what the same command had written {round(apart.total_seconds() / 60)} minutes before, "
+        "when arXiv answered none of its look-ups" in head
+    )
     # The days of the files are those of their first lines.
     assert {moment(sample().head["drawn"]).date().isoformat()} == {"2026-11-27"}
     assert {moment(review()[0][0]["read"]).date(), moment(summary()[0]["made"]).date()} == {
@@ -1396,6 +1601,69 @@ def test_the_readme_says_which_questions_there_are():
     )
 
 
+def test_the_readme_says_what_the_rehearsal_is_made_of():
+    heading = "The questions of the rehearsal"
+    said, table = said_in(heading), rows(heading)
+    found, head, total = of_the_round(), rehearsed()[0], rehearsed()[-1]
+    asked = [line for line in found if line["question"]]
+    accepted = [line for line in found if line["verdict"] == ACCEPT]
+    papers = len({line["paper"] for line in found})
+
+    assert (
+        f"on {WORDS[len(asked)]} questions about papers of the first evaluation (Section 10 of "
+        "the pre-registration)" in said
+    )
+    assert (
+        f"with the texts as they are now (`{DRAFTER}` and `{SIFTER}`), on {papers} papers of "
+        "the first evaluation" in said
+    )
+    none = total["with_drafts"] - total["kept"]
+    assert (
+        f"That round had {total['places']} places. In {total['nothing_to_ask']} the reply said "
+        f"that the part holds nothing to ask about, in {none} no draft passed everything, and "
+        f"{total['kept']} kept a draft. The maintainer accepted {total['accepted']} of the "
+        f"{total['kept']} and rejected {total['rejected']}, each for another reason (`other`)."
+        in said
+    )
+    assert rehearsed()[-2]["rejected"]["other"] == total["rejected"]
+    assert (
+        f"With two of a kind where the evaluation has four, the {len(accepted)} accepted drafts "
+        f"make {len(asked)} questions:" in said
+    )
+    assert (REHEARSAL_PER_KIND, PER_CELL) == (2, 4)
+    for kind in KINDS:
+        drafts = sum(1 for line in accepted if line["kind"] == kind)
+        questions = sum(1 for line in asked if line["asked_as"] == kind)
+        if kind == SEARCH_FIRST:
+            # No place of the tuning is of this kind, so no draft is.
+            assert not [line for line in found if line["kind"] == kind]
+            drafts = "none: no place of that round is of this kind"
+        assert row(f"`{kind}`", drafts, questions) in table
+    assert len(table) == 2 + len(KINDS)
+    looked = [line["search"] for line in found if "search" in line]
+    assert len(looked) == 2 and all(x["latest"] and x["rank"] == 1 for x in looked)
+    assert (
+        "until two are found by their title. The first two it asked about were: arXiv lists "
+        "each in the version of the round as its latest, and a search for its title lists it "
+        "first." in said
+    )
+    about = Counter(line["paper"] for line in asked)
+    assert sorted(about.values())[-2:] == [1, 2]
+    assert f"Two of the {WORDS[len(asked)]} questions are about one paper" in said
+    first = rehearsed(FIRST_TRY)
+    problems = Counter(
+        line["search"]["problem"] for line in of_the_round(FIRST_TRY) if "search" in line
+    )
+    assert (
+        f"`drafting.assemble --rehearsal` made the file at {hour(head['made'])} on 2026-11-28, "
+        f"by `{ASSEMBLED}` with no file of the repository changed. It had been run once before, "
+        f"at {hour(first[0]['made'])}, and then arXiv answered none of its look-ups: of the "
+        f"{WORDS[sum(problems.values())]} papers it asked about, {WORDS[problems['timeout']]} "
+        f"came back as `timeout` and {WORDS[problems['upstream_busy']]} as `upstream_busy`" in said
+    )
+    assert f"The requests of that round come to ${total['cost']:.2f} at list prices." in said
+
+
 def test_the_sections_that_the_readme_names_are_the_ones_it_means():
     # A number of a section says little by itself: each mention is held to the heading
     # that the pre-registration has under that number.
@@ -1407,7 +1675,13 @@ def test_the_sections_that_the_readme_names_are_the_ones_it_means():
         "by its number in Section 5 of the pre-registration": "Checks by a program",
         "each beside its passage (Section 7 of the pre-registration)": "Review by the maintainer",
         "Section 7 has the maintainer alone read the drafts": "Review by the maintainer",
+        "Section 8 of the pre-registration gives the counts of the places": (
+            "How the texts were made"
+        ),
         "was short of (Section 9 of the pre-registration)": "The question file",
+        "papers of the first evaluation (Section 10 of the pre-registration)": (
+            "Conditions and runs"
+        ),
         "(Section 13 of the pre-registration): the margin of ten points stays": (
             "Hypotheses, and how each is read"
         ),
@@ -1422,8 +1696,8 @@ def test_the_sections_that_the_readme_names_are_the_ones_it_means():
     assert "names the file by it in Sections 9 and 10" in said
     assert (headings()["9"], headings()["10"]) == ("The question file", "Conditions and runs")
     # No other section is named than these.
-    named = set(re.findall(r"Sections? (\d+)", said)) | {"10"}
-    assert named == {"3", "4", "5", "7", "9", "10", "13", "15"}
+    named = set(re.findall(r"Sections? (\d+)", said))
+    assert named == {"3", "4", "5", "7", "8", "9", "10", "13", "15"}
 
 
 def test_the_readme_of_all_results_points_here():
@@ -1436,8 +1710,9 @@ def test_the_readme_of_all_results_points_here():
         f"the {found.count(OK)} that were split was given" in said
     )
     assert (
-        f"Its {len(load_questions(QUESTIONS))} questions are in `eval_data/{QUESTIONS.name}`"
-        in said
+        f"Its {len(load_questions(QUESTIONS))} questions are in `eval_data/{QUESTIONS.name}`, "
+        f"and the {WORDS[len(load_questions(REHEARSAL))]} of its rehearsal in "
+        f"`eval_data/{REHEARSAL.name}`." in said
     )
     assert "No run of it has been made, and nothing there is a result" in said
     day = moment(review()[0][0]["read"]).date().isoformat()
@@ -1468,6 +1743,17 @@ def test_the_rules_for_agents_say_what_is_fixed_and_who_reviewed():
         in rules
     )
     assert "do not run `drafting.assemble` over them again" in rules
+    assert (
+        f"`eval_data/{REHEARSAL.name}` holds the {WORDS[len(load_questions(REHEARSAL))]} "
+        "questions of the rehearsal (Section 10 of the pre-registration), which "
+        "`drafting.assemble --rehearsal` made on 2026-11-28 UTC of the last round of the tuning, "
+        f"and `results/archives/{REHEARSED.name}` what they were made of. Both are fixed, and so "
+        "is the summary of the first try beside them" in rules
+    )
+    assert moment(rehearsed()[0]["made"]).date().isoformat() == "2026-11-28"
+    assert headings()["10"] == "Conditions and runs"
+    assert "Nothing is changed for what these runs show." in flat(PRE_REGISTRATION)
+    assert "Nothing is changed for what the rehearsal shows." in rules
     # The words that stood for the digest are named once more, as what was replaced: in
     # the two sections that hold the digest now.
     assert "One thing was put into Sections 9 and 10 afterwards" in rules

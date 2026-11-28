@@ -160,6 +160,13 @@ works here follows the rules below.
   a key, an anchor or a note, and do not run `drafting.assemble` over them again. No
   question is left out after the file has its digest (Section 14); what is found about a
   question later is written under Deviations, or in the report.
+- `eval_data/questions_rehearsal.jsonl` holds the seven questions of the rehearsal
+  (Section 10 of the pre-registration), which `drafting.assemble --rehearsal` made on
+  2026-11-28 UTC of the last round of the tuning, and
+  `results/archives/rehearsal-candidates.jsonl` what they were made of. Both are fixed,
+  and so is the summary of the first try beside them: the test holds the three by their
+  SHA-256. Nothing is changed for what the rehearsal shows. A command that fails in it is
+  mended, and the change is listed under Deviations.
 
 ## Style
 
